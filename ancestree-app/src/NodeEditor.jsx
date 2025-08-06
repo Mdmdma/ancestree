@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function NodeEditor({ node, onUpdate }) {
+function NodeEditor({ node, onUpdate, onDelete, hasConnections }) {
   const [formData, setFormData] = useState({
     name: '',
     surname: '',
@@ -35,6 +35,17 @@ function NodeEditor({ node, onUpdate }) {
     const newData = { ...formData, [field]: value };
     setFormData(newData);
     onUpdate(node.id, newData);
+  };
+
+  const handleDelete = () => {
+    if (hasConnections) {
+      alert('Diese Person kann nicht gelöscht werden, da sie noch Verbindungen zu anderen Personen hat. Entferne zuerst alle Verbindungen.');
+      return;
+    }
+    
+    if (window.confirm(`Möchtest du "${formData.name} ${formData.surname}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
+      onDelete(node.id);
+    }
   };
 
   const inputStyle = {
@@ -155,6 +166,30 @@ function NodeEditor({ node, onUpdate }) {
         <option value="male">Männlich</option>
         <option value="female">Weiblich</option>
       </select>
+
+      {!hasConnections && (
+        <div style={{ marginTop: '30px', borderTop: '1px solid #666', paddingTop: '20px' }}>
+          <button
+            onClick={handleDelete}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+          >
+            🗑️ Person löschen
+          </button>
+        </div>
+      )}
+
+      
     </div>
   );
 }
