@@ -7,9 +7,12 @@ import {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
+  useUpdateNodeInternals, // Add this import
 } from '@xyflow/react';
 import PersonNode from './PersonNode';
 import NodeEditor from './NodeEditor';
+import PartnerEdge from './PartnerEdge';
+import BloodlineEdge from './BloodlineEdge';
 
 import '@xyflow/react/dist/style.css';
 
@@ -17,11 +20,16 @@ const nodeTypes = {
   person: PersonNode,
 };
 
+const edgeTypes = {
+  partner: PartnerEdge,
+  bloodline: BloodlineEdge,
+};
+
 const initialNodes = [
   {
     id: '0',
     type: 'person',
-    data: { 
+    data: {
       name: 'Moidal',
       surname: 'Erler',
       birthDate: '1950-01-01',
@@ -30,37 +38,66 @@ const initialNodes = [
       city: 'Tux',
       zip: '6293',
       country: 'AT',
-      gender: 'female'
+      phone: '+43 5287 87123', // Add phone number
+      gender: 'female',
+      isSelected: false
     },
     position: { x: 0, y: 50 },
   },
 ];
- 
+
 let id = 1;
 const getId = () => `${id++}`;
 const nodeOrigin = [0.5, 0];
- 
+
 const AddNodeOnEdgeDrop = () => {
   const reactFlowWrapper = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
- 
-  const [nodes, setNodes, onNodesChange] = useNodesState(
-    initialNodes.map(node => ({
-      ...node,
-      data: { ...node.data, isSelected: false }
-    }))
-  );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { screenToFlowPosition } = useReactFlow();
-  
+  const updateNodeInternals = useUpdateNodeInternals(); // Add this hook
+
+  // Strict connection validation
+  const isValidConnection = useCallback((connection) => {
+    const { sourceHandle, targetHandle } = connection;
+
+    console.log('Validating connection:', sourceHandle, '->', targetHandle);
+
+    // Family connections: child handle -> parent handle ONLY
+    if (sourceHandle === 'child' && targetHandle === 'parent') {
+      return true;
+    }
+
+    // Partner connections: partner handles can only connect to other partner handles
+    if ((sourceHandle === 'partner-left' && targetHandle === 'partner-right') ||
+      (sourceHandle === 'partner-right' && targetHandle === 'partner-left')) {
+      return true;
+    }
+
+    // Block all other combinations
+    console.log('Connection blocked:', sourceHandle, '->', targetHandle);
+    return false;
+  }, []);
+
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
-    [],
+    (params) => {
+      console.log('Connection attempt:', params);
+      if (isValidConnection(params)) {
+        // Determine edge type based on handles
+        const edgeType = (params.sourceHandle?.includes('partner') || params.targetHandle?.includes('partner'))
+          ? 'partner'
+          : 'bloodline';
+
+        setEdges((eds) => addEdge({ ...params, type: edgeType }, eds));
+      }
+    },
+    [isValidConnection],
   );
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
-    // Update all nodes to mark which one is selected
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
@@ -71,7 +108,6 @@ const AddNodeOnEdgeDrop = () => {
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
-    // Mark all nodes as not selected
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
@@ -89,42 +125,125 @@ const AddNodeOnEdgeDrop = () => {
       )
     );
   }, [setNodes]);
- 
+
   const onConnectEnd = useCallback(
     (event, connectionState) => {
-      if (!connectionState.isValid) {
-        const newId = getId();
-        const { clientX, clientY } =
-          'changedTouches' in event ? event.changedTouches[0] : event;
-        const newNode = {
-          id: newId,
-          type: 'person',
-          position: screenToFlowPosition({
-            x: clientX,
-            y: clientY,
-          }),
-          data: { 
-            name: `Noa`,
-            surname: `Erler`,
-            birthDate: null,
-            deathDate: null,
-            street: '',
-            city: '',
-            zip: '',
-            country: '',
-            gender: 'male',
-            isSelected: false
-          },
-          origin: [0.5, 0.0],
-        };
+      if (!connectionState.isValid && connectionState.fromNode && connectionState.fromHandle) {
+        try {
+          const newId = getId();
+          const { clientX, clientY } =
+            'changedTouches' in event ? event.changedTouches[0] : event;
+          
+          const sourceHandle = connectionState.fromHandle.id;
+          const sourceNode = connectionState.fromNode;
+          
+          console.log('Creating new node from handle:', sourceHandle);
+          
 
-        setNodes((nds) => nds.concat(newNode));
-        setEdges((eds) =>
-          eds.concat({ id: newId, source: connectionState.fromNode.id, target: newId }),
-        );
+          // Base new node data - inherit from source node
+          const newNodeData = {
+            name: 'Name',
+            surname: sourceNode.data.surname, // Copy surname from source node
+            birthDate: '',
+            deathDate: '',
+            street: sourceNode.data.street || '', // Copy street from source node
+            city: sourceNode.data.city || '',     // Copy city from source node
+            zip: sourceNode.data.zip || '',       // Copy zip from source node
+            country: sourceNode.data.country || '', // Copy country from source node
+            phone: '', 
+            gender: Math.random() > 0.5 ? 'male' : 'female',
+            isSelected: false
+          };      
+
+          // Use the actual drop position instead of fixed positions
+          const newPosition = screenToFlowPosition({ x: clientX, y: clientY });
+          
+          // Only set the name based on connection type, keep the drop position
+          if (sourceHandle === 'parent') {
+            newNodeData.name = 'Elternteil';
+            newPosition.y -= 50; // Adjust position for children
+          } else if (sourceHandle === 'child') {
+            newNodeData.name = 'Kind';
+            
+          } else if (sourceHandle === 'partner-left') {
+            newNodeData.name = 'Partner'; 
+            newPosition.x -= 75; // Adjust position for left partner
+            newPosition.y -= 25
+          } else if (sourceHandle === 'partner-right') {
+            newNodeData.name = 'Partner';
+            newPosition.x += 75; // Adjust position for right partner
+            newPosition.y -= 25; // Adjust position for right partner
+          }
+
+          const newNode = {
+            id: newId,
+            type: 'person',
+            position: newPosition, // Use actual drop position
+            data: newNodeData,
+          };
+
+          // Add the node first
+          setNodes((nds) => [...nds, newNode]);
+
+          // Update node internals to ensure handles are properly registered
+          setTimeout(() => {
+            updateNodeInternals(newId);
+
+            // Then create the edge
+            setTimeout(() => {
+              let newEdge = null;
+
+              if (sourceHandle === 'parent') {
+                newEdge = {
+                  id: `edge-${newId}`,
+                  source: newId,
+                  target: sourceNode.id,
+                  sourceHandle: 'child',
+                  targetHandle: 'parent',
+                  type: 'bloodline'
+                };
+              } else if (sourceHandle === 'child') {
+                newEdge = {
+                  id: `edge-${newId}`,
+                  source: sourceNode.id,
+                  target: newId,
+                  sourceHandle: 'child',
+                  targetHandle: 'parent',
+                  type: 'bloodline'
+                };
+              } else if (sourceHandle === 'partner-left') {
+                newEdge = {
+                  id: `edge-${newId}`,
+                  source: sourceNode.id,
+                  target: newId,
+                  sourceHandle: 'partner-left',
+                  targetHandle: 'partner-right',
+                  type: 'partner'
+                };
+              } else if (sourceHandle === 'partner-right') {
+                newEdge = {
+                  id: `edge-${newId}`,
+                  source: newId,
+                  target: sourceNode.id,
+                  sourceHandle: 'partner-left',
+                  targetHandle: 'partner-right',
+                  type: 'partner'
+                };
+              }
+
+              if (newEdge) {
+                console.log('Creating edge:', newEdge);
+                setEdges((eds) => [...eds, newEdge]);
+              }
+            }, 25);
+          }, 25);
+
+        } catch (error) {
+          console.error('Error creating new node:', error);
+        }
       }
     },
-    [screenToFlowPosition],
+    [screenToFlowPosition, setNodes, setEdges, updateNodeInternals],
   );
 
   return (
@@ -146,6 +265,8 @@ const AddNodeOnEdgeDrop = () => {
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            isValidConnection={isValidConnection}
             fitView
             fitViewOptions={{ padding: 2 }}
             nodeOrigin={nodeOrigin}
@@ -154,23 +275,31 @@ const AddNodeOnEdgeDrop = () => {
           </ReactFlow>
         </div>
       </div>
-      
+
       {/* Right panel for node editing */}
-      <div style={{ 
-        width: '300px', 
-        borderLeft: '1px solid #ccc', 
+      <div style={{
+        width: '300px',
+        borderLeft: '1px solid #ccc',
         backgroundColor: '#09380dff',
         padding: '20px'
       }}>
         {selectedNode ? (
-          <NodeEditor 
-            node={selectedNode} 
+          <NodeEditor
+            node={selectedNode}
             onUpdate={updateNodeData}
           />
         ) : (
-          <div>
-            <h3>Select a node to edit</h3>
-            <p>Click on any person node to edit their information.</p>
+          <div style={{ color: 'white' }}>
+            <h3>Wähle eine Person</h3>
+            <p>Klicke auf eine beliebige Person, um ihre Informationen zu bearbeiten.</p>
+            <p>Ziehe von einem farbigen Punkt ins leere, um eine neue Person hinzuzufügen.</p>
+            <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
+              <h4>Verbindungsregeln:</h4>
+              <p>🔴 Rot (oben): Eltern hinzufügen</p>
+              <p>🟠 Orange (unten): Kinder hinzufügen</p>
+              <p>🔵 Blau (links/rechts): Partner hinzufügen</p>
+              <br />             
+            </div>
           </div>
         )}
       </div>
@@ -178,8 +307,10 @@ const AddNodeOnEdgeDrop = () => {
   );
 }
 
-export default () => (
+const App = () => (
   <ReactFlowProvider>
     <AddNodeOnEdgeDrop />
   </ReactFlowProvider>
 );
+
+export default App;

@@ -1,6 +1,4 @@
-import { IconButton } from "@chakra-ui/react";
 import React from "react";
-import { X } from "react-bootstrap-icons";
 import {
   BezierEdge,
   EdgeLabelRenderer,
@@ -32,22 +30,33 @@ export default function BloodlineEdge(props) {
 
   return (
     <>
-      <BezierEdge {...props} />
+      <BezierEdge {...props} style={{ stroke: 'rgba(233, 42, 9, 1)', strokeWidth: 1 }} />
       <EdgeLabelRenderer>
-        <IconButton
-          aria-label="Delete Edge"
-          position="absolute"
-          icon={<X />}
-          color="red"
-          transform={`translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`}
-          pointerEvents="all"
-          bg="transparent"
-          size="sm"
-          onClick={() =>
-            setEdges((prevEdges) => prevEdges.filter((edge) => edge.id !== id))
-          }
-        />
-      </EdgeLabelRenderer>
-    </>
-  );
-}
+              <button
+                style={{
+                  position: "absolute",
+                  transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+                  pointerEvents: "all",
+                  backgroundColor: "transparent",
+                  color: "red",
+                  border: "none",
+                  width: "12px",
+                  height: "12px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: "1",
+                }}
+                onClick={() =>
+                  setEdges((prevEdges) => prevEdges.filter((edge) => edge.id !== id))
+                }
+              >
+                ×
+              </button>
+            </EdgeLabelRenderer>
+          </>
+        );
+      }

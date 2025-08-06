@@ -3,7 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import CustomHandle from "./CustomHandle";
 
 export default function PersonNode({ data }) {
-  const { name, surname, birthDate, deathDate, street, city, zip, country, gender, isSelected } = data;
+  const { name, surname, birthDate, deathDate, street, city, zip, country, phone, gender, isSelected } = data;
 
   // Format address display
   const formatAddress = () => {
@@ -24,6 +24,7 @@ export default function PersonNode({ data }) {
     return (
       <div
         style={{
+          position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -41,8 +42,50 @@ export default function PersonNode({ data }) {
             {name} {surname}
           </div>
         </div>
-        <CustomHandle type="source" position={Position.Right} />
-        <CustomHandle type="target" position={Position.Left} />
+        
+        {/* Family handles - Top (Parents) and Bottom (Children) */}
+        <CustomHandle 
+          type="target" 
+          position={Position.Top} 
+          id="parent"
+          style={{ 
+            background: '#ff6b6b',
+            width: '12px',
+            height: '12px'
+          }}
+        />
+        <CustomHandle 
+          type="source" 
+          position={Position.Bottom} 
+          id="child"
+          style={{ 
+            background: '#dd7f13ff',
+            width: '12px',
+            height: '12px'
+          }}
+        />
+        
+        {/* Relationship handles - Left and Right (Partners/Spouses) */}
+        <CustomHandle 
+          type="source" 
+          position={Position.Left} 
+          id="partner-left"
+          style={{ 
+            background: '#45b7d1',
+            width: '12px',
+            height: '12px'
+          }}
+        />
+        <CustomHandle 
+          type="target" 
+          position={Position.Right} 
+          id="partner-right"
+          style={{ 
+            background: '#45b7d1',
+            width: '12px',
+            height: '12px'
+          }}
+        />
       </div>
     );
   }
@@ -51,16 +94,17 @@ export default function PersonNode({ data }) {
   return (
     <div
       style={{
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
         borderRadius: '8px',
-        backgroundColor: '#d4edda', // Slightly different color when selected
-        border: '3px solid #28a745', // Green border when selected
+        backgroundColor: '#d4edda',
+        border: '3px solid #09380dff',
         padding: '12px',
         gap: '8px',
         width: '200px',
-        boxShadow: '0 4px 8px rgba(0,0,0,0.2)' // Add shadow when selected
+        boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
@@ -92,8 +136,57 @@ export default function PersonNode({ data }) {
         </div>
       )}
       
-      <CustomHandle type="source" position={Position.Right} />
-      <CustomHandle type="target" position={Position.Left} />
+      {phone && (
+        <div style={{ width: '100%' }}>
+          <div style={{ fontSize: '0.75rem', color: '#888' }}>
+            📞 {phone}
+          </div>
+        </div>
+      )}
+      
+      {/* Family handles - Top (Parents) and Bottom (Children) */}
+      <CustomHandle 
+        type="target" 
+        position={Position.Top} 
+        id="parent"
+        style={{ 
+          background: '#ff6b6b',
+          width: '12px',
+          height: '12px'
+        }}
+      />
+      <CustomHandle 
+        type="source" 
+        position={Position.Bottom} 
+        id="child"
+        style={{ 
+          background: '#dd7f13ff',
+          width: '12px',
+          height: '12px'
+        }}
+      />
+      
+      {/* Relationship handles - Left and Right (Partners/Spouses) */}
+      <CustomHandle 
+        type="source" 
+        position={Position.Left} 
+        id="partner-left"
+        style={{ 
+          background: '#45b7d1',
+          width: '12px',
+          height: '12px'
+        }}
+      />
+      <CustomHandle 
+        type="target" 
+        position={Position.Right} 
+        id="partner-right"
+        style={{ 
+          background: '#45b7d1',
+          width: '12px',
+          height: '12px'
+        }}
+      />
     </div>
   );
 }

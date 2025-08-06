@@ -10,6 +10,7 @@ function NodeEditor({ node, onUpdate }) {
     city: '',
     zip: '',
     country: '',
+    phone: '',
     gender: 'male'
   });
 
@@ -24,6 +25,7 @@ function NodeEditor({ node, onUpdate }) {
         city: node.data.city || '',
         zip: node.data.zip || '',
         country: node.data.country || '',
+        phone: node.data.phone || '',
         gender: node.data.gender || 'male'
       });
     }
@@ -91,6 +93,15 @@ function NodeEditor({ node, onUpdate }) {
         value={formData.deathDate}
         onChange={(e) => handleInputChange('deathDate', e.target.value || null)}
         style={inputStyle}
+      />
+
+      <label style={labelStyle}>Telefon:</label>
+      <input
+        type="tel"
+        value={formData.phone}
+        onChange={(e) => handleInputChange('phone', e.target.value)}
+        style={inputStyle}
+        placeholder="z.B. +43 5287 87123"
       />
 
       <label style={labelStyle}>Straße:</label>
