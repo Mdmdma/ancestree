@@ -14,6 +14,8 @@ import PersonNode from './PersonNode';
 import NodeEditor from './NodeEditor';
 import PartnerEdge from './PartnerEdge';
 import BloodlineEdge from './BloodlineEdge';
+import BloodlineEdgeHidden from './BloodlineEdgeHidden';
+import BloodlineEdgeFake from './BloodlineEdgeFake';
 import { api } from './api';
 
 import '@xyflow/react/dist/style.css';
@@ -25,6 +27,8 @@ const nodeTypes = {
 const edgeTypes = {
   partner: PartnerEdge,
   bloodline: BloodlineEdge,
+  bloodlinehidden: BloodlineEdgeHidden,
+  bloodlinefake: BloodlineEdgeFake,
 };
 
 let id = 1;
@@ -206,7 +210,7 @@ const AddNodeOnEdgeDrop = () => {
       if (!birthDate) return 1940 * 5; // Default year for nodes without birth date, scaled
       
       const birthYear = new Date(birthDate).getFullYear();
-      const minYear = 1850;
+      const minYear = 1700;
       const maxYear = 2050;
       
       // Clamp birth year to our range and scale it for more separation
@@ -219,12 +223,11 @@ const AddNodeOnEdgeDrop = () => {
     // Create ELK instance
     const elk = new ELK();
 
-    // Identify which nodes are on the bloodline (have parent/child relationships)
+    // Identify which nodes are on the bloodline using the node bloodline property
     const bloodlineNodeIds = new Set();
-    edges.forEach(edge => {
-      if (edge.type === 'bloodline') {
-        bloodlineNodeIds.add(edge.source);
-        bloodlineNodeIds.add(edge.target);
+    nodes.forEach(node => {
+      if (node.data.bloodline) {
+        bloodlineNodeIds.add(node.id);
       }
     });
 
@@ -255,17 +258,19 @@ const AddNodeOnEdgeDrop = () => {
       elkNodes: elkNodes,
       partnerCounts: Array.from(partnerCounts.entries()),
       nodeCount: nodes.length,
-      bloodlineNodeCount: bloodlineNodeIds.size,
-      partnerOnlyNodeCount: nodes.length - bloodlineNodeIds.size,
-      edgeCount: edges.filter(e => e.type === 'bloodline').length,
+      bloodlineNodeCount: nodes.filter(n => n.data.bloodline).length,
+      partnerOnlyNodeCount: nodes.filter(n => !n.data.bloodline).length,
+      edgeCount: edges.filter(e => e.type === 'bloodline' || e.type === 'bloodlinehidden').length,
+      fakeEdgeCount: edges.filter(e => e.type === 'bloodlinefake').length,
       partnerEdgeCount: edges.filter(e => e.type === 'partner').length
     });
 
     const elkEdges = [];
     
     // Add bloodline edges for hierarchical structure
+    // Note: bloodlinefake edges are excluded from ELK layout
     edges.forEach(edge => {
-      if (edge.type === 'bloodline') {
+      if (edge.type === 'bloodline' || edge.type === 'bloodlinehidden') {
         if (edge.sourceHandle === 'child' && edge.targetHandle === 'parent') {
           // Parent -> Child direction for proper hierarchy
           elkEdges.push({
@@ -338,7 +343,8 @@ const AddNodeOnEdgeDrop = () => {
           edges.forEach(edge => {
             if (edge.type === 'partner' && (edge.source === node.id || edge.target === node.id)) {
               const partnerId = edge.source === node.id ? edge.target : edge.source;
-              const partnerIsBloodline = bloodlineNodeIds.has(partnerId);
+              const partnerNode = nodes.find(n => n.id === partnerId);
+              const partnerIsBloodline = partnerNode && partnerNode.data.bloodline;
               
               // Only count non-bloodline left partners
               if (!partnerIsBloodline) {
@@ -395,9 +401,9 @@ const AddNodeOnEdgeDrop = () => {
             const targetNode = updatedNodes.find(n => n.id === edge.target);
             
             if (sourceNode && targetNode) {
-              // Determine which node is on the bloodline (has a position from ELK)
-              const sourceIsBloodline = bloodlineNodeIds.has(edge.source);
-              const targetIsBloodline = bloodlineNodeIds.has(edge.target);
+              // Determine which node is on the bloodline using node properties
+              const sourceIsBloodline = sourceNode.data.bloodline;
+              const targetIsBloodline = targetNode.data.bloodline;
               
               let bloodlineNode, partnerNode;
               let isLeftPartner;
@@ -446,23 +452,24 @@ const AddNodeOnEdgeDrop = () => {
       // Handle multiple partners for bloodline nodes
       const processedMultiPartners = new Set();
       
-      Array.from(bloodlineNodeIds).forEach(nodeId => {
-        if (!processedMultiPartners.has(nodeId)) {
-          processedMultiPartners.add(nodeId);
+      nodes.forEach(node => {
+        if (node.data.bloodline && !processedMultiPartners.has(node.id)) {
+          processedMultiPartners.add(node.id);
           
           // Find all partners of this bloodline node
           const leftPartners = [];
           const rightPartners = [];
           
           edges.forEach(edge => {
-            if (edge.type === 'partner' && (edge.source === nodeId || edge.target === nodeId)) {
-              const partnerId = edge.source === nodeId ? edge.target : edge.source;
-              const partnerIsBloodline = bloodlineNodeIds.has(partnerId);
+            if (edge.type === 'partner' && (edge.source === node.id || edge.target === node.id)) {
+              const partnerId = edge.source === node.id ? edge.target : edge.source;
+              const partnerNode = nodes.find(n => n.id === partnerId);
+              const partnerIsBloodline = partnerNode && partnerNode.data.bloodline;
               
               // Only position non-bloodline partners (bloodline partners are handled above)
               if (!partnerIsBloodline) {
-                const isLeftPartner = (edge.source === nodeId && edge.sourceHandle === 'partner-left') ||
-                                     (edge.target === nodeId && edge.targetHandle === 'partner-left');
+                const isLeftPartner = (edge.source === node.id && edge.sourceHandle === 'partner-left') ||
+                                     (edge.target === node.id && edge.targetHandle === 'partner-left');
                 
                 if (isLeftPartner) {
                   leftPartners.push(partnerId);
@@ -473,7 +480,7 @@ const AddNodeOnEdgeDrop = () => {
             }
           });
           
-          const bloodlineNode = updatedNodes.find(n => n.id === nodeId);
+          const bloodlineNode = updatedNodes.find(n => n.id === node.id);
           if (bloodlineNode && (leftPartners.length > 0 || rightPartners.length > 0)) {
             const nodeWidth = 200;
             const partnerSpacing = nodeWidth + 20;
@@ -565,21 +572,108 @@ const AddNodeOnEdgeDrop = () => {
   const onConnect = useCallback(
     async (params) => {
       if (isValidConnection(params)) {
-        const edgeType = (params.sourceHandle?.includes('partner') || params.targetHandle?.includes('partner')) 
-          ? 'partner' 
-          : 'bloodline';
+        // Check if this is a partner connection
+        const isPartnerConnection = params.sourceHandle?.includes('partner') || params.targetHandle?.includes('partner');
         
-        const newEdge = { ...params, type: edgeType };
-        
-        try {
-          await api.createEdge(newEdge);
-          setEdges((eds) => addEdge(newEdge, eds));
-        } catch (error) {
-          console.error('Failed to create edge:', error);
+        if (isPartnerConnection) {
+          // Regular partner edge
+          const newEdge = { ...params, type: 'partner' };
+          
+          try {
+            await api.createEdge(newEdge);
+            setEdges((eds) => addEdge(newEdge, eds));
+          } catch (error) {
+            console.error('Failed to create edge:', error);
+          }
+        } else {
+          // This is a parent-child connection, check if source is a non-bloodline partner
+          const sourceNode = nodes.find(n => n.id === params.source);
+          const targetNode = nodes.find(n => n.id === params.target);
+          
+          if (sourceNode && targetNode) {
+            // Function to find bloodline partner of a given node
+            const findBloodlinePartner = (nodeId) => {
+              for (const edge of edges) {
+                if (edge.type === 'partner') {
+                  if (edge.source === nodeId) {
+                    const targetNode = nodes.find(n => n.id === edge.target);
+                    if (targetNode && targetNode.data.bloodline) {
+                      return edge.target;
+                    }
+                  } else if (edge.target === nodeId) {
+                    const sourceNode = nodes.find(n => n.id === edge.source);
+                    if (sourceNode && sourceNode.data.bloodline) {
+                      return edge.source;
+                    }
+                  }
+                }
+              }
+              return null;
+            };
+            
+            let edgesToCreate = [];
+            
+            // Check if source is a non-bloodline partner connecting to a child/parent
+            if (!sourceNode.data.bloodline && (params.sourceHandle === 'child' || params.targetHandle === 'parent')) {
+              // Source is partner node connecting as parent/child - create fake edge
+              edgesToCreate.push({
+                ...params,
+                type: 'bloodlinefake'
+              });
+              
+              // Find bloodline partner and create hidden edge
+              const bloodlinePartner = findBloodlinePartner(sourceNode.id);
+              if (bloodlinePartner) {
+                edgesToCreate.push({
+                  id: `edge-hidden-${params.source}-${params.target}`,
+                  source: params.sourceHandle === 'child' ? bloodlinePartner : bloodlinePartner,
+                  target: params.sourceHandle === 'child' ? params.target : params.target,
+                  sourceHandle: params.sourceHandle,
+                  targetHandle: params.targetHandle,
+                  type: 'bloodlinehidden'
+                });
+              }
+            } else if (!targetNode.data.bloodline && (params.sourceHandle === 'child' || params.targetHandle === 'parent')) {
+              // Target is partner node - create fake edge  
+              edgesToCreate.push({
+                ...params,
+                type: 'bloodlinefake'
+              });
+              
+              // Find bloodline partner and create hidden edge
+              const bloodlinePartner = findBloodlinePartner(targetNode.id);
+              if (bloodlinePartner) {
+                edgesToCreate.push({
+                  id: `edge-hidden-${params.source}-${params.target}`,
+                  source: params.targetHandle === 'parent' ? params.source : params.source,
+                  target: params.targetHandle === 'parent' ? bloodlinePartner : bloodlinePartner,
+                  sourceHandle: params.sourceHandle,
+                  targetHandle: params.targetHandle,
+                  type: 'bloodlinehidden'
+                });
+              }
+            } else {
+              // Regular bloodline connection
+              edgesToCreate.push({
+                ...params,
+                type: 'bloodline'
+              });
+            }
+            
+            // Create all edges
+            for (const edge of edgesToCreate) {
+              try {
+                await api.createEdge(edge);
+                setEdges((eds) => addEdge(edge, eds));
+              } catch (error) {
+                console.error('Failed to create edge:', error);
+              }
+            }
+          }
         }
       }
     },
-    [isValidConnection, setEdges],
+    [isValidConnection, setEdges, nodes, edges],
   );
 
   const onNodeClick = useCallback((event, node) => {
@@ -663,7 +757,8 @@ const AddNodeOnEdgeDrop = () => {
             phone: sourceNode.data.phone || '',
             gender: Math.random() > 0.5 ? 'male' : 'female',
             numberOfPartners: 0, // Track number of partners for sizing
-            isSelected: false
+            isSelected: false,
+            bloodline: !sourceHandle.includes('partner') // true for parent/child handles, false for partner handles
           };
 
           const newPosition = screenToFlowPosition({ x: clientX, y: clientY });
@@ -706,50 +801,127 @@ const AddNodeOnEdgeDrop = () => {
             updateNodeInternals(newId);
             
             setTimeout(async () => {
-              let newEdge = null;
+              let newEdges = []; // Array to hold multiple edges
               
+              // Function to check if a node is on the bloodline using the node property
+              const isBloodlineNode = (nodeId) => {
+                const node = nodes.find(n => n.id === nodeId);
+                return node ? node.data.bloodline : false;
+              };
+
+              // Function to find bloodline partner of a given node using node properties
+              const findBloodlinePartner = (nodeId) => {
+                for (const edge of edges) {
+                  if (edge.type === 'partner') {
+                    if (edge.source === nodeId) {
+                      const targetNode = nodes.find(n => n.id === edge.target);
+                      if (targetNode && targetNode.data.bloodline) {
+                        return edge.target;
+                      }
+                    } else if (edge.target === nodeId) {
+                      const sourceNode = nodes.find(n => n.id === edge.source);
+                      if (sourceNode && sourceNode.data.bloodline) {
+                        return edge.source;
+                      }
+                    }
+                  }
+                }
+                return null;
+              };
+
               if (sourceHandle === 'parent') {
-                newEdge = {
-                  id: `edge-${newId}`,
-                  source: newId,
-                  target: sourceNode.id,
-                  sourceHandle: 'child',
-                  targetHandle: 'parent',
-                  type: 'bloodline'
-                };
+                if (sourceNode.data.bloodline) {
+                  // Source is bloodline node - create normal bloodline edge
+                  newEdges.push({
+                    id: `edge-${newId}`,
+                    source: newId,
+                    target: sourceNode.id,
+                    sourceHandle: 'child',
+                    targetHandle: 'parent',
+                    type: 'bloodline'
+                  });
+                } else {
+                  // Source is partner node - create fake edge and hidden edge to bloodline partner
+                  newEdges.push({
+                    id: `edge-${newId}`,
+                    source: newId,
+                    target: sourceNode.id,
+                    sourceHandle: 'child',
+                    targetHandle: 'parent',
+                    type: 'bloodlinefake'
+                  });
+                  
+                  const bloodlinePartner = findBloodlinePartner(sourceNode.id);
+                  if (bloodlinePartner) {
+                    newEdges.push({
+                      id: `edge-hidden-${newId}`,
+                      source: newId,
+                      target: bloodlinePartner,
+                      sourceHandle: 'child',
+                      targetHandle: 'parent',
+                      type: 'bloodlinehidden'
+                    });
+                  }
+                }
               } else if (sourceHandle === 'child') {
-                newEdge = {
-                  id: `edge-${newId}`,
-                  source: sourceNode.id,
-                  target: newId,
-                  sourceHandle: 'child',
-                  targetHandle: 'parent',
-                  type: 'bloodline'
-                };
+                if (sourceNode.data.bloodline) {
+                  // Source is bloodline node - create normal bloodline edge
+                  newEdges.push({
+                    id: `edge-${newId}`,
+                    source: sourceNode.id,
+                    target: newId,
+                    sourceHandle: 'child',
+                    targetHandle: 'parent',
+                    type: 'bloodline'
+                  });
+                } else {
+                  // Source is partner node - create fake edge and hidden edge to bloodline partner
+                  newEdges.push({
+                    id: `edge-${newId}`,
+                    source: sourceNode.id,
+                    target: newId,
+                    sourceHandle: 'child',
+                    targetHandle: 'parent',
+                    type: 'bloodlinefake'
+                  });
+                  
+                  const bloodlinePartner = findBloodlinePartner(sourceNode.id);
+                  if (bloodlinePartner) {
+                    newEdges.push({
+                      id: `edge-hidden-${newId}`,
+                      source: bloodlinePartner,
+                      target: newId,
+                      sourceHandle: 'child',
+                      targetHandle: 'parent',
+                      type: 'bloodlinehidden'
+                    });
+                  }
+                }
               } else if (sourceHandle === 'partner-left') {
-                newEdge = {
+                newEdges.push({
                   id: `edge-${newId}`,
                   source: sourceNode.id,
                   target: newId,
                   sourceHandle: 'partner-left',
                   targetHandle: 'partner-right',
                   type: 'partner'
-                };
+                });
               } else if (sourceHandle === 'partner-right') {
-                newEdge = {
+                newEdges.push({
                   id: `edge-${newId}`,
                   source: newId,
                   target: sourceNode.id,
                   sourceHandle: 'partner-left',
                   targetHandle: 'partner-right',
                   type: 'partner'
-                };
+                });
               }
 
-              if (newEdge) {
+              // Create all edges
+              for (const edge of newEdges) {
                 try {
-                  await api.createEdge(newEdge);
-                  setEdges((eds) => [...eds, newEdge]);
+                  await api.createEdge(edge);
+                  setEdges((eds) => [...eds, edge]);
                 } catch (error) {
                   console.error('Failed to create edge:', error);
                 }
@@ -762,7 +934,7 @@ const AddNodeOnEdgeDrop = () => {
         }
       }
     },
-    [screenToFlowPosition, setNodes, setEdges, updateNodeInternals],
+    [screenToFlowPosition, setNodes, setEdges, updateNodeInternals, nodes, edges],
   );
 
   if (loading) {
@@ -899,7 +1071,8 @@ const AddNodeOnEdgeDrop = () => {
                     <div>Total Nodes: {debugInfo.nodeCount}</div>
                     <div>Bloodline Nodes (in ELK): {debugInfo.bloodlineNodeCount}</div>
                     <div>Partner-only Nodes: {debugInfo.partnerOnlyNodeCount}</div>
-                    <div>Bloodline Edges: {debugInfo.edgeCount}</div>
+                    <div>Bloodline Edges (for layout): {debugInfo.edgeCount}</div>
+                    <div>Fake Bloodline Edges (ignored): {debugInfo.fakeEdgeCount}</div>
                     <div>Partner Edges: {debugInfo.partnerEdgeCount}</div>
                   </div>
                   

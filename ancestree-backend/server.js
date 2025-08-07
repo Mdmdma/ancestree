@@ -71,6 +71,7 @@ app.get('/api/nodes', (req, res) => {
         country: row.country,
         phone: row.phone,
         gender: row.gender,
+        bloodline: Boolean(row.bloodline),
         isSelected: false
       }
     }));
@@ -106,10 +107,11 @@ app.post('/api/nodes', (req, res) => {
   
   db.run(`INSERT INTO nodes (
     id, type, position_x, position_y, name, surname, birth_date, death_date,
-    street, city, zip, country, phone, gender
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    street, city, zip, country, phone, gender, bloodline
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     id, type, position.x, position.y, data.name, data.surname, data.birthDate,
-    data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender
+    data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender,
+    data.bloodline ? 1 : 0
   ], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -127,10 +129,11 @@ app.put('/api/nodes/:id', (req, res) => {
   db.run(`UPDATE nodes SET 
     position_x = ?, position_y = ?, name = ?, surname = ?, birth_date = ?,
     death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?, gender = ?,
-    updated_at = CURRENT_TIMESTAMP
+    bloodline = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?`, [
     position?.x, position?.y, data.name, data.surname, data.birthDate,
-    data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender, id
+    data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender,
+    data.bloodline ? 1 : 0, id
   ], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
