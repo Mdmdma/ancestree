@@ -922,7 +922,7 @@ const AddNodeOnEdgeDrop = () => {
             city: sourceNode.data.city || '',
             zip: sourceNode.data.zip || '',
             country: sourceNode.data.country || '',
-            phone: sourceNode.data.phone || '',
+            phone: '',
             gender: Math.random() > 0.5 ? 'male' : 'female',
             numberOfPartners: 0, // Track number of partners for sizing
             isSelected: false,
