@@ -26,7 +26,7 @@ export default function BloodlineEdgeFake(props) {
   // Debug mode: yellow
   const edgeColor = isDebugMode ? 'rgba(255, 235, 59, 1)' : 'rgba(233, 42, 9, 1)'; // Yellow in debug, red in normal
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     targetX,

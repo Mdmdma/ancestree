@@ -45,7 +45,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(edge)
     });
-    return response.json();
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to create edge');
+    }
+    
+    return result;
   },
 
   async deleteEdge(id) {
@@ -68,6 +75,83 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/cleanup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
+    });
+    return response.json();
+  },
+
+  // Image operations
+  async uploadImage(file, description = '', uploadedBy = 'anonymous') {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('description', description);
+    formData.append('uploaded_by', uploadedBy);
+
+    const response = await fetch(`${API_BASE_URL}/images/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    return response.json();
+  },
+
+  async loadImages() {
+    const response = await fetch(`${API_BASE_URL}/images`);
+    return response.json();
+  },
+
+  async getImage(id) {
+    const response = await fetch(`${API_BASE_URL}/images/${id}`);
+    return response.json();
+  },
+
+  async updateImageDescription(id, description) {
+    const response = await fetch(`${API_BASE_URL}/images/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description })
+    });
+    return response.json();
+  },
+
+  async deleteImage(id) {
+    const response = await fetch(`${API_BASE_URL}/images/${id}`, {
+      method: 'DELETE'
+    });
+    return response.json();
+  },
+
+  // Image-person associations
+  async tagPersonInImage(imageId, personId, positionX = null, positionY = null, width = null, height = null) {
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/people`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        personId, 
+        positionX, 
+        positionY, 
+        width, 
+        height 
+      })
+    });
+    return response.json();
+  },
+
+  async removePersonFromImage(imageId, personId) {
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/people/${personId}`, {
+      method: 'DELETE'
+    });
+    return response.json();
+  },
+
+  async updatePersonPositionInImage(imageId, personId, positionX, positionY, width, height) {
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/people/${personId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        positionX, 
+        positionY, 
+        width, 
+        height 
+      })
     });
     return response.json();
   }

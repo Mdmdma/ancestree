@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = false, nodes = [], edges = [] }) {
+function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = false, edges = [] }) {
   const [formData, setFormData] = useState({
     name: '',
     surname: '',

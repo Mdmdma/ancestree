@@ -26,7 +26,7 @@ export default function BloodlineEdgeHidden(props) {
   // Debug mode: orange
   const edgeColor = isDebugMode ? 'rgba(255, 152, 0, 1)' : 'rgba(0, 0, 0, 0.1)'; // Orange in debug, transparent in normal
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     targetX,

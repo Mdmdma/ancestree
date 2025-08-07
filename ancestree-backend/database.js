@@ -40,6 +40,37 @@ db.serialize(() => {
     FOREIGN KEY (target) REFERENCES nodes (id) ON DELETE CASCADE
   )`);
 
+  // Images table
+  db.run(`CREATE TABLE IF NOT EXISTS images (
+    id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    original_filename TEXT NOT NULL,
+    s3_key TEXT NOT NULL,
+    s3_url TEXT NOT NULL,
+    description TEXT,
+    upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    file_size INTEGER,
+    mime_type TEXT,
+    uploaded_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Image people associations table (many-to-many relationship)
+  db.run(`CREATE TABLE IF NOT EXISTS image_people (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_id TEXT NOT NULL,
+    person_id TEXT NOT NULL,
+    position_x REAL,
+    position_y REAL,
+    width REAL,
+    height REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
+    FOREIGN KEY (person_id) REFERENCES nodes (id) ON DELETE CASCADE,
+    UNIQUE(image_id, person_id)
+  )`);
+
   // Insert initial data if empty
   db.get("SELECT COUNT(*) as count FROM nodes", (err, row) => {
     if (row.count === 0) {

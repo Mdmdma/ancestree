@@ -15,16 +15,14 @@ export default function PartnerEdge(props) {
     targetY,
     sourcePosition,
     targetPosition,
-    data,
   } = props;
 
   const { setEdges } = useReactFlow();
-  const isDebugMode = data?.isDebugMode || false;
 
-  // Partner edges stay green in both normal and debug modes
-  const edgeColor = '#4ecdc4'; // Green in both modes
+  // Partner edges stay green
+  const edgeColor = '#4ecdc4';
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     targetX,

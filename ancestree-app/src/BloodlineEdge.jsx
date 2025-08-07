@@ -15,18 +15,14 @@ export default function BloodlineEdge(props) {
     targetY,
     sourcePosition,
     targetPosition,
-    data,
   } = props;
 
   const { setEdges } = useReactFlow();
-  const isDebugMode = data?.isDebugMode || false;
 
-  // Color logic based on debug mode
-  // Normal mode: red for both normal and fake bloodline edges
-  // Debug mode: red for normal bloodline edges
-  const edgeColor = 'rgba(233, 42, 9, 1)'; // Red in both modes
+  // Color logic: red for bloodline edges
+  const edgeColor = 'rgba(233, 42, 9, 1)';
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     targetX,

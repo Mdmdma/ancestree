@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   Background,
   ReactFlow,
@@ -12,6 +12,7 @@ import {
 import ELK from 'elkjs/lib/elk.bundled.js';
 import PersonNode from './PersonNode';
 import NodeEditor from './NodeEditor';
+import ImageGallery from './ImageGallery';
 import PartnerEdge from './PartnerEdge';
 import BloodlineEdge from './BloodlineEdge';
 import BloodlineEdgeHidden from './BloodlineEdgeHidden';
@@ -71,11 +72,11 @@ const calculateBirthDate = (sourceNode, relationshipType) => {
 };
 
 const AddNodeOnEdgeDrop = () => {
-  const reactFlowWrapper = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [activeTab, setActiveTab] = useState('editor'); // 'editor' or 'images'
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -259,10 +260,6 @@ const AddNodeOnEdgeDrop = () => {
         };
       });
 
-    // Debug: Log ELK nodes structure
-    console.log('ELK Nodes for debugging:', elkNodes);
-    console.log('Partner counts:', Array.from(partnerCounts.entries()));
-
     // Store debug info for UI display
     setDebugInfo({
       elkNodes: elkNodes,
@@ -330,15 +327,8 @@ const AddNodeOnEdgeDrop = () => {
     };
 
     try {
-      // Debug: Log complete ELK graph structure
-      console.log('Complete ELK graph structure:', graph);
-      
       // Run ELK layout
       const layoutedGraph = await elk.layout(graph);
-      
-      // Debug: Log layout results
-      console.log('ELK layout results:', layoutedGraph);
-      console.log('Layouted nodes with positions:', layoutedGraph.children);
       
       // Apply ELK X coordinates to bloodline nodes and override Y coordinates with birth year positioning
       const updatedNodes = nodes.map((node) => {
@@ -577,7 +567,7 @@ const AddNodeOnEdgeDrop = () => {
     }
     
     return false;
-  }, []);
+  }, [edges]);
 
   const onConnect = useCallback(
     async (params) => {
@@ -614,54 +604,54 @@ const AddNodeOnEdgeDrop = () => {
                 )
               );
 
-              // Convert all existing bloodline edges of this node to fake bloodline edges
-              const targetNodeBloodlineEdges = edges.filter(edge => 
-                (edge.source === params.target || edge.target === params.target) && 
-                edge.type === 'bloodline'
-              );
+                // Convert all existing bloodline edges of this node to fake bloodline edges
+                const targetNodeBloodlineEdges = edges.filter(edge => 
+                  (edge.source === params.target || edge.target === params.target) && 
+                  edge.type === 'bloodline'
+                );
 
-              for (const edge of targetNodeBloodlineEdges) {
-                try {
-                  // Delete the old bloodline edge
-                  await api.deleteEdge(edge.id);
-                  
-                  // Create a new fake bloodline edge with the same properties
-                  const fakeEdge = {
-                    ...edge,
-                    id: `fake-${edge.id}`,
-                    type: 'bloodlinefake',
-                    data: { isDebugMode: showDebug }
-                  };
-                  
-                  await api.createEdge(fakeEdge);
-                  
-                  // Update the edges state
-                  setEdges((eds) => 
-                    eds.map(e => e.id === edge.id ? fakeEdge : e)
-                  );
-                } catch (error) {
-                  console.error('Failed to convert bloodline edge to fake:', error);
+                for (const edge of targetNodeBloodlineEdges) {
+                  try {
+                    // Delete the old bloodline edge
+                    await api.deleteEdge(edge.id);
+                    
+                    // Create a new fake bloodline edge with the same properties
+                    const fakeEdge = {
+                      ...edge,
+                      id: `fake-${edge.id}`,
+                      type: 'bloodlinefake',
+                      data: { isDebugMode: showDebug }
+                    };
+                    
+                    await api.createEdge(fakeEdge);
+                    
+                    // Update the edges state
+                    setEdges((eds) => 
+                      eds.map(e => e.id === edge.id ? fakeEdge : e)
+                    );
+                  } catch (error) {
+                    console.error('Failed to convert bloodline edge to fake:', error);
+                  }
+                }
+
+                // Remove all hidden bloodline edges connected to this node
+                const targetNodeHiddenEdges = edges.filter(edge => 
+                  (edge.source === params.target || edge.target === params.target) && 
+                  edge.type === 'bloodlinehidden'
+                );
+
+                for (const edge of targetNodeHiddenEdges) {
+                  try {
+                    await api.deleteEdge(edge.id);
+                    setEdges((eds) => eds.filter(e => e.id !== edge.id));
+                  } catch (error) {
+                    console.error('Failed to remove hidden bloodline edge:', error);
+                  }
                 }
               }
-
-              // Remove all hidden bloodline edges connected to this node
-              const targetNodeHiddenEdges = edges.filter(edge => 
-                (edge.source === params.target || edge.target === params.target) && 
-                edge.type === 'bloodlinehidden'
-              );
-
-              for (const edge of targetNodeHiddenEdges) {
-                try {
-                  await api.deleteEdge(edge.id);
-                  setEdges((eds) => eds.filter(e => e.id !== edge.id));
-                } catch (error) {
-                  console.error('Failed to remove hidden bloodline edge:', error);
-                }
-              }
+            } catch (error) {
+              console.error('Failed to create edge:', error);
             }
-          } catch (error) {
-            console.error('Failed to create edge:', error);
-          }
         } else {
           // This is a parent-child connection, check if source is a non-bloodline partner
           const sourceNode = nodes.find(n => n.id === params.source);
@@ -789,6 +779,7 @@ const AddNodeOnEdgeDrop = () => {
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
+    setActiveTab('editor'); // Switch to editor tab when a node is selected
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
@@ -815,7 +806,13 @@ const AddNodeOnEdgeDrop = () => {
       setNodes((nds) =>
         nds.map((node) =>
           node.id === nodeId
-            ? { ...node, data: { ...node.data, ...newData } }
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  ...newData
+                } 
+              }
             : node
         )
       );
@@ -839,7 +836,14 @@ const AddNodeOnEdgeDrop = () => {
       setNodes((nds) =>
         nds.map((node) =>
           node.id === nodeId
-            ? { ...node, data: { ...node.data, ...newData }, position: finalPosition }
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  ...newData
+                }, 
+                position: finalPosition 
+              }
             : node
         )
       );
@@ -902,16 +906,31 @@ const AddNodeOnEdgeDrop = () => {
     return edges.some(edge => edge.source === nodeId || edge.target === nodeId);
   }, [edges]);
 
+  // Handle person selection from image gallery
+  const handlePersonSelectFromGallery = useCallback((personId) => {
+    const person = nodes.find(node => node.id === personId);
+    if (person) {
+      setSelectedNode(person);
+      setActiveTab('editor');
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          data: { ...n.data, isSelected: n.id === personId }
+        }))
+      );
+    }
+  }, [nodes, setNodes]);
+
   const onConnectEnd = useCallback(
     async (event, connectionState) => {
       if (!connectionState.isValid && connectionState.fromNode && connectionState.fromHandle) {
         try {
+          const sourceHandle = connectionState.fromHandle.id;
+          const sourceNode = connectionState.fromNode;
+          
           const newId = getId();
           const { clientX, clientY } =
             'changedTouches' in event ? event.changedTouches[0] : event;
-          
-          const sourceHandle = connectionState.fromHandle.id;
-          const sourceNode = connectionState.fromNode;
           
           const newNodeData = {
             name: 'Neue Person',
@@ -971,12 +990,6 @@ const AddNodeOnEdgeDrop = () => {
             setTimeout(async () => {
               let newEdges = []; // Array to hold multiple edges
               
-              // Function to check if a node is on the bloodline using the node property
-              const isBloodlineNode = (nodeId) => {
-                const node = nodes.find(n => n.id === nodeId);
-                return node ? node.data.bloodline : false;
-              };
-
               // Function to find bloodline partner of a given node using node properties
               const findBloodlinePartner = (nodeId) => {
                 for (const edge of edges) {
@@ -1071,29 +1084,27 @@ const AddNodeOnEdgeDrop = () => {
                     });
                   }
                 }
-              } else if (sourceHandle === 'partner-left') {
-                newEdges.push({
-                  id: `edge-${newId}`,
-                  source: sourceNode.id,
-                  target: newId,
-                  sourceHandle: 'partner-left',
-                  targetHandle: 'partner-right',
-                  type: 'partner',
-                  data: { isDebugMode: showDebug }
-                });
-              } else if (sourceHandle === 'partner-right') {
-                newEdges.push({
-                  id: `edge-${newId}`,
-                  source: newId,
-                  target: sourceNode.id,
-                  sourceHandle: 'partner-left',
-                  targetHandle: 'partner-right',
-                  type: 'partner',
-                  data: { isDebugMode: showDebug }
-                });
-              }
-
-              // Create all edges
+            } else if (sourceHandle === 'partner-left') {
+              newEdges.push({
+                id: `edge-${newId}`,
+                source: sourceNode.id,
+                target: newId,
+                sourceHandle: 'partner-left',
+                targetHandle: 'partner-right',
+                type: 'partner',
+                data: { isDebugMode: showDebug }
+              });
+            } else if (sourceHandle === 'partner-right') {
+              newEdges.push({
+                id: `edge-${newId}`,
+                source: newId,
+                target: sourceNode.id,
+                sourceHandle: 'partner-left',
+                targetHandle: 'partner-right',
+                type: 'partner',
+                data: { isDebugMode: showDebug }
+              });
+            }              // Create all edges
               for (const edge of newEdges) {
                 try {
                   await api.createEdge(edge);
@@ -1151,149 +1162,206 @@ const AddNodeOnEdgeDrop = () => {
         width: '300px', 
         borderLeft: '1px solid #ccc', 
         backgroundColor: '#09380dff',
-        padding: '20px'
+        padding: '0',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
-        {selectedNode ? (
-          <NodeEditor 
-            node={selectedNode} 
-            onUpdate={showDebug ? updateNodeDataAndPosition : updateNodeData}
-            onDelete={deleteNode}
-            hasConnections={nodeHasConnections(selectedNode.id)}
-            isDebugMode={showDebug}
-            nodes={nodes}
-            edges={edges}
-          />
-        ) : (
-          <div style={{ color: 'white' }}>
-            <h3>Wähle eine Person</h3>
-            <p>Klicke auf eine beliebige Person, um ihre Informationen zu bearbeiten.</p>
-            <p>Ziehe von einem farbigen Punkt ins leere, um eine neue Person hinzuzufügen.</p>
-            
-            <div style={{ marginTop: '30px' }}>
-              <button 
-                onClick={autoLayout}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  marginBottom: '10px'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#4CAF50'}
-              >
-                🔄 Auto Layout
-              </button>
-              
-              <button 
-                onClick={fitTreeToView}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#2196F3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  marginBottom: '10px'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#1976D2'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#2196F3'}
-              >
-                🔍 Fit to View
-              </button>
-              
-              <button 
-                onClick={() => setShowDebug(!showDebug)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: showDebug ? '#FF5722' : '#9C27B0',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  marginBottom: '10px'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = showDebug ? '#E64A19' : '#7B1FA2'}
-                onMouseOut={(e) => e.target.style.backgroundColor = showDebug ? '#FF5722' : '#9C27B0'}
-              >
-                {showDebug ? '🚫 Hide Debug' : '🔧 Show Debug'}
-              </button>
-              
-              <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
-                Auto Layout: Strg+L (Cmd+L)<br/>
-                Fit to View: Strg+F (Cmd+F)
-              </p>
-              
-              {showDebug && debugInfo && (
-                <div style={{ 
-                  backgroundColor: '#1e1e1e', 
-                  padding: '15px', 
-                  borderRadius: '5px', 
-                  marginBottom: '20px',
-                  fontSize: '0.8rem',
-                  maxHeight: '400px',
-                  overflowY: 'auto',
-                  border: '1px solid #444'
-                }}>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#FFF' }}>🔧 ELK Debug Info</h4>
+        {/* Tab Navigation */}
+        <div style={{ 
+          display: 'flex', 
+          borderBottom: '1px solid #ccc',
+          backgroundColor: '#0a4b11ff'
+        }}>
+          <button
+            onClick={() => setActiveTab('editor')}
+            style={{
+              flex: 1,
+              padding: '12px',
+              backgroundColor: activeTab === 'editor' ? '#09380dff' : 'transparent',
+              color: 'white',
+              border: 'none',
+              borderBottom: activeTab === 'editor' ? '2px solid #4CAF50' : '2px solid transparent',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: activeTab === 'editor' ? 'bold' : 'normal'
+            }}
+          >
+            👤 Editor
+          </button>
+          <button
+            onClick={() => setActiveTab('images')}
+            style={{
+              flex: 1,
+              padding: '12px',
+              backgroundColor: activeTab === 'images' ? '#09380dff' : 'transparent',
+              color: 'white',
+              border: 'none',
+              borderBottom: activeTab === 'images' ? '2px solid #4CAF50' : '2px solid transparent',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: activeTab === 'images' ? 'bold' : 'normal'
+            }}
+          >
+            📸 Photos
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
+          {activeTab === 'editor' && (
+            <>
+              {selectedNode ? (
+                <NodeEditor 
+                  node={selectedNode} 
+                  onUpdate={showDebug ? updateNodeDataAndPosition : updateNodeData}
+                  onDelete={deleteNode}
+                  hasConnections={nodeHasConnections(selectedNode.id)}
+                  isDebugMode={showDebug}
+                  nodes={nodes}
+                  edges={edges}
+                />
+              ) : (
+                <div style={{ color: 'white' }}>
+                  <h3>Wähle eine Person</h3>
+                  <p>Klicke auf eine beliebige Person, um ihre Informationen zu bearbeiten.</p>
+                  <p>Ziehe von einem farbigen Punkt ins leere, um eine neue Person hinzuzufügen.</p>
                   
-                  <div style={{ marginBottom: '15px' }}>
-                    <strong style={{ color: '#4CAF50' }}>Overview:</strong>
-                    <div>Total Nodes: {debugInfo.nodeCount}</div>
-                    <div>Bloodline Nodes (in ELK): {debugInfo.bloodlineNodeCount}</div>
-                    <div>Partner-only Nodes: {debugInfo.partnerOnlyNodeCount}</div>
-                    <div>Bloodline Edges (for layout): {debugInfo.edgeCount}</div>
-                    <div>Fake Bloodline Edges (ignored): {debugInfo.fakeEdgeCount}</div>
-                    <div>Partner Edges: {debugInfo.partnerEdgeCount}</div>
-                  </div>
-                  
-                  <div style={{ marginBottom: '15px' }}>
-                    <strong style={{ color: '#2196F3' }}>Partner Counts:</strong>
-                    {debugInfo.partnerCounts.map(([nodeId, count]) => (
-                      <div key={nodeId} style={{ marginLeft: '10px' }}>
-                        Node {nodeId}: {count} partner{count !== 1 ? 's' : ''}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div>
-                    <strong style={{ color: '#FF9800' }}>ELK Node Dimensions:</strong>
-                    {debugInfo.elkNodes.map(node => (
-                      <div key={node.id} style={{ 
-                        marginLeft: '10px', 
-                        marginBottom: '8px',
-                        padding: '5px',
-                        backgroundColor: '#333',
-                        borderRadius: '3px'
+                  <div style={{ marginTop: '30px' }}>
+                    <button 
+                      onClick={autoLayout}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '16px',
+                        cursor: 'pointer',
+                        marginBottom: '10px'
+                      }}
+                      onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
+                      onMouseOut={(e) => e.target.style.backgroundColor = '#4CAF50'}
+                    >
+                      🔄 Auto Layout
+                    </button>
+                    
+                    <button 
+                      onClick={fitTreeToView}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        backgroundColor: '#2196F3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '16px',
+                        cursor: 'pointer',
+                        marginBottom: '10px'
+                      }}
+                      onMouseOver={(e) => e.target.style.backgroundColor = '#1976D2'}
+                      onMouseOut={(e) => e.target.style.backgroundColor = '#2196F3'}
+                    >
+                      🔍 Fit to View
+                    </button>
+                    
+                    <button 
+                      onClick={() => setShowDebug(!showDebug)}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        backgroundColor: showDebug ? '#FF5722' : '#9C27B0',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '16px',
+                        cursor: 'pointer',
+                        marginBottom: '10px'
+                      }}
+                      onMouseOver={(e) => e.target.style.backgroundColor = showDebug ? '#E64A19' : '#7B1FA2'}
+                      onMouseOut={(e) => e.target.style.backgroundColor = showDebug ? '#FF5722' : '#9C27B0'}
+                    >
+                      {showDebug ? '🚫 Hide Debug' : '🔧 Show Debug'}
+                    </button>
+                    
+                    <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
+                      Auto Layout: Strg+L (Cmd+L)<br/>
+                      Fit to View: Strg+F (Cmd+F)
+                    </p>
+                    
+                    {showDebug && debugInfo && (
+                      <div style={{ 
+                        backgroundColor: '#1e1e1e', 
+                        padding: '15px', 
+                        borderRadius: '5px', 
+                        marginBottom: '20px',
+                        fontSize: '0.8rem',
+                        maxHeight: '400px',
+                        overflowY: 'auto',
+                        border: '1px solid #444'
                       }}>
-                        <div><strong>Node {node.id}:</strong></div>
-                        <div>• Width: {node.width}px</div>
-                        <div>• Height: {node.height}px</div>
-                        <div>• Partners: {node.properties.numberOfPartners}</div>
-                        <div>• Birth: {node.properties.birthDate || 'Not set'}</div>
+                        <h4 style={{ margin: '0 0 10px 0', color: '#FFF' }}>🔧 ELK Debug Info</h4>
+                        
+                        <div style={{ marginBottom: '15px' }}>
+                          <strong style={{ color: '#4CAF50' }}>Overview:</strong>
+                          <div>Total Nodes: {debugInfo.nodeCount}</div>
+                          <div>Bloodline Nodes (in ELK): {debugInfo.bloodlineNodeCount}</div>
+                          <div>Partner-only Nodes: {debugInfo.partnerOnlyNodeCount}</div>
+                          <div>Bloodline Edges (for layout): {debugInfo.edgeCount}</div>
+                          <div>Fake Bloodline Edges (ignored): {debugInfo.fakeEdgeCount}</div>
+                          <div>Partner Edges: {debugInfo.partnerEdgeCount}</div>
+                        </div>
+                        
+                        <div style={{ marginBottom: '15px' }}>
+                          <strong style={{ color: '#2196F3' }}>Partner Counts:</strong>
+                          {debugInfo.partnerCounts.map(([nodeId, count]) => (
+                            <div key={nodeId} style={{ marginLeft: '10px' }}>
+                              Node {nodeId}: {count} partner{count !== 1 ? 's' : ''}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div>
+                          <strong style={{ color: '#FF9800' }}>ELK Node Dimensions:</strong>
+                          {debugInfo.elkNodes.map(node => (
+                            <div key={node.id} style={{ 
+                              marginLeft: '10px', 
+                              marginBottom: '8px',
+                              padding: '5px',
+                              backgroundColor: '#333',
+                              borderRadius: '3px'
+                            }}>
+                              <div><strong>Node {node.id}:</strong></div>
+                              <div>• Width: {node.width}px</div>
+                              <div>• Height: {node.height}px</div>
+                              <div>• Partners: {node.properties.numberOfPartners}</div>
+                              <div>• Birth: {node.properties.birthDate || 'Not set'}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
+                  </div>
+                  
+                  <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
+                    <h4>Verbindungsregeln:</h4>
+                    <p>🔴 Rot (oben): Eltern hinzufügen</p>
+                    <p>🟠 Orange (unten): Kinder hinzufügen</p>
+                    <p>🔵 Blau (links/rechts): Partner hinzufügen</p>
                   </div>
                 </div>
               )}
-            </div>
-            
-            <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-              <h4>Verbindungsregeln:</h4>
-              <p>🔴 Rot (oben): Eltern hinzufügen</p>
-              <p>🟠 Orange (unten): Kinder hinzufügen</p>
-              <p>🔵 Blau (links/rechts): Partner hinzufügen</p>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+          
+          {activeTab === 'images' && (
+            <ImageGallery 
+              nodes={nodes}
+              selectedNode={selectedNode}
+              onPersonSelect={handlePersonSelectFromGallery}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
