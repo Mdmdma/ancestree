@@ -9,6 +9,7 @@ import {
   ReactFlowProvider,
   useUpdateNodeInternals,
 } from '@xyflow/react';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import PersonNode from './PersonNode';
 import NodeEditor from './NodeEditor';
 import PartnerEdge from './PartnerEdge';
@@ -69,6 +70,8 @@ const AddNodeOnEdgeDrop = () => {
   const reactFlowWrapper = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -147,138 +150,367 @@ const AddNodeOnEdgeDrop = () => {
     loadData();
   }, [setNodes, setEdges]);
 
-  // Auto layout functionality
+  // Function to calculate and update partner counts for all nodes
+  const updatePartnerCounts = useCallback(() => {
+    const partnerCounts = new Map();
+    
+    // Initialize all nodes with 0 partners
+    nodes.forEach(node => {
+      partnerCounts.set(node.id, 0);
+    });
+    
+    // Count partners from edges
+    edges.forEach(edge => {
+      if (edge.type === 'partner') {
+        partnerCounts.set(edge.source, (partnerCounts.get(edge.source) || 0) + 1);
+        partnerCounts.set(edge.target, (partnerCounts.get(edge.target) || 0) + 1);
+      }
+    });
+    
+    // Update nodes with partner counts
+    const updatedNodes = nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        numberOfPartners: partnerCounts.get(node.id) || 0
+      }
+    }));
+    
+    setNodes(updatedNodes);
+    return partnerCounts;
+  }, [nodes, edges, setNodes]);
+
+  // Function to calculate node dimensions based on partner count
+  const getNodeDimensions = useCallback((numberOfPartners) => {
+    const baseWidth = 200;
+    const baseHeight = 100;
+    // Calculate total width needed for this node and all its partners
+    const totalWidth = baseWidth * (1 + numberOfPartners); // Each partner gets a full node width
+    const partnerHeightIncrease = 0; // Additional height per partner
+    
+    return {
+      width: totalWidth,
+      height: baseHeight + (numberOfPartners * partnerHeightIncrease)
+    };
+  }, []);
+
+  // Auto layout functionality using ELK.js for hierarchical layout with birth year Y positioning
   const autoLayout = useCallback(async () => {
     if (nodes.length === 0) return;
 
-    // Build relationships from edges
-    const relationships = {
-      children: new Map(), // nodeId -> [childIds]
-      parents: new Map(),  // nodeId -> [parentIds]
-      partners: new Map()  // nodeId -> [partnerIds]
+    // Update partner counts first
+    const partnerCounts = updatePartnerCounts();
+
+    // Function to calculate Y position with increased separation from birth year
+    const calculateYPosition = (birthDate) => {
+      if (!birthDate) return 1940 * 5; // Default year for nodes without birth date, scaled
+      
+      const birthYear = new Date(birthDate).getFullYear();
+      const minYear = 1850;
+      const maxYear = 2050;
+      
+      // Clamp birth year to our range and scale it for more separation
+      const clampedYear = Math.max(minYear, Math.min(maxYear, birthYear));
+      
+      // Scale by 5x to increase separation between generations
+      return clampedYear * 5;
     };
 
-    // Initialize maps
-    nodes.forEach(node => {
-      relationships.children.set(node.id, []);
-      relationships.parents.set(node.id, []);
-      relationships.partners.set(node.id, []);
+    // Create ELK instance
+    const elk = new ELK();
+
+    // Identify which nodes are on the bloodline (have parent/child relationships)
+    const bloodlineNodeIds = new Set();
+    edges.forEach(edge => {
+      if (edge.type === 'bloodline') {
+        bloodlineNodeIds.add(edge.source);
+        bloodlineNodeIds.add(edge.target);
+      }
     });
 
-    // Populate relationships from edges
+    // Build ELK graph structure with only bloodline nodes, but sized to accommodate partners
+    const elkNodes = nodes
+      .filter(node => bloodlineNodeIds.has(node.id))
+      .map(node => {
+        const numberOfPartners = partnerCounts.get(node.id) || node.data.numberOfPartners || 0;
+        const dimensions = getNodeDimensions(numberOfPartners);
+        
+        return {
+          id: node.id,
+          width: dimensions.width,
+          height: dimensions.height,
+          properties: {
+            birthDate: node.data.birthDate,
+            numberOfPartners: numberOfPartners
+          }
+        };
+      });
+
+    // Debug: Log ELK nodes structure
+    console.log('ELK Nodes for debugging:', elkNodes);
+    console.log('Partner counts:', Array.from(partnerCounts.entries()));
+
+    // Store debug info for UI display
+    setDebugInfo({
+      elkNodes: elkNodes,
+      partnerCounts: Array.from(partnerCounts.entries()),
+      nodeCount: nodes.length,
+      bloodlineNodeCount: bloodlineNodeIds.size,
+      partnerOnlyNodeCount: nodes.length - bloodlineNodeIds.size,
+      edgeCount: edges.filter(e => e.type === 'bloodline').length,
+      partnerEdgeCount: edges.filter(e => e.type === 'partner').length
+    });
+
+    const elkEdges = [];
+    
+    // Add bloodline edges for hierarchical structure
     edges.forEach(edge => {
       if (edge.type === 'bloodline') {
         if (edge.sourceHandle === 'child' && edge.targetHandle === 'parent') {
-          relationships.children.get(edge.target)?.push(edge.source);
-          relationships.parents.get(edge.source)?.push(edge.target);
+          // Parent -> Child direction for proper hierarchy
+          elkEdges.push({
+            id: edge.id,
+            sources: [edge.target], // parent
+            targets: [edge.source]  // child
+          });
         }
-      } else if (edge.type === 'partner') {
-        relationships.partners.get(edge.source)?.push(edge.target);
-        relationships.partners.get(edge.target)?.push(edge.source);
       }
     });
 
-    // Find root nodes (nodes with no parents)
-    const rootNodes = nodes.filter(node => 
-      relationships.parents.get(node.id)?.length === 0
-    );
-
-    if (rootNodes.length === 0) {
-      // If no clear root, pick the oldest person or first node
-      const oldestNode = nodes.reduce((oldest, current) => {
-        const currentBirth = current.data.birthDate;
-        const oldestBirth = oldest.data.birthDate;
-        if (!currentBirth) return oldest;
-        if (!oldestBirth) return current;
-        return currentBirth < oldestBirth ? current : oldest;
-      });
-      rootNodes.push(oldestNode);
-    }
-
-    // Layout configuration
-    const nodeWidth = 200;
-    const nodeHeight = 150;
-    const horizontalSpacing = 250;
-    const verticalSpacing = 200;
-    const partnerSpacing = 280;
-
-    const layoutedNodes = new Map();
-    const processedNodes = new Set();
-
-    // Position nodes level by level
-    const positionSubtree = (nodeId, x, y, generation) => {
-      if (processedNodes.has(nodeId) || layoutedNodes.has(nodeId)) {
-        return layoutedNodes.get(nodeId) || { x, y };
-      }
-
-      processedNodes.add(nodeId);
-      
-      // Position current node
-      layoutedNodes.set(nodeId, { x, y });
-
-      // Position partners next to each other
-      const partners = relationships.partners.get(nodeId) || [];
-      partners.forEach((partnerId, index) => {
-        if (!processedNodes.has(partnerId)) {
-          const partnerX = x + partnerSpacing * (index + 1);
-          layoutedNodes.set(partnerId, { x: partnerX, y });
-          processedNodes.add(partnerId);
+    // Group partners together by creating compound nodes
+    const partnerGroups = new Map();
+    const partnerPairs = new Set();
+    
+    edges.forEach((edge) => {
+      if (edge.type === 'partner') {
+        const pairKey = [edge.source, edge.target].sort().join('-');
+        if (!partnerPairs.has(pairKey)) {
+          partnerPairs.add(pairKey);
+          const groupId = `partner-group-${edge.source}-${edge.target}`;
+          partnerGroups.set(groupId, {
+            members: [edge.source, edge.target],
+            leftPartner: edge.sourceHandle === 'partner-left' ? edge.source : edge.target,
+            rightPartner: edge.sourceHandle === 'partner-left' ? edge.target : edge.source
+          });
         }
-      });
-
-      // Position children in the next generation
-      const children = relationships.children.get(nodeId) || [];
-      if (children.length > 0) {
-        const childY = y + verticalSpacing;
-        const totalChildrenWidth = (children.length - 1) * horizontalSpacing;
-        const startX = x - totalChildrenWidth / 2;
-
-        children.forEach((childId, index) => {
-          const childX = startX + index * horizontalSpacing;
-          positionSubtree(childId, childX, childY, generation + 1);
-        });
       }
+    });
 
-      return { x, y };
+    // Create ELK graph
+    const graph = {
+      id: 'root',
+      layoutOptions: {
+        'elk.algorithm': 'layered',
+        'elk.direction': 'DOWN',
+        'elk.spacing.nodeNode': '30',
+        'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+        'elk.spacing.edgeEdge': '20',
+        'elk.spacing.edgeNode': '30',
+        'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+        'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+        'elk.layered.cycleBreaking.strategy': 'GREEDY'
+      },
+      children: elkNodes,
+      edges: elkEdges
     };
 
-    // Start layout from root nodes
-    let currentX = 0;
-    rootNodes.forEach((rootNode, index) => {
-      positionSubtree(rootNode.id, currentX, 100, 0);
-      currentX += 600; // Space between different family trees
-    });
-
-    // Position any remaining unconnected nodes
-    let orphanX = currentX + 300;
-    nodes.forEach(node => {
-      if (!layoutedNodes.has(node.id)) {
-        layoutedNodes.set(node.id, { x: orphanX, y: 100 });
-        orphanX += horizontalSpacing;
-      }
-    });
-
-    // Update all node positions
-    const updatedNodes = nodes.map(node => {
-      const newPosition = layoutedNodes.get(node.id) || node.position;
-      return {
-        ...node,
-        position: newPosition
-      };
-    });
-
-    // Update UI
-    setNodes(updatedNodes);
-
-    // Save all position changes to database
     try {
+      // Debug: Log complete ELK graph structure
+      console.log('Complete ELK graph structure:', graph);
+      
+      // Run ELK layout
+      const layoutedGraph = await elk.layout(graph);
+      
+      // Debug: Log layout results
+      console.log('ELK layout results:', layoutedGraph);
+      console.log('Layouted nodes with positions:', layoutedGraph.children);
+      
+      // Apply ELK X coordinates to bloodline nodes and override Y coordinates with birth year positioning
+      const updatedNodes = nodes.map((node) => {
+        const elkNode = layoutedGraph.children.find(n => n.id === node.id);
+        
+        if (elkNode) {
+          // This is a bloodline node - use ELK positioning but adjust for left partners
+          const numberOfPartners = partnerCounts.get(node.id) || node.data.numberOfPartners || 0;
+          
+          // Count left partners for this bloodline node
+          let leftPartnerCount = 0;
+          edges.forEach(edge => {
+            if (edge.type === 'partner' && (edge.source === node.id || edge.target === node.id)) {
+              const partnerId = edge.source === node.id ? edge.target : edge.source;
+              const partnerIsBloodline = bloodlineNodeIds.has(partnerId);
+              
+              // Only count non-bloodline left partners
+              if (!partnerIsBloodline) {
+                const isLeftPartner = (edge.source === node.id && edge.sourceHandle === 'partner-left') ||
+                                     (edge.target === node.id && edge.targetHandle === 'partner-left');
+                if (isLeftPartner) {
+                  leftPartnerCount++;
+                }
+              }
+            }
+          });
+          
+          // Shift the bloodline node to the right by the number of left partners
+          const nodeWidth = 200;
+          const partnerSpacing = nodeWidth + 20;
+          const leftPartnerShift = leftPartnerCount * partnerSpacing;
+          
+          const x = elkNode.x + leftPartnerShift; 
+          const y = calculateYPosition(node.data.birthDate);
+          
+          return {
+            ...node,
+            position: { x, y },
+            data: {
+              ...node.data,
+              numberOfPartners: numberOfPartners
+            }
+          };
+        } else {
+          // This is a partner-only node - will be positioned relative to bloodline partners later
+          const numberOfPartners = partnerCounts.get(node.id) || node.data.numberOfPartners || 0;
+          
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              numberOfPartners: numberOfPartners
+            }
+          };
+        }
+      });
+
+      // Position partner nodes relative to their bloodline partners
+      const processedPairs = new Set();
+      
+      edges.forEach(edge => {
+        if (edge.type === 'partner') {
+          const pairKey = [edge.source, edge.target].sort().join('-');
+          
+          if (!processedPairs.has(pairKey)) {
+            processedPairs.add(pairKey);
+            
+            const sourceNode = updatedNodes.find(n => n.id === edge.source);
+            const targetNode = updatedNodes.find(n => n.id === edge.target);
+            
+            if (sourceNode && targetNode) {
+              // Determine which node is on the bloodline (has a position from ELK)
+              const sourceIsBloodline = bloodlineNodeIds.has(edge.source);
+              const targetIsBloodline = bloodlineNodeIds.has(edge.target);
+              
+              let bloodlineNode, partnerNode;
+              let isLeftPartner;
+              
+              if (sourceIsBloodline && !targetIsBloodline) {
+                // Source is bloodline, target is partner
+                bloodlineNode = sourceNode;
+                partnerNode = targetNode;
+                isLeftPartner = edge.sourceHandle === 'partner-left';
+              } else if (targetIsBloodline && !sourceIsBloodline) {
+                // Target is bloodline, source is partner
+                bloodlineNode = targetNode;
+                partnerNode = sourceNode;
+                isLeftPartner = edge.targetHandle === 'partner-left';
+              } else if (sourceIsBloodline && targetIsBloodline) {
+                // Both are bloodline nodes - position them side by side
+                const avgX = (sourceNode.position.x + targetNode.position.x) / 2;
+                const avgY = (sourceNode.position.y + targetNode.position.y) / 2;
+                const partnerSpacing = 220; // Increased spacing for bloodline partners
+                
+                if (edge.sourceHandle === 'partner-left') {
+                  targetNode.position.x = avgX - partnerSpacing / 2;
+                  sourceNode.position.x = avgX + partnerSpacing / 2;
+                } else {
+                  sourceNode.position.x = avgX - partnerSpacing / 2;
+                  targetNode.position.x = avgX + partnerSpacing / 2;
+                }
+                
+                sourceNode.position.y = avgY;
+                targetNode.position.y = avgY;
+              } else if (bloodlineNode && partnerNode) {
+                // Position partner node relative to bloodline node
+                const nodeWidth = 200;
+                const partnerSpacing = nodeWidth + 20; // Small gap between nodes
+                
+                partnerNode.position.x = isLeftPartner 
+                  ? bloodlineNode.position.x - partnerSpacing
+                  : bloodlineNode.position.x + partnerSpacing;
+                partnerNode.position.y = bloodlineNode.position.y;
+              }
+            }
+          }
+        }
+      });
+
+      // Handle multiple partners for bloodline nodes
+      const processedMultiPartners = new Set();
+      
+      Array.from(bloodlineNodeIds).forEach(nodeId => {
+        if (!processedMultiPartners.has(nodeId)) {
+          processedMultiPartners.add(nodeId);
+          
+          // Find all partners of this bloodline node
+          const leftPartners = [];
+          const rightPartners = [];
+          
+          edges.forEach(edge => {
+            if (edge.type === 'partner' && (edge.source === nodeId || edge.target === nodeId)) {
+              const partnerId = edge.source === nodeId ? edge.target : edge.source;
+              const partnerIsBloodline = bloodlineNodeIds.has(partnerId);
+              
+              // Only position non-bloodline partners (bloodline partners are handled above)
+              if (!partnerIsBloodline) {
+                const isLeftPartner = (edge.source === nodeId && edge.sourceHandle === 'partner-left') ||
+                                     (edge.target === nodeId && edge.targetHandle === 'partner-left');
+                
+                if (isLeftPartner) {
+                  leftPartners.push(partnerId);
+                } else {
+                  rightPartners.push(partnerId);
+                }
+              }
+            }
+          });
+          
+          const bloodlineNode = updatedNodes.find(n => n.id === nodeId);
+          if (bloodlineNode && (leftPartners.length > 0 || rightPartners.length > 0)) {
+            const nodeWidth = 200;
+            const partnerSpacing = nodeWidth + 20;
+            
+            // Position left partners (chain leftward from bloodline node)
+            leftPartners.forEach((partnerId, index) => {
+              const partnerNode = updatedNodes.find(n => n.id === partnerId);
+              if (partnerNode) {
+                partnerNode.position.x = bloodlineNode.position.x - (index + 1) * partnerSpacing;
+                partnerNode.position.y = bloodlineNode.position.y;
+              }
+            });
+            
+            // Position right partners (chain rightward from bloodline node)
+            rightPartners.forEach((partnerId, index) => {
+              const partnerNode = updatedNodes.find(n => n.id === partnerId);
+              if (partnerNode) {
+                partnerNode.position.x = bloodlineNode.position.x + (index + 1) * partnerSpacing;
+                partnerNode.position.y = bloodlineNode.position.y;
+              }
+            });
+          }
+        }
+      });
+
+      // Update UI
+      setNodes(updatedNodes);
+
+      // Save all position changes to database
       await Promise.all(
         updatedNodes.map(node => 
           api.updateNode(node.id, { position: node.position, data: node.data })
         )
       );
+
     } catch (error) {
-      console.error('Failed to save layout changes:', error);
+      console.error('ELK layout failed:', error);
     }
   }, [nodes, edges, setNodes]);
 
@@ -430,6 +662,7 @@ const AddNodeOnEdgeDrop = () => {
             country: sourceNode.data.country || '',
             phone: sourceNode.data.phone || '',
             gender: Math.random() > 0.5 ? 'male' : 'female',
+            numberOfPartners: 0, // Track number of partners for sizing
             isSelected: false
           };
 
@@ -624,10 +857,81 @@ const AddNodeOnEdgeDrop = () => {
                 🔍 Fit to View
               </button>
               
+              <button 
+                onClick={() => setShowDebug(!showDebug)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: showDebug ? '#FF5722' : '#9C27B0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  marginBottom: '10px'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = showDebug ? '#E64A19' : '#7B1FA2'}
+                onMouseOut={(e) => e.target.style.backgroundColor = showDebug ? '#FF5722' : '#9C27B0'}
+              >
+                {showDebug ? '🚫 Hide Debug' : '🔧 Show Debug'}
+              </button>
+              
               <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
                 Auto Layout: Strg+L (Cmd+L)<br/>
                 Fit to View: Strg+F (Cmd+F)
               </p>
+              
+              {showDebug && debugInfo && (
+                <div style={{ 
+                  backgroundColor: '#1e1e1e', 
+                  padding: '15px', 
+                  borderRadius: '5px', 
+                  marginBottom: '20px',
+                  fontSize: '0.8rem',
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                  border: '1px solid #444'
+                }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#FFF' }}>🔧 ELK Debug Info</h4>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <strong style={{ color: '#4CAF50' }}>Overview:</strong>
+                    <div>Total Nodes: {debugInfo.nodeCount}</div>
+                    <div>Bloodline Nodes (in ELK): {debugInfo.bloodlineNodeCount}</div>
+                    <div>Partner-only Nodes: {debugInfo.partnerOnlyNodeCount}</div>
+                    <div>Bloodline Edges: {debugInfo.edgeCount}</div>
+                    <div>Partner Edges: {debugInfo.partnerEdgeCount}</div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <strong style={{ color: '#2196F3' }}>Partner Counts:</strong>
+                    {debugInfo.partnerCounts.map(([nodeId, count]) => (
+                      <div key={nodeId} style={{ marginLeft: '10px' }}>
+                        Node {nodeId}: {count} partner{count !== 1 ? 's' : ''}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div>
+                    <strong style={{ color: '#FF9800' }}>ELK Node Dimensions:</strong>
+                    {debugInfo.elkNodes.map(node => (
+                      <div key={node.id} style={{ 
+                        marginLeft: '10px', 
+                        marginBottom: '8px',
+                        padding: '5px',
+                        backgroundColor: '#333',
+                        borderRadius: '3px'
+                      }}>
+                        <div><strong>Node {node.id}:</strong></div>
+                        <div>• Width: {node.width}px</div>
+                        <div>• Height: {node.height}px</div>
+                        <div>• Partners: {node.properties.numberOfPartners}</div>
+                        <div>• Birth: {node.properties.birthDate || 'Not set'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             
             <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>

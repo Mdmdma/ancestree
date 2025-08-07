@@ -46,7 +46,7 @@ db.serialize(() => {
         id, type, position_x, position_y, name, surname, birth_date, death_date,
         street, city, zip, country, phone, gender
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-        '0', 'person', 0, 50, 'Moidal', 'Erler', '1950-01-01', '1950-01-01',
+        '0', 'person', 0, 50, 'Moidal', 'Erler', '1890-01-01', '1950-01-01',
         'Hauptstraße 123', 'Tux', '6293', 'AT', '+43 5287 87123', 'female'
       ]);
     }
