@@ -15,9 +15,14 @@ export default function PartnerEdge(props) {
     targetY,
     sourcePosition,
     targetPosition,
+    data,
   } = props;
 
   const { setEdges } = useReactFlow();
+  const isDebugMode = data?.isDebugMode || false;
+
+  // Partner edges stay green in both normal and debug modes
+  const edgeColor = '#4ecdc4'; // Green in both modes
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -30,7 +35,7 @@ export default function PartnerEdge(props) {
 
   return (
     <>
-      <BezierEdge {...props} style={{ stroke: '#4ecdc4', strokeWidth: 1}} />
+      <BezierEdge {...props} style={{ stroke: edgeColor, strokeWidth: 1}} />
       <EdgeLabelRenderer>
         <button
           style={{

@@ -15,9 +15,16 @@ export default function BloodlineEdge(props) {
     targetY,
     sourcePosition,
     targetPosition,
+    data,
   } = props;
 
   const { setEdges } = useReactFlow();
+  const isDebugMode = data?.isDebugMode || false;
+
+  // Color logic based on debug mode
+  // Normal mode: red for both normal and fake bloodline edges
+  // Debug mode: red for normal bloodline edges
+  const edgeColor = 'rgba(233, 42, 9, 1)'; // Red in both modes
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -30,7 +37,7 @@ export default function BloodlineEdge(props) {
 
   return (
     <>
-      <BezierEdge {...props} style={{ stroke: 'rgba(233, 42, 9, 1)', strokeWidth: 1 }} />
+      <BezierEdge {...props} style={{ stroke: edgeColor, strokeWidth: 1 }} />
       <EdgeLabelRenderer>
               <button
                 style={{

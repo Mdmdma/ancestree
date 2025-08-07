@@ -82,6 +82,16 @@ const AddNodeOnEdgeDrop = () => {
   const { screenToFlowPosition, fitView } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
 
+  // Update edges with debug mode information when showDebug changes
+  useEffect(() => {
+    setEdges((currentEdges) =>
+      currentEdges.map((edge) => ({
+        ...edge,
+        data: { ...edge.data, isDebugMode: showDebug }
+      }))
+    );
+  }, [showDebug, setEdges]);
+
   // Handle node changes including position updates
   const handleNodesChange = useCallback(async (changes) => {
     onNodesChange(changes);
@@ -577,11 +587,78 @@ const AddNodeOnEdgeDrop = () => {
         
         if (isPartnerConnection) {
           // Regular partner edge
-          const newEdge = { ...params, type: 'partner' };
+          const newEdge = { ...params, type: 'partner', data: { isDebugMode: showDebug } };
           
           try {
             await api.createEdge(newEdge);
             setEdges((eds) => addEdge(newEdge, eds));
+            
+            // Remove target node from bloodline when connected as partner
+            const targetNode = nodes.find(n => n.id === params.target);
+            if (targetNode && targetNode.data.bloodline) {
+              const updatedData = {
+                ...targetNode.data,
+                bloodline: false
+              };
+              
+              await api.updateNode(params.target, { 
+                position: targetNode.position, 
+                data: updatedData 
+              });
+              
+              setNodes((nds) =>
+                nds.map((node) =>
+                  node.id === params.target
+                    ? { ...node, data: updatedData }
+                    : node
+                )
+              );
+
+              // Convert all existing bloodline edges of this node to fake bloodline edges
+              const targetNodeBloodlineEdges = edges.filter(edge => 
+                (edge.source === params.target || edge.target === params.target) && 
+                edge.type === 'bloodline'
+              );
+
+              for (const edge of targetNodeBloodlineEdges) {
+                try {
+                  // Delete the old bloodline edge
+                  await api.deleteEdge(edge.id);
+                  
+                  // Create a new fake bloodline edge with the same properties
+                  const fakeEdge = {
+                    ...edge,
+                    id: `fake-${edge.id}`,
+                    type: 'bloodlinefake',
+                    data: { isDebugMode: showDebug }
+                  };
+                  
+                  await api.createEdge(fakeEdge);
+                  
+                  // Update the edges state
+                  setEdges((eds) => 
+                    eds.map(e => e.id === edge.id ? fakeEdge : e)
+                  );
+                } catch (error) {
+                  console.error('Failed to convert bloodline edge to fake:', error);
+                }
+              }
+
+              // Remove all hidden bloodline edges connected to this node
+              const targetNodeHiddenEdges = edges.filter(edge => 
+                (edge.source === params.target || edge.target === params.target) && 
+                edge.type === 'bloodlinehidden'
+              );
+
+              for (const edge of targetNodeHiddenEdges) {
+                try {
+                  await api.deleteEdge(edge.id);
+                  setEdges((eds) => eds.filter(e => e.id !== edge.id));
+                } catch (error) {
+                  console.error('Failed to remove hidden bloodline edge:', error);
+                }
+              }
+            }
           } catch (error) {
             console.error('Failed to create edge:', error);
           }
@@ -610,6 +687,35 @@ const AddNodeOnEdgeDrop = () => {
               }
               return null;
             };
+
+            // Function to check for existing hidden bloodline edge between two nodes
+            const findHiddenBloodlineEdge = (sourceId, targetId) => {
+              return edges.find(edge => 
+                edge.type === 'bloodlinehidden' &&
+                ((edge.source === sourceId && edge.target === targetId) ||
+                 (edge.source === targetId && edge.target === sourceId))
+              );
+            };
+
+            // Check if there's already a hidden bloodline edge between these nodes
+            const existingHiddenEdge = findHiddenBloodlineEdge(params.source, params.target);
+            
+            if (existingHiddenEdge) {
+              // Replace hidden edge with normal bloodline edge
+              try {
+                // Delete the hidden edge
+                await api.deleteEdge(existingHiddenEdge.id);
+                setEdges((eds) => eds.filter(edge => edge.id !== existingHiddenEdge.id));
+                
+                // Create normal bloodline edge
+                const normalBloodlineEdge = { ...params, type: 'bloodline', data: { isDebugMode: showDebug } };
+                await api.createEdge(normalBloodlineEdge);
+                setEdges((eds) => addEdge(normalBloodlineEdge, eds));
+              } catch (error) {
+                console.error('Failed to replace hidden edge:', error);
+              }
+              return; // Exit early, we've handled this case
+            }
             
             let edgesToCreate = [];
             
@@ -618,7 +724,8 @@ const AddNodeOnEdgeDrop = () => {
               // Source is partner node connecting as parent/child - create fake edge
               edgesToCreate.push({
                 ...params,
-                type: 'bloodlinefake'
+                type: 'bloodlinefake',
+                data: { isDebugMode: showDebug }
               });
               
               // Find bloodline partner and create hidden edge
@@ -630,14 +737,16 @@ const AddNodeOnEdgeDrop = () => {
                   target: params.sourceHandle === 'child' ? params.target : params.target,
                   sourceHandle: params.sourceHandle,
                   targetHandle: params.targetHandle,
-                  type: 'bloodlinehidden'
+                  type: 'bloodlinehidden',
+                  data: { isDebugMode: showDebug }
                 });
               }
             } else if (!targetNode.data.bloodline && (params.sourceHandle === 'child' || params.targetHandle === 'parent')) {
               // Target is partner node - create fake edge  
               edgesToCreate.push({
                 ...params,
-                type: 'bloodlinefake'
+                type: 'bloodlinefake',
+                data: { isDebugMode: showDebug }
               });
               
               // Find bloodline partner and create hidden edge
@@ -649,14 +758,16 @@ const AddNodeOnEdgeDrop = () => {
                   target: params.targetHandle === 'parent' ? bloodlinePartner : bloodlinePartner,
                   sourceHandle: params.sourceHandle,
                   targetHandle: params.targetHandle,
-                  type: 'bloodlinehidden'
+                  type: 'bloodlinehidden',
+                  data: { isDebugMode: showDebug }
                 });
               }
             } else {
               // Regular bloodline connection
               edgesToCreate.push({
                 ...params,
-                type: 'bloodline'
+                type: 'bloodline',
+                data: { isDebugMode: showDebug }
               });
             }
             
@@ -712,6 +823,63 @@ const AddNodeOnEdgeDrop = () => {
       console.error('Failed to update node:', error);
     }
   }, [setNodes, nodes]);
+
+  // Enhanced update function for NodeDebugger (handles both data and position)
+  const updateNodeDataAndPosition = useCallback(async (nodeId, newData, newPosition) => {
+    try {
+      const currentNode = nodes.find(n => n.id === nodeId);
+      const finalPosition = newPosition || currentNode.position;
+      
+      // Check if bloodline status is being changed from true to false
+      const wasBloodline = currentNode.data.bloodline;
+      const isNowBloodline = newData.bloodline;
+      
+      await api.updateNode(nodeId, { position: finalPosition, data: newData });
+      
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, ...newData }, position: finalPosition }
+            : node
+        )
+      );
+
+      // If node was removed from bloodline, convert all its bloodline edges to fake
+      if (wasBloodline && !isNowBloodline) {
+        const nodeEdges = edges.filter(edge => 
+          (edge.source === nodeId || edge.target === nodeId) && 
+          edge.type === 'bloodline'
+        );
+
+        for (const edge of nodeEdges) {
+          try {
+            // Delete the old bloodline edge
+            await api.deleteEdge(edge.id);
+            
+            // Create a new fake bloodline edge with the same properties
+            const fakeEdge = {
+              ...edge,
+              id: `fake-${edge.id}`,
+              type: 'bloodlinefake',
+              data: { isDebugMode: showDebug }
+            };
+            
+            await api.createEdge(fakeEdge);
+            
+            // Update the edges state
+            setEdges((eds) => 
+              eds.map(e => e.id === edge.id ? fakeEdge : e)
+            );
+          } catch (error) {
+            console.error('Failed to convert bloodline edge to fake:', error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update node:', error);
+      throw error; // Re-throw so NodeDebugger can handle it
+    }
+  }, [setNodes, nodes, edges, setEdges]);
 
   // Delete node functionality
   const deleteNode = useCallback(async (nodeId) => {
@@ -838,7 +1006,8 @@ const AddNodeOnEdgeDrop = () => {
                     target: sourceNode.id,
                     sourceHandle: 'child',
                     targetHandle: 'parent',
-                    type: 'bloodline'
+                    type: 'bloodline',
+                    data: { isDebugMode: showDebug }
                   });
                 } else {
                   // Source is partner node - create fake edge and hidden edge to bloodline partner
@@ -848,7 +1017,8 @@ const AddNodeOnEdgeDrop = () => {
                     target: sourceNode.id,
                     sourceHandle: 'child',
                     targetHandle: 'parent',
-                    type: 'bloodlinefake'
+                    type: 'bloodlinefake',
+                    data: { isDebugMode: showDebug }
                   });
                   
                   const bloodlinePartner = findBloodlinePartner(sourceNode.id);
@@ -859,7 +1029,8 @@ const AddNodeOnEdgeDrop = () => {
                       target: bloodlinePartner,
                       sourceHandle: 'child',
                       targetHandle: 'parent',
-                      type: 'bloodlinehidden'
+                      type: 'bloodlinehidden',
+                      data: { isDebugMode: showDebug }
                     });
                   }
                 }
@@ -872,7 +1043,8 @@ const AddNodeOnEdgeDrop = () => {
                     target: newId,
                     sourceHandle: 'child',
                     targetHandle: 'parent',
-                    type: 'bloodline'
+                    type: 'bloodline',
+                    data: { isDebugMode: showDebug }
                   });
                 } else {
                   // Source is partner node - create fake edge and hidden edge to bloodline partner
@@ -882,7 +1054,8 @@ const AddNodeOnEdgeDrop = () => {
                     target: newId,
                     sourceHandle: 'child',
                     targetHandle: 'parent',
-                    type: 'bloodlinefake'
+                    type: 'bloodlinefake',
+                    data: { isDebugMode: showDebug }
                   });
                   
                   const bloodlinePartner = findBloodlinePartner(sourceNode.id);
@@ -893,7 +1066,8 @@ const AddNodeOnEdgeDrop = () => {
                       target: newId,
                       sourceHandle: 'child',
                       targetHandle: 'parent',
-                      type: 'bloodlinehidden'
+                      type: 'bloodlinehidden',
+                      data: { isDebugMode: showDebug }
                     });
                   }
                 }
@@ -904,7 +1078,8 @@ const AddNodeOnEdgeDrop = () => {
                   target: newId,
                   sourceHandle: 'partner-left',
                   targetHandle: 'partner-right',
-                  type: 'partner'
+                  type: 'partner',
+                  data: { isDebugMode: showDebug }
                 });
               } else if (sourceHandle === 'partner-right') {
                 newEdges.push({
@@ -913,7 +1088,8 @@ const AddNodeOnEdgeDrop = () => {
                   target: sourceNode.id,
                   sourceHandle: 'partner-left',
                   targetHandle: 'partner-right',
-                  type: 'partner'
+                  type: 'partner',
+                  data: { isDebugMode: showDebug }
                 });
               }
 
@@ -980,9 +1156,12 @@ const AddNodeOnEdgeDrop = () => {
         {selectedNode ? (
           <NodeEditor 
             node={selectedNode} 
-            onUpdate={updateNodeData}
+            onUpdate={showDebug ? updateNodeDataAndPosition : updateNodeData}
             onDelete={deleteNode}
             hasConnections={nodeHasConnections(selectedNode.id)}
+            isDebugMode={showDebug}
+            nodes={nodes}
+            edges={edges}
           />
         ) : (
           <div style={{ color: 'white' }}>
