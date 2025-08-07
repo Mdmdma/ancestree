@@ -519,7 +519,7 @@ const AddNodeOnEdgeDrop = () => {
     } catch (error) {
       console.error('ELK layout failed:', error);
     }
-  }, [nodes, edges, setNodes]);
+  }, [nodes, edges, setNodes, getNodeDimensions, updatePartnerCounts]);
 
   // Fit tree to view
   const fitTreeToView = useCallback(() => {
@@ -567,7 +567,7 @@ const AddNodeOnEdgeDrop = () => {
     }
     
     return false;
-  }, [edges]);
+  }, []);
 
   const onConnect = useCallback(
     async (params) => {
@@ -774,7 +774,7 @@ const AddNodeOnEdgeDrop = () => {
         }
       }
     },
-    [isValidConnection, setEdges, nodes, edges],
+    [isValidConnection, setEdges, nodes, edges, showDebug, setNodes],
   );
 
   const onNodeClick = useCallback((event, node) => {
@@ -786,7 +786,7 @@ const AddNodeOnEdgeDrop = () => {
         data: { ...n.data, isSelected: n.id === node.id }
       }))
     );
-  }, [setNodes]);
+  }, [setNodes, setSelectedNode, setActiveTab]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
@@ -883,7 +883,7 @@ const AddNodeOnEdgeDrop = () => {
       console.error('Failed to update node:', error);
       throw error; // Re-throw so NodeDebugger can handle it
     }
-  }, [setNodes, nodes, edges, setEdges]);
+  }, [setNodes, nodes, edges, setEdges, showDebug]);
 
   // Delete node functionality
   const deleteNode = useCallback(async (nodeId) => {
@@ -1121,7 +1121,7 @@ const AddNodeOnEdgeDrop = () => {
         }
       }
     },
-    [screenToFlowPosition, setNodes, setEdges, updateNodeInternals, nodes, edges],
+    [screenToFlowPosition, setNodes, setEdges, updateNodeInternals, nodes, edges, showDebug],
   );
 
   if (loading) {
