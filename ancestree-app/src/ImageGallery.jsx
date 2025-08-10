@@ -164,32 +164,53 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
   const handlePersonTag = async (personId) => {
     if (!selectedImage || !personId) return;
 
+    // Check if person is already tagged
+    const isAlreadyTagged = selectedImage.people?.some(p => p.personId === personId);
+    if (isAlreadyTagged) {
+      console.log('Person is already tagged in this image');
+      return;
+    }
+
     try {
       const result = await api.tagPersonInImage(selectedImage.id, personId);
       if (result.success) {
         // Refresh the selected image data
         const updatedImage = await api.getImage(selectedImage.id);
         setSelectedImage(updatedImage);
+        console.log('Person successfully tagged');
       } else {
-        alert(appConfig.ui.imageGallery.errors.tagFailed + (result.error || appConfig.ui.imageGallery.errors.unknownError));
+        if (result.error && result.error.includes('already tagged')) {
+          console.log('Person is already tagged in this image');
+        } else {
+          alert(appConfig.ui.imageGallery.errors.tagFailed + (result.error || appConfig.ui.imageGallery.errors.unknownError));
+        }
       }
     } catch (error) {
       console.error('Tagging error:', error);
-      alert(appConfig.ui.imageGallery.errors.tagFailed + error.message);
+      if (error.message && error.message.includes('already tagged')) {
+        console.log('Person is already tagged in this image');
+      } else {
+        alert(appConfig.ui.imageGallery.errors.tagFailed + error.message);
+      }
     }
   };
 
   // Auto-tag when a person is selected in tagging mode
   useEffect(() => {
     if (taggingMode && selectedNode && viewMode === 'view') {
-      // Small delay to make the selection visible before auto-tagging
-      const timeoutId = setTimeout(() => {
-        handlePersonTag(selectedNode.id);
-      }, 500);
+      // Check if this person is already tagged to avoid duplicate tagging
+      const isAlreadyTagged = selectedImage?.people?.some(p => p.personId === selectedNode.id);
       
-      return () => clearTimeout(timeoutId);
+      if (!isAlreadyTagged) {
+        // Small delay to make the selection visible before auto-tagging
+        const timeoutId = setTimeout(() => {
+          handlePersonTag(selectedNode.id);
+        }, 500);
+        
+        return () => clearTimeout(timeoutId);
+      }
     }
-  }, [selectedNode, taggingMode, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedNode, taggingMode, viewMode, selectedImage?.people]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle person removal from image
   const handleRemovePersonTag = async (personId) => {
@@ -198,9 +219,13 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
     try {
       const result = await api.removePersonFromImage(selectedImage.id, personId);
       if (result.success) {
-        // Refresh the selected image data
+        // Refresh the selected image data and the gallery
         const updatedImage = await api.getImage(selectedImage.id);
         setSelectedImage(updatedImage);
+        
+        // Also refresh the main gallery to update the person count
+        await loadImages();
+        
         console.log(appConfig.ui.imageGallery.success.personRemoved);
       } else {
         alert(appConfig.ui.imageGallery.errors.removeFailed + (result.error || appConfig.ui.imageGallery.errors.unknownError));
@@ -298,8 +323,10 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '15px'
+          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+          gap: '15px',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           {images.map((image, index) => (
             <div
@@ -407,17 +434,18 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
         </button>
       </div>
 
-      {/* Main Upload Area */}
+      {/* Main Upload Area - Large invisible drop zone */}
       <div
         style={{
-          border: `2px dashed ${dragOver ? '#4CAF50' : '#666'}`,
-          borderRadius: '10px',
-          padding: '40px',
-          textAlign: 'center',
+          padding: '20px 0',
           marginBottom: '20px',
-          backgroundColor: '#2a2a2a',
-          transition: 'all 0.3s ease',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          minHeight: '300px',
+          width: '100%',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
         }}
         onClick={() => document.getElementById('file-input').click()}
         onDragEnter={handleDragEnter}
@@ -425,25 +453,40 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        <div style={{ fontSize: '48px', marginBottom: '10px' }}>
-          📤
-        </div>
-        <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', color: '#ffffff' }}>
-          {appConfig.ui.imageGallery.upload.dragDropTitle}
-        </div>
-        <div style={{ fontSize: '14px', color: '#cccccc', marginBottom: '15px' }}>
-          {appConfig.ui.imageGallery.upload.supportedFormats}
-        </div>
-        <div style={{
-          display: 'inline-block',
-          padding: '12px 24px',
-          backgroundColor: '#4CAF50',
-          color: 'white',
-          borderRadius: '5px',
-          fontSize: '14px',
-          fontWeight: 'bold'
-        }}>
-          {appConfig.ui.imageGallery.upload.selectFileButton}
+        {/* Visual upload box - smaller and centered */}
+        <div
+          style={{
+            border: `2px dashed ${dragOver ? '#4CAF50' : '#666'}`,
+            borderRadius: '10px',
+            padding: '40px',
+            textAlign: 'center',
+            backgroundColor: '#2a2a2a',
+            transition: 'all 0.3s ease',
+            width: '100%',
+            maxWidth: '400px',
+            pointerEvents: 'none' // Prevent this from interfering with drag events
+          }}
+        >
+          <div style={{ fontSize: '48px', marginBottom: '10px' }}>
+            📤
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', color: '#ffffff' }}>
+            {appConfig.ui.imageGallery.upload.dragDropTitle}
+          </div>
+          <div style={{ fontSize: '14px', color: '#cccccc', marginBottom: '15px' }}>
+            {appConfig.ui.imageGallery.upload.supportedFormats}
+          </div>
+          <div style={{
+            display: 'inline-block',
+            padding: '12px 24px',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            borderRadius: '5px',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }}>
+            {appConfig.ui.imageGallery.upload.selectFileButton}
+          </div>
         </div>
       </div>
 
@@ -458,19 +501,28 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
 
       {/* Instructions */}
       <div style={{ 
-        fontSize: '14px', 
-        color: '#cccccc', 
-        backgroundColor: '#2a2a2a',
-        padding: '15px',
-        borderRadius: '5px',
-        border: '1px solid #444'
+        display: 'flex',
+        justifyContent: 'center',
+        width: '100%'
       }}>
-        <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{appConfig.ui.imageGallery.upload.howItWorksTitle}</h5>
-        <ol style={{ paddingLeft: '20px', margin: 0, lineHeight: '1.6' }}>
-          {appConfig.ui.imageGallery.upload.steps.map((step, index) => (
-            <li key={index}>{step}</li>
-          ))}
-        </ol>
+        <div style={{ 
+          fontSize: '14px', 
+          color: '#cccccc', 
+          backgroundColor: '#2a2a2a',
+          padding: '15px',
+          borderRadius: '5px',
+          border: '1px solid #444',
+          width: '100%',
+          maxWidth: '400px',
+          boxSizing: 'border-box'
+        }}>
+          <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{appConfig.ui.imageGallery.upload.howItWorksTitle}</h5>
+          <ol style={{ paddingLeft: '20px', margin: 0, lineHeight: '1.6', wordWrap: 'break-word' }}>
+            {appConfig.ui.imageGallery.upload.steps.map((step, index) => (
+              <li key={index} style={{ marginBottom: '5px' }}>{step}</li>
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );
@@ -808,8 +860,10 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
           <h4 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{appConfig.ui.imageGallery.view.taggedPeopleTitle} ({selectedImage.people.length})</h4>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
-            gap: '10px' 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+            gap: '10px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             {selectedImage.people.map((person, index) => (
               <div
@@ -828,7 +882,9 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
                   style={{ cursor: 'pointer', flex: 1, color: '#ffffff' }}
                   onClick={() => onPersonSelect && onPersonSelect(person.personId)}
                 >
-                  <strong>{person.personName} {person.personSurname}</strong>
+                  <strong>
+                    {((person.personName || person.person_name || '') + ' ' + (person.personSurname || person.person_surname || '')).trim() || 'Unnamed Person'}
+                  </strong>
                 </div>
                 <button
                   onClick={() => handleRemovePersonTag(person.personId)}
@@ -862,22 +918,34 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
 
   return (
     <div style={{
-      padding: '20px',
       backgroundColor: '#1a1a1a',
-      borderRadius: '8px',
-      height: '100vh',
+      height: '100%',
       overflowY: 'auto',
+      overflowX: 'hidden',
       boxSizing: 'border-box',
-      color: '#ffffff'
+      color: '#ffffff',
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: 0 // Allows flex shrinking
     }}>
-      <h3 style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
-        {appConfig.ui.imageGallery.title}
-      </h3>
+      <div style={{ padding: '20px', flexShrink: 0 }}>
+        <h3 style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
+          {appConfig.ui.imageGallery.title}
+        </h3>
+      </div>
 
-      {viewMode === 'gallery' && renderGallery()}
-      {viewMode === 'upload' && renderUpload()}
-      {viewMode === 'confirm' && renderConfirm()}
-      {viewMode === 'view' && selectedImage && renderImageView()}
+      <div style={{ 
+        flex: 1, 
+        padding: '0 20px 20px 20px', 
+        overflowY: 'auto', 
+        overflowX: 'hidden',
+        minHeight: 0 // Allows flex shrinking
+      }}>
+        {viewMode === 'gallery' && renderGallery()}
+        {viewMode === 'upload' && renderUpload()}
+        {viewMode === 'confirm' && renderConfirm()}
+        {viewMode === 'view' && selectedImage && renderImageView()}
+      </div>
     </div>
   );
 };

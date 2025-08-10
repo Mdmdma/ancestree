@@ -92,7 +92,7 @@ export const appConfig = {
         dragDropTitle: "Per Drag & Drop oder Klick hochladen",
         supportedFormats: "Unterstützte Formate: JPEG, PNG, GIF, WebP (Max 10MB)",
         selectFileButton: "📁 Datei auswählen",
-        dropHereMessage: "Lass dein Bild hier fallen!",
+        dropHereMessage: "",
         howItWorksTitle: "📝 So funktioniert's:",
         steps: [
           "Wähle eine Bilddatei aus oder ziehe sie herein",
@@ -115,7 +115,7 @@ export const appConfig = {
         descriptionLabel: "Beschreibung (optional):",
         descriptionPlaceholder: "Gib eine Beschreibung für dieses Bild ein...",
         descriptionHint: "Füge Details hinzu, wann und wo dieses Foto aufgenommen wurde, wer darauf zu sehen ist oder andere relevante Informationen.",
-        uploadButton: "📤 Bild hochladen",
+        uploadButton: "Bild hochladen",
         uploadingButton: "⏳ Wird hochgeladen...",
         uploadingMessage: "Bitte warte, während dein Bild hochgeladen wird..."
       },

@@ -635,15 +635,19 @@ app.post('/api/images/upload', upload.single('image'), (req, res) => {
 app.get('/api/images', (req, res) => {
   db.all(`SELECT i.*, 
     GROUP_CONCAT(
-      json_object(
-        'person_id', ip.person_id,
-        'person_name', n.name,
-        'person_surname', n.surname,
-        'position_x', ip.position_x,
-        'position_y', ip.position_y,
-        'width', ip.width,
-        'height', ip.height
-      )
+      CASE 
+        WHEN ip.person_id IS NOT NULL THEN 
+          json_object(
+            'person_id', ip.person_id,
+            'person_name', COALESCE(n.name, ''),
+            'person_surname', COALESCE(n.surname, ''),
+            'position_x', ip.position_x,
+            'position_y', ip.position_y,
+            'width', ip.width,
+            'height', ip.height
+          )
+        ELSE NULL
+      END
     ) as people
     FROM images i
     LEFT JOIN image_people ip ON i.id = ip.image_id
@@ -655,21 +659,37 @@ app.get('/api/images', (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    const images = rows.map(row => ({
-      id: row.id,
-      filename: row.filename,
-      originalFilename: row.original_filename,
-      s3Key: row.s3_key,
-      s3Url: row.s3_url,
-      description: row.description,
-      uploadDate: row.upload_date,
-      fileSize: row.file_size,
-      mimeType: row.mime_type,
-      uploadedBy: row.uploaded_by,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      people: row.people ? JSON.parse(`[${row.people}]`) : []
-    }));
+    const images = rows.map(row => {
+      let people = [];
+      if (row.people) {
+        try {
+          // Split by commas and parse each JSON object
+          const peopleStrings = row.people.split(',');
+          people = peopleStrings
+            .filter(p => p && p.trim() !== 'null')
+            .map(p => JSON.parse(p.trim()));
+        } catch (e) {
+          console.error('Error parsing people JSON:', e);
+          people = [];
+        }
+      }
+
+      return {
+        id: row.id,
+        filename: row.filename,
+        originalFilename: row.original_filename,
+        s3Key: row.s3_key,
+        s3Url: row.s3_url,
+        description: row.description,
+        uploadDate: row.upload_date,
+        fileSize: row.file_size,
+        mimeType: row.mime_type,
+        uploadedBy: row.uploaded_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        people: people
+      };
+    });
 
     res.json(images);
   });
