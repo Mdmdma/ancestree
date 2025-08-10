@@ -177,6 +177,10 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
         // Refresh the selected image data
         const updatedImage = await api.getImage(selectedImage.id);
         setSelectedImage(updatedImage);
+        
+        // Also refresh the main gallery to update the person count
+        await loadImages();
+        
         console.log('Person successfully tagged');
       } else {
         if (result.error && result.error.includes('already tagged')) {
@@ -292,7 +296,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             backgroundColor: '#4CAF50',
             color: 'white',
             border: 'none',
-            borderRadius: '5px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '14px'
           }}
@@ -306,7 +310,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             backgroundColor: '#2196F3',
             color: 'white',
             border: 'none',
-            borderRadius: '5px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '14px'
           }}
@@ -397,7 +401,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
           bottom: 0,
           backgroundColor: 'rgba(76, 175, 80, 0.1)',
           border: '3px dashed #4CAF50',
-          borderRadius: '10px',
+          borderRadius: '15px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -425,7 +429,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             backgroundColor: '#666',
             color: 'white',
             border: 'none',
-            borderRadius: '5px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '14px'
           }}
@@ -457,7 +461,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
         <div
           style={{
             border: `2px dashed ${dragOver ? '#4CAF50' : '#666'}`,
-            borderRadius: '10px',
+            borderRadius: '15px',
             padding: '40px',
             textAlign: 'center',
             backgroundColor: '#2a2a2a',
@@ -481,7 +485,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             padding: '12px 24px',
             backgroundColor: '#4CAF50',
             color: 'white',
-            borderRadius: '5px',
+            borderRadius: '8px',
             fontSize: '14px',
             fontWeight: 'bold'
           }}>
@@ -508,9 +512,9 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
         <div style={{ 
           fontSize: '14px', 
           color: '#cccccc', 
-          backgroundColor: '#2a2a2a',
+          backgroundColor: '#2a2a2a', 
           padding: '15px',
-          borderRadius: '5px',
+          borderRadius: '8px',
           border: '1px solid #444',
           width: '100%',
           maxWidth: '400px',
@@ -541,7 +545,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             backgroundColor: '#666',
             color: 'white',
             border: 'none',
-            borderRadius: '5px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '14px'
           }}
@@ -555,7 +559,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             backgroundColor: '#f44336',
             color: 'white',
             border: 'none',
-            borderRadius: '5px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '14px'
           }}
@@ -578,7 +582,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             maxHeight: '300px',
             objectFit: 'contain',
             border: '1px solid #444',
-            borderRadius: '5px',
+            borderRadius: '8px',
             backgroundColor: '#2a2a2a'
           }}
         />
@@ -589,7 +593,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
         marginBottom: '20px', 
         padding: '15px', 
         backgroundColor: '#2a2a2a', 
-        borderRadius: '5px',
+        borderRadius: '8px',
         border: '1px solid #444'
       }}>
         <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{appConfig.ui.imageGallery.confirm.fileInfoTitle}</h5>
@@ -614,7 +618,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             height: '100px',
             padding: '10px',
             border: '1px solid #444',
-            borderRadius: '5px',
+            borderRadius: '8px',
             fontSize: '14px',
             resize: 'vertical',
             fontFamily: 'inherit',
@@ -637,7 +641,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
             backgroundColor: uploadingImage ? '#ccc' : '#4CAF50',
             color: 'white',
             border: 'none',
-            borderRadius: '5px',
+            borderRadius: '8px',
             cursor: uploadingImage ? 'not-allowed' : 'pointer',
             fontSize: '16px',
             fontWeight: 'bold',
@@ -879,8 +883,8 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
                 }}
               >
                 <div
-                  style={{ cursor: 'pointer', flex: 1, color: '#ffffff' }}
-                  onClick={() => onPersonSelect && onPersonSelect(person.personId)}
+                  style={{ cursor: taggingMode ? 'default' : 'pointer', flex: 1, color: '#ffffff' }}
+                  onClick={() => !taggingMode && onPersonSelect && onPersonSelect(person.personId)}
                 >
                   <strong>
                     {((person.personName || person.person_name || '') + ' ' + (person.personSurname || person.person_surname || '')).trim() || 'Unnamed Person'}

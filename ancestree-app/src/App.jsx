@@ -77,6 +77,7 @@ const AddNodeOnEdgeDrop = () => {
   const [debugInfo, setDebugInfo] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [activeTab, setActiveTab] = useState('editor'); // 'editor' or 'images'
+  const [isTaggingMode, setIsTaggingMode] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -779,14 +780,17 @@ const AddNodeOnEdgeDrop = () => {
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
-    setActiveTab('editor'); // Switch to editor tab when a node is selected
+    // Only switch to editor tab if not in tagging mode
+    if (!isTaggingMode) {
+      setActiveTab('editor'); // Switch to editor tab when a node is selected
+    }
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
         data: { ...n.data, isSelected: n.id === node.id }
       }))
     );
-  }, [setNodes, setSelectedNode, setActiveTab]);
+  }, [setNodes, setSelectedNode, setActiveTab, isTaggingMode]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
@@ -911,7 +915,10 @@ const AddNodeOnEdgeDrop = () => {
     const person = nodes.find(node => node.id === personId);
     if (person) {
       setSelectedNode(person);
-      setActiveTab('editor');
+      // Only switch to editor tab if not in tagging mode
+      if (!isTaggingMode) {
+        setActiveTab('editor');
+      }
       setNodes((nds) =>
         nds.map((n) => ({
           ...n,
@@ -919,7 +926,12 @@ const AddNodeOnEdgeDrop = () => {
         }))
       );
     }
-  }, [nodes, setNodes]);
+  }, [nodes, setNodes, isTaggingMode]);
+
+  // Handle tagging mode changes from image gallery
+  const handleTaggingModeChange = useCallback((isTagging) => {
+    setIsTaggingMode(isTagging);
+  }, []);
 
   const onConnectEnd = useCallback(
     async (event, connectionState) => {
@@ -1379,6 +1391,7 @@ const AddNodeOnEdgeDrop = () => {
               nodes={nodes}
               selectedNode={selectedNode}
               onPersonSelect={handlePersonSelectFromGallery}
+              onTaggingModeChange={handleTaggingModeChange}
             />
           )}
         </div>

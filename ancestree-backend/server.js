@@ -634,7 +634,7 @@ app.post('/api/images/upload', upload.single('image'), (req, res) => {
 // Get all images
 app.get('/api/images', (req, res) => {
   db.all(`SELECT i.*, 
-    GROUP_CONCAT(
+    json_group_array(
       CASE 
         WHEN ip.person_id IS NOT NULL THEN 
           json_object(
@@ -663,11 +663,18 @@ app.get('/api/images', (req, res) => {
       let people = [];
       if (row.people) {
         try {
-          // Split by commas and parse each JSON object
-          const peopleStrings = row.people.split(',');
-          people = peopleStrings
-            .filter(p => p && p.trim() !== 'null')
-            .map(p => JSON.parse(p.trim()));
+          // Parse the JSON array
+          const parsedPeople = JSON.parse(row.people);
+          // Filter out null values and convert to camelCase
+          people = parsedPeople.filter(p => p !== null).map(p => ({
+            personId: p.person_id,
+            personName: p.person_name,
+            personSurname: p.person_surname,
+            positionX: p.position_x,
+            positionY: p.position_y,
+            width: p.width,
+            height: p.height
+          }));
         } catch (e) {
           console.error('Error parsing people JSON:', e);
           people = [];
