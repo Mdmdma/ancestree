@@ -23,8 +23,10 @@ db.serialize(() => {
     phone TEXT,
     gender TEXT,
     bloodline BOOLEAN DEFAULT 1,
+    preferred_image_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (preferred_image_id) REFERENCES images (id) ON DELETE SET NULL
   )`);
 
   // Edges table
@@ -70,6 +72,33 @@ db.serialize(() => {
     FOREIGN KEY (person_id) REFERENCES nodes (id) ON DELETE CASCADE,
     UNIQUE(image_id, person_id)
   )`);
+
+  // Add preferred_image_id column to nodes table if it doesn't exist
+  db.run(`PRAGMA table_info(nodes)`, (err, result) => {
+    if (err) {
+      console.error('Error checking table info:', err);
+      return;
+    }
+  });
+  
+  // Check if preferred_image_id column exists, if not add it
+  db.all(`PRAGMA table_info(nodes)`, (err, columns) => {
+    if (err) {
+      console.error('Error checking table columns:', err);
+      return;
+    }
+    
+    const hasPreferredImageId = columns.some(col => col.name === 'preferred_image_id');
+    if (!hasPreferredImageId) {
+      db.run(`ALTER TABLE nodes ADD COLUMN preferred_image_id TEXT REFERENCES images(id) ON DELETE SET NULL`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding preferred_image_id column:', alterErr);
+        } else {
+          console.log('Successfully added preferred_image_id column to nodes table');
+        }
+      });
+    }
+  });
 
   // Insert initial data if empty
   db.get("SELECT COUNT(*) as count FROM nodes", (err, row) => {

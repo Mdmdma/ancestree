@@ -154,5 +154,21 @@ export const api = {
       })
     });
     return response.json();
+  },
+
+  // Preferred image operations
+  async setPreferredImage(personId, imageId) {
+    const response = await fetch(`${API_BASE_URL}/nodes/${personId}/preferred-image`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageId })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to set preferred image');
+    }
+    
+    return response.json();
   }
 };

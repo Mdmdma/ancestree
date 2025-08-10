@@ -52,9 +52,9 @@ const upload = multer({
   }
 });
 
-// Cleanup routine to remove items with null keys
+// Cleanup routine to remove items with null keys and duplicate edges
 function cleanupNullKeys() {
-  console.log('Running cleanup routine for null keys...');
+  console.log('Running cleanup routine for null keys and duplicate edges...');
   
   // Remove nodes with null id
   db.run("DELETE FROM nodes WHERE id IS NULL", function(err) {
@@ -80,6 +80,120 @@ function cleanupNullKeys() {
       console.error('Error cleaning up edges with null references:', err.message);
     } else if (this.changes > 0) {
       console.log(`Cleaned up ${this.changes} edges with null references`);
+    }
+  });
+
+  // Clean up self-loop edges (edges that connect a node with itself)
+  db.run("DELETE FROM edges WHERE source = target", function(err) {
+    if (err) {
+      console.error('Error cleaning up self-loop edges:', err.message);
+    } else if (this.changes > 0) {
+      console.log(`Cleaned up ${this.changes} self-loop edges`);
+    }
+  });
+
+  // Clean up orphaned image references
+  cleanupOrphanedImageReferences();
+
+  // Clean up duplicate edges with same endpoints, keeping only highest rank edge
+  // Only edges of the same type are considered duplicates - different relationship types can coexist
+  cleanupDuplicateEdges();
+}
+
+function cleanupDuplicateEdges() {
+  console.log('Cleaning up duplicate edges with same endpoints and type...');
+  
+  // Find duplicate edges (same source, target, AND type - different relationship types are allowed)
+  const query = `
+    WITH EdgePairs AS (
+      SELECT 
+        e1.id as id1,
+        e2.id as id2,
+        e1.source as source1,
+        e1.target as target1,
+        e2.source as source2,
+        e2.target as target2,
+        e1.type as type1,
+        e2.type as type2,
+        CASE e1.type 
+          WHEN 'bloodline' THEN 1
+          WHEN 'bloodlinehidden' THEN 2  
+          WHEN 'bloodlinefake' THEN 3
+          WHEN 'partner' THEN 4
+          ELSE 5
+        END as priority1,
+        CASE e2.type 
+          WHEN 'bloodline' THEN 1
+          WHEN 'bloodlinehidden' THEN 2
+          WHEN 'bloodlinefake' THEN 3  
+          WHEN 'partner' THEN 4
+          ELSE 5
+        END as priority2
+      FROM edges e1
+      JOIN edges e2 ON e1.id < e2.id
+      WHERE (
+        -- Only consider edges duplicates if they have same endpoints AND same type
+        (e1.source = e2.source AND e1.target = e2.target AND e1.type = e2.type) OR
+        (e1.source = e2.target AND e1.target = e2.source AND e1.type = e2.type)
+      )
+    )
+    SELECT 
+      CASE 
+        WHEN priority1 <= priority2 THEN id2
+        ELSE id1 
+      END as id_to_delete
+    FROM EdgePairs
+  `;
+  
+  db.all(query, (err, duplicateEdges) => {
+    if (err) {
+      console.error('Error finding duplicate edges:', err.message);
+      return;
+    }
+    
+    if (duplicateEdges.length === 0) {
+      console.log('No duplicate edges found');
+      return;
+    }
+    
+    console.log(`Found ${duplicateEdges.length} duplicate edges to remove`);
+    
+    // Delete the lower priority duplicate edges
+    const idsToDelete = duplicateEdges.map(edge => edge.id_to_delete);
+    const placeholders = idsToDelete.map(() => '?').join(',');
+    
+    db.run(`DELETE FROM edges WHERE id IN (${placeholders})`, idsToDelete, function(err) {
+      if (err) {
+        console.error('Error deleting duplicate edges:', err.message);
+      } else {
+        console.log(`Successfully removed ${this.changes} duplicate edges`);
+      }
+    });
+  });
+}
+
+function cleanupOrphanedImageReferences() {
+  console.log('Cleaning up orphaned image references...');
+  
+  // Clean up image_people entries that reference non-existent images
+  db.run(`DELETE FROM image_people 
+          WHERE image_id NOT IN (SELECT id FROM images)`, function(err) {
+    if (err) {
+      console.error('Error cleaning up orphaned image_people entries:', err.message);
+    } else if (this.changes > 0) {
+      console.log(`Cleaned up ${this.changes} orphaned image_people entries`);
+    }
+  });
+  
+  // Clean up preferred_image_id references in nodes that point to non-existent images
+  db.run(`UPDATE nodes 
+          SET preferred_image_id = NULL 
+          WHERE preferred_image_id IS NOT NULL 
+          AND preferred_image_id NOT IN (SELECT id FROM images)`, function(err) {
+    if (err) {
+      console.error('Error cleaning up orphaned preferred image references:', err.message);
+    } else if (this.changes > 0) {
+      console.log(`Cleaned up ${this.changes} orphaned preferred image references`);
     }
   });
 }
@@ -118,6 +232,7 @@ app.get('/api/nodes', (req, res) => {
         phone: row.phone,
         gender: row.gender,
         bloodline: Boolean(row.bloodline),
+        preferredImageId: row.preferred_image_id,
         isSelected: false
       }
     }));
@@ -153,11 +268,11 @@ app.post('/api/nodes', (req, res) => {
   
   db.run(`INSERT INTO nodes (
     id, type, position_x, position_y, name, surname, birth_date, death_date,
-    street, city, zip, country, phone, gender, bloodline
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    street, city, zip, country, phone, gender, bloodline, preferred_image_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     id, type, position.x, position.y, data.name, data.surname, data.birthDate,
     data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender,
-    data.bloodline ? 1 : 0
+    data.bloodline ? 1 : 0, data.preferredImageId || null
   ], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -175,17 +290,37 @@ app.put('/api/nodes/:id', (req, res) => {
   db.run(`UPDATE nodes SET 
     position_x = ?, position_y = ?, name = ?, surname = ?, birth_date = ?,
     death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?, gender = ?,
-    bloodline = ?, updated_at = CURRENT_TIMESTAMP
+    bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?`, [
     position?.x, position?.y, data.name, data.surname, data.birthDate,
     data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender,
-    data.bloodline ? 1 : 0, id
+    data.bloodline ? 1 : 0, data.preferredImageId || null, id
   ], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     res.json({ success: true, changes: this.changes });
+  });
+});
+
+// Set preferred image for a person
+app.put('/api/nodes/:personId/preferred-image', (req, res) => {
+  const { personId } = req.params;
+  const { imageId } = req.body;
+  
+  db.run(`UPDATE nodes SET preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, 
+  [imageId || null, personId], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'Person not found' });
+    }
+    
+    res.json({ success: true, personId, imageId: imageId || null });
   });
 });
 
@@ -263,17 +398,23 @@ app.post('/api/reset', (req, res) => {
 
 // Manual cleanup endpoint
 app.post('/api/cleanup', (req, res) => {
-  let totalCleaned = 0;
+  let totalNullCleaned = 0;
+  let totalSelfLoopsCleaned = 0;
+  let totalDuplicatesCleaned = 0;
+  let totalOrphanedImagesCleaned = 0;
   let operations = 0;
-  const maxOperations = 3;
+  const maxOperations = 7; // Increased to include orphaned image cleanup
   
   function checkComplete() {
     operations++;
     if (operations === maxOperations) {
       res.json({ 
         success: true, 
-        message: `Cleanup completed. Removed ${totalCleaned} items with null keys.`,
-        itemsRemoved: totalCleaned
+        message: `Cleanup completed. Removed ${totalNullCleaned} items with null keys, ${totalSelfLoopsCleaned} self-loop edges, ${totalDuplicatesCleaned} duplicate edges, and ${totalOrphanedImagesCleaned} orphaned image references.`,
+        nullItemsRemoved: totalNullCleaned,
+        selfLoopEdgesRemoved: totalSelfLoopsCleaned,
+        duplicateEdgesRemoved: totalDuplicatesCleaned,
+        orphanedImageReferencesRemoved: totalOrphanedImagesCleaned
       });
     }
   }
@@ -284,7 +425,7 @@ app.post('/api/cleanup', (req, res) => {
       res.status(500).json({ error: 'Error cleaning nodes: ' + err.message });
       return;
     }
-    totalCleaned += this.changes;
+    totalNullCleaned += this.changes;
     checkComplete();
   });
   
@@ -294,7 +435,7 @@ app.post('/api/cleanup', (req, res) => {
       res.status(500).json({ error: 'Error cleaning edges: ' + err.message });
       return;
     }
-    totalCleaned += this.changes;
+    totalNullCleaned += this.changes;
     checkComplete();
   });
   
@@ -304,8 +445,142 @@ app.post('/api/cleanup', (req, res) => {
       res.status(500).json({ error: 'Error cleaning edge references: ' + err.message });
       return;
     }
-    totalCleaned += this.changes;
+    totalNullCleaned += this.changes;
     checkComplete();
+  });
+
+  // Remove self-loop edges (edges that connect a node with itself)
+  db.run("DELETE FROM edges WHERE source = target", function(err) {
+    if (err) {
+      res.status(500).json({ error: 'Error cleaning self-loop edges: ' + err.message });
+      return;
+    }
+    totalSelfLoopsCleaned = this.changes;
+    checkComplete();
+  });
+
+  // Clean up orphaned image_people entries
+  db.run(`DELETE FROM image_people WHERE image_id NOT IN (SELECT id FROM images)`, function(err) {
+    if (err) {
+      res.status(500).json({ error: 'Error cleaning orphaned image_people: ' + err.message });
+      return;
+    }
+    totalOrphanedImagesCleaned += this.changes;
+    checkComplete();
+  });
+
+  // Clean up orphaned preferred image references
+  db.run(`UPDATE nodes SET preferred_image_id = NULL 
+          WHERE preferred_image_id IS NOT NULL 
+          AND preferred_image_id NOT IN (SELECT id FROM images)`, function(err) {
+    if (err) {
+      res.status(500).json({ error: 'Error cleaning orphaned preferred images: ' + err.message });
+      return;
+    }
+    totalOrphanedImagesCleaned += this.changes;
+    checkComplete();
+  });
+
+  // Clean up duplicate edges
+  const duplicateQuery = `
+    WITH EdgePairs AS (
+      SELECT 
+        e1.id as id1,
+        e2.id as id2,
+        e1.source as source1,
+        e1.target as target1,
+        e2.source as source2,
+        e2.target as target2,
+        e1.type as type1,
+        e2.type as type2,
+        CASE e1.type 
+          WHEN 'bloodline' THEN 1
+          WHEN 'bloodlinehidden' THEN 2  
+          WHEN 'bloodlinefake' THEN 3
+          WHEN 'partner' THEN 4
+          ELSE 5
+        END as priority1,
+        CASE e2.type 
+          WHEN 'bloodline' THEN 1
+          WHEN 'bloodlinehidden' THEN 2
+          WHEN 'bloodlinefake' THEN 3  
+          WHEN 'partner' THEN 4
+          ELSE 5
+        END as priority2
+      FROM edges e1
+      JOIN edges e2 ON e1.id < e2.id
+      WHERE (
+        -- Only consider edges duplicates if they have same endpoints AND same type
+        (e1.source = e2.source AND e1.target = e2.target AND e1.type = e2.type) OR
+        (e1.source = e2.target AND e1.target = e2.source AND e1.type = e2.type)
+      )
+    )
+    SELECT 
+      CASE 
+        WHEN priority1 <= priority2 THEN id2
+        ELSE id1 
+      END as id_to_delete
+    FROM EdgePairs
+  `;
+  
+  db.all(duplicateQuery, (err, duplicateEdges) => {
+    if (err) {
+      res.status(500).json({ error: 'Error finding duplicate edges: ' + err.message });
+      return;
+    }
+    
+    if (duplicateEdges.length === 0) {
+      checkComplete();
+      return;
+    }
+    
+    // Delete the lower priority duplicate edges
+    const idsToDelete = duplicateEdges.map(edge => edge.id_to_delete);
+    const placeholders = idsToDelete.map(() => '?').join(',');
+    
+    db.run(`DELETE FROM edges WHERE id IN (${placeholders})`, idsToDelete, function(err) {
+      if (err) {
+        res.status(500).json({ error: 'Error deleting duplicate edges: ' + err.message });
+        return;
+      }
+      totalDuplicatesCleaned = this.changes;
+      checkComplete();
+    });
+  });
+});
+
+// Test endpoint to create self-loop edges for testing cleanup (development only)
+app.post('/api/test/create-self-loops', (req, res) => {
+  // This endpoint is for testing the self-loop cleanup functionality
+  const testEdges = [
+    { id: 'self-loop-1', source: 'node1', target: 'node1', type: 'bloodline' },
+    { id: 'self-loop-2', source: 'node2', target: 'node2', type: 'partner' },
+    { id: 'self-loop-3', source: 'node3', target: 'node3', type: 'bloodlinehidden' },
+    { id: 'normal-edge', source: 'node1', target: 'node2', type: 'bloodline' }, // Normal edge should remain
+  ];
+  
+  let insertCount = 0;
+  const totalInserts = testEdges.length;
+  
+  testEdges.forEach(edge => {
+    db.run(
+      "INSERT OR REPLACE INTO edges (id, source, target, type) VALUES (?, ?, ?, ?)",
+      [edge.id, edge.source, edge.target, edge.type],
+      function(err) {
+        if (err) {
+          console.error('Error inserting test edge:', err.message);
+        } else {
+          insertCount++;
+          if (insertCount === totalInserts) {
+            res.json({ 
+              success: true, 
+              message: `Created ${totalInserts} test edges including self-loops`,
+              testEdges: testEdges
+            });
+          }
+        }
+      }
+    );
   });
 });
 
@@ -592,6 +867,69 @@ app.delete('/api/images/:id', (req, res) => {
           message: 'Image deleted successfully',
           s3Deleted: !s3Err
         });
+      });
+    });
+  });
+});
+
+// Fetch images for a specific person
+app.get('/api/people/:personId/images', (req, res) => {
+  const { personId } = req.params;
+
+  const query = `
+    SELECT i.id, i.s3_url, i.description, i.original_filename, i.created_at
+    FROM images i
+    INNER JOIN image_people ip ON i.id = ip.image_id
+    WHERE ip.person_id = ?
+    ORDER BY i.created_at DESC
+  `;
+
+  db.all(query, [personId], (err, rows) => {
+    if (err) {
+      console.error('Database error in /api/people/:personId/images:', err.message);
+      res.status(500).json({ error: err.message });
+      return;
+    }
+
+    // For each image, get all tagged people
+    const images = [];
+    let processedImages = 0;
+    
+    if (rows.length === 0) {
+      return res.json([]);
+    }
+
+    rows.forEach(row => {
+      const imageId = row.id;
+      
+      // Get all people tagged in this image
+      db.all(`
+        SELECT ip.person_id as personId, n.name as personName, n.surname as personSurname
+        FROM image_people ip
+        JOIN nodes n ON ip.person_id = n.id
+        WHERE ip.image_id = ?
+      `, [imageId], (err, peopleRows) => {
+        if (err) {
+          console.error('Error fetching people for image:', err.message);
+          processedImages++;
+        } else {
+          images.push({
+            id: row.id,
+            s3Url: row.s3_url,
+            description: row.description,
+            originalFilename: row.original_filename,
+            createdAt: row.created_at,
+            people: peopleRows
+          });
+          processedImages++;
+        }
+        
+        // When all images are processed, send response
+        if (processedImages === rows.length) {
+          // Sort by creation date (most recent first)
+          images.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          res.json(images);
+        }
       });
     });
   });

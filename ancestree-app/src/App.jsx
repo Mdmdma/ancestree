@@ -18,6 +18,7 @@ import BloodlineEdge from './BloodlineEdge';
 import BloodlineEdgeHidden from './BloodlineEdgeHidden';
 import BloodlineEdgeFake from './BloodlineEdgeFake';
 import { api } from './api';
+import { appConfig } from './config';
 
 import '@xyflow/react/dist/style.css';
 
@@ -77,6 +78,7 @@ const AddNodeOnEdgeDrop = () => {
   const [debugInfo, setDebugInfo] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
   const [activeTab, setActiveTab] = useState('editor'); // 'editor' or 'images'
+  const [isImageTaggingMode, setIsImageTaggingMode] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -576,8 +578,14 @@ const AddNodeOnEdgeDrop = () => {
         const isPartnerConnection = params.sourceHandle?.includes('partner') || params.targetHandle?.includes('partner');
         
         if (isPartnerConnection) {
-          // Regular partner edge
-          const newEdge = { ...params, type: 'partner', data: { isDebugMode: showDebug } };
+          // Regular partner edge - generate ID if not present
+          const edgeId = params.id || `partner-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const newEdge = { 
+            ...params, 
+            id: edgeId,
+            type: 'partner', 
+            data: { isDebugMode: showDebug } 
+          };
           
           try {
             await api.createEdge(newEdge);
@@ -698,7 +706,13 @@ const AddNodeOnEdgeDrop = () => {
                 setEdges((eds) => eds.filter(edge => edge.id !== existingHiddenEdge.id));
                 
                 // Create normal bloodline edge
-                const normalBloodlineEdge = { ...params, type: 'bloodline', data: { isDebugMode: showDebug } };
+                const edgeId = params.id || `bloodline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const normalBloodlineEdge = { 
+                  ...params, 
+                  id: edgeId,
+                  type: 'bloodline', 
+                  data: { isDebugMode: showDebug } 
+                };
                 await api.createEdge(normalBloodlineEdge);
                 setEdges((eds) => addEdge(normalBloodlineEdge, eds));
               } catch (error) {
@@ -764,6 +778,10 @@ const AddNodeOnEdgeDrop = () => {
             // Create all edges
             for (const edge of edgesToCreate) {
               try {
+                // Ensure edge has an ID
+                if (!edge.id) {
+                  edge.id = `${edge.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                }
                 await api.createEdge(edge);
                 setEdges((eds) => addEdge(edge, eds));
               } catch (error) {
@@ -779,14 +797,19 @@ const AddNodeOnEdgeDrop = () => {
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
-    setActiveTab('editor'); // Switch to editor tab when a node is selected
+    
+    // If in image tagging mode, don't switch to editor tab or open node editor
+    if (!isImageTaggingMode) {
+      setActiveTab('editor'); // Switch to editor tab when a node is selected
+    }
+    
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
         data: { ...n.data, isSelected: n.id === node.id }
       }))
     );
-  }, [setNodes, setSelectedNode, setActiveTab]);
+  }, [setNodes, setSelectedNode, setActiveTab, isImageTaggingMode]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
@@ -920,6 +943,11 @@ const AddNodeOnEdgeDrop = () => {
       );
     }
   }, [nodes, setNodes]);
+
+  // Handle image tagging mode changes
+  const handleImageTaggingModeChange = useCallback((isTagging) => {
+    setIsImageTaggingMode(isTagging);
+  }, []);
 
   const onConnectEnd = useCallback(
     async (event, connectionState) => {
@@ -1125,16 +1153,30 @@ const AddNodeOnEdgeDrop = () => {
   );
 
   if (loading) {
-    return <div>Loading family tree...</div>;
+    return <div>{appConfig.ui.common.loading}</div>;
   }
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw' }}>
       <div style={{ flex: 1 }}>
         <article className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px' }}>
-          <h1>Familie Inntertal</h1>
-          <p>Verbindungen über generationen</p>
-          <p>Hilf jetzt mit unseren Stammbaum zu vervollständigen</p>
+          <h1>{appConfig.header.title}</h1>
+          <p>{appConfig.header.subtitle}</p>
+          <p>{appConfig.header.description}</p>
+          {isImageTaggingMode && (
+            <div style={{
+              backgroundColor: '#e8f5e8',
+              border: '2px solid #4CAF50',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              margin: '5px 0',
+              color: '#2e7d32',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}>
+              {appConfig.ui.imageTagging.activeMessage}
+            </div>
+          )}
         </article>
         <div style={{ width: '100%', height: 'calc(100vh - 120px)' }}>
           <ReactFlow
@@ -1186,7 +1228,7 @@ const AddNodeOnEdgeDrop = () => {
               fontWeight: activeTab === 'editor' ? 'bold' : 'normal'
             }}
           >
-            👤 Editor
+            {appConfig.ui.tabs.editor}
           </button>
           <button
             onClick={() => setActiveTab('images')}
@@ -1202,7 +1244,7 @@ const AddNodeOnEdgeDrop = () => {
               fontWeight: activeTab === 'images' ? 'bold' : 'normal'
             }}
           >
-            📸 Photos
+            {appConfig.ui.tabs.photos}
           </button>
         </div>
 
@@ -1222,9 +1264,9 @@ const AddNodeOnEdgeDrop = () => {
                 />
               ) : (
                 <div style={{ color: 'white' }}>
-                  <h3>Wähle eine Person</h3>
-                  <p>Klicke auf eine beliebige Person, um ihre Informationen zu bearbeiten.</p>
-                  <p>Ziehe von einem farbigen Punkt ins leere, um eine neue Person hinzuzufügen.</p>
+                  <h3>{appConfig.ui.editor.selectPersonTitle}</h3>
+                  <p>{appConfig.ui.editor.selectPersonDescription}</p>
+                  <p>{appConfig.ui.editor.addPersonDescription}</p>
                   
                   <div style={{ marginTop: '30px' }}>
                     <button 
@@ -1243,7 +1285,7 @@ const AddNodeOnEdgeDrop = () => {
                       onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
                       onMouseOut={(e) => e.target.style.backgroundColor = '#4CAF50'}
                     >
-                      🔄 Auto Layout
+                      {appConfig.ui.editor.buttons.autoLayout}
                     </button>
                     
                     <button 
@@ -1262,7 +1304,7 @@ const AddNodeOnEdgeDrop = () => {
                       onMouseOver={(e) => e.target.style.backgroundColor = '#1976D2'}
                       onMouseOut={(e) => e.target.style.backgroundColor = '#2196F3'}
                     >
-                      🔍 Fit to View
+                      {appConfig.ui.editor.buttons.fitToView}
                     </button>
                     
                     <button 
@@ -1281,12 +1323,12 @@ const AddNodeOnEdgeDrop = () => {
                       onMouseOver={(e) => e.target.style.backgroundColor = showDebug ? '#E64A19' : '#7B1FA2'}
                       onMouseOut={(e) => e.target.style.backgroundColor = showDebug ? '#FF5722' : '#9C27B0'}
                     >
-                      {showDebug ? '🚫 Hide Debug' : '🔧 Show Debug'}
+                      {showDebug ? appConfig.ui.editor.buttons.hideDebug : appConfig.ui.editor.buttons.showDebug}
                     </button>
                     
                     <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
-                      Auto Layout: Strg+L (Cmd+L)<br/>
-                      Fit to View: Strg+F (Cmd+F)
+                      Auto Layout: {appConfig.ui.editor.shortcuts.autoLayout}<br/>
+                      Fit to View: {appConfig.ui.editor.shortcuts.fitToView}
                     </p>
                     
                     {showDebug && debugInfo && (
@@ -1300,29 +1342,29 @@ const AddNodeOnEdgeDrop = () => {
                         overflowY: 'auto',
                         border: '1px solid #444'
                       }}>
-                        <h4 style={{ margin: '0 0 10px 0', color: '#FFF' }}>🔧 ELK Debug Info</h4>
+                        <h4 style={{ margin: '0 0 10px 0', color: '#FFF' }}>{appConfig.ui.editor.debug.title}</h4>
                         
                         <div style={{ marginBottom: '15px' }}>
-                          <strong style={{ color: '#4CAF50' }}>Overview:</strong>
-                          <div>Total Nodes: {debugInfo.nodeCount}</div>
-                          <div>Bloodline Nodes (in ELK): {debugInfo.bloodlineNodeCount}</div>
-                          <div>Partner-only Nodes: {debugInfo.partnerOnlyNodeCount}</div>
-                          <div>Bloodline Edges (for layout): {debugInfo.edgeCount}</div>
-                          <div>Fake Bloodline Edges (ignored): {debugInfo.fakeEdgeCount}</div>
-                          <div>Partner Edges: {debugInfo.partnerEdgeCount}</div>
+                          <strong style={{ color: '#4CAF50' }}>{appConfig.ui.editor.debug.overview}</strong>
+                          <div>{appConfig.ui.editor.debug.totalNodes} {debugInfo.nodeCount}</div>
+                          <div>{appConfig.ui.editor.debug.bloodlineNodes} {debugInfo.bloodlineNodeCount}</div>
+                          <div>{appConfig.ui.editor.debug.partnerOnlyNodes} {debugInfo.partnerOnlyNodeCount}</div>
+                          <div>{appConfig.ui.editor.debug.bloodlineEdges} {debugInfo.edgeCount}</div>
+                          <div>{appConfig.ui.editor.debug.fakeEdges} {debugInfo.fakeEdgeCount}</div>
+                          <div>{appConfig.ui.editor.debug.partnerEdges} {debugInfo.partnerEdgeCount}</div>
                         </div>
                         
                         <div style={{ marginBottom: '15px' }}>
-                          <strong style={{ color: '#2196F3' }}>Partner Counts:</strong>
+                          <strong style={{ color: '#2196F3' }}>{appConfig.ui.editor.debug.partnerCounts}</strong>
                           {debugInfo.partnerCounts.map(([nodeId, count]) => (
                             <div key={nodeId} style={{ marginLeft: '10px' }}>
-                              Node {nodeId}: {count} partner{count !== 1 ? 's' : ''}
+                              {appConfig.ui.editor.debug.nodeLabel} {nodeId}: {count} {count !== 1 ? appConfig.ui.editor.debug.partnersPlural : appConfig.ui.editor.debug.partners}
                             </div>
                           ))}
                         </div>
                         
                         <div>
-                          <strong style={{ color: '#FF9800' }}>ELK Node Dimensions:</strong>
+                          <strong style={{ color: '#FF9800' }}>{appConfig.ui.editor.debug.elkNodeDimensions}</strong>
                           {debugInfo.elkNodes.map(node => (
                             <div key={node.id} style={{ 
                               marginLeft: '10px', 
@@ -1331,11 +1373,11 @@ const AddNodeOnEdgeDrop = () => {
                               backgroundColor: '#333',
                               borderRadius: '3px'
                             }}>
-                              <div><strong>Node {node.id}:</strong></div>
-                              <div>• Width: {node.width}px</div>
-                              <div>• Height: {node.height}px</div>
-                              <div>• Partners: {node.properties.numberOfPartners}</div>
-                              <div>• Birth: {node.properties.birthDate || 'Not set'}</div>
+                              <div><strong>{appConfig.ui.editor.debug.nodeLabel} {node.id}:</strong></div>
+                              <div>• {appConfig.ui.editor.debug.width} {node.width}px</div>
+                              <div>• {appConfig.ui.editor.debug.height} {node.height}px</div>
+                              <div>• {appConfig.ui.editor.debug.partnersLabel} {node.properties.numberOfPartners}</div>
+                              <div>• {appConfig.ui.editor.debug.birth} {node.properties.birthDate || appConfig.ui.editor.debug.notSet}</div>
                             </div>
                           ))}
                         </div>
@@ -1344,10 +1386,10 @@ const AddNodeOnEdgeDrop = () => {
                   </div>
                   
                   <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-                    <h4>Verbindungsregeln:</h4>
-                    <p>🔴 Rot (oben): Eltern hinzufügen</p>
-                    <p>🟠 Orange (unten): Kinder hinzufügen</p>
-                    <p>🔵 Blau (links/rechts): Partner hinzufügen</p>
+                    <h4>{appConfig.ui.editor.connectionRules.title}</h4>
+                    <p>{appConfig.ui.editor.connectionRules.parent}</p>
+                    <p>{appConfig.ui.editor.connectionRules.child}</p>
+                    <p>{appConfig.ui.editor.connectionRules.partner}</p>
                   </div>
                 </div>
               )}
@@ -1359,6 +1401,7 @@ const AddNodeOnEdgeDrop = () => {
               nodes={nodes}
               selectedNode={selectedNode}
               onPersonSelect={handlePersonSelectFromGallery}
+              onTaggingModeChange={handleImageTaggingModeChange}
             />
           )}
         </div>
