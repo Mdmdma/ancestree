@@ -223,7 +223,7 @@ const AddNodeOnEdgeDrop = () => {
       
       const birthYear = new Date(birthDate).getFullYear();
       const minYear = 1700;
-      const maxYear = 2050;
+      const maxYear = 2100;
       
       // Clamp birth year to our range and scale it for more separation
       const clampedYear = Math.max(minYear, Math.min(maxYear, birthYear));
