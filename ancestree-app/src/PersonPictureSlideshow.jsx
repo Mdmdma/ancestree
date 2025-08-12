@@ -460,9 +460,10 @@ const overlayStyle = {
 const modalStyle = {
   backgroundColor: '#1a1a1a',
   borderRadius: '10px',
-  width: '90vw',
-  maxWidth: '800px',
-  maxHeight: '90vh',
+  width: '80vw',
+  height:'80vh',
+  maxWidth: '3000px',
+  maxHeight: '3000px',
   display: 'flex',
   flexDirection: 'column',
   border: '1px solid #444'
@@ -502,12 +503,13 @@ const imageContainerStyle = {
   justifyContent: 'center',
   alignItems: 'center',
   marginBottom: '20px',
-  minHeight: '400px',
+  flex: '1 1 0',
+  minHeight: 0,
 };
 
 const mainImageStyle = {
-  maxWidth: '100%',
-  maxHeight: '400px',
+  width: '100%',
+  maxHeight: 'calc(46vh)', // leave space for info and tagged people
   objectFit: 'contain',
   borderRadius: '5px',
 };
@@ -572,7 +574,9 @@ const peopleGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
   gap: '10px',
-  marginTop: '10px'
+  marginTop: '10px',
+  maxHeight: '120px', // only scroll if more than one row
+  overflowY: 'auto',
 };
 
 const thumbnailContainerStyle = {

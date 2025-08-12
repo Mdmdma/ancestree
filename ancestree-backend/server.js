@@ -10,6 +10,7 @@ const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const db = require('./database');
+const axios = require('axios'); // Add axios for API calls
 
 const app = express();
 const PORT = 3001;
@@ -582,6 +583,53 @@ app.post('/api/test/create-self-loops', (req, res) => {
       }
     );
   });
+});
+
+// ============= GEOCODING ENDPOINTS =============
+
+// Geocode address using Google Maps API
+app.post('/api/geocode', async (req, res) => {
+  const { address } = req.body;
+  
+  if (!address || address.trim() === '') {
+    return res.status(400).json({ error: 'Address is required' });
+  }
+  
+  try {
+    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!googleMapsApiKey) {
+      return res.status(500).json({ error: 'Google Maps API key not configured' });
+    }
+    
+    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+      params: {
+        address: address.trim(),
+        key: googleMapsApiKey
+      }
+    });
+    
+    if (response.data.status === 'OK' && response.data.results.length > 0) {
+      const result = response.data.results[0];
+      const location = result.geometry.location;
+      
+      res.json({
+        lat: location.lat,
+        lng: location.lng,
+        formatted_address: result.formatted_address,
+        place_id: result.place_id
+      });
+    } else if (response.data.status === 'ZERO_RESULTS') {
+      res.status(404).json({ error: 'Address not found' });
+    } else if (response.data.status === 'OVER_QUERY_LIMIT') {
+      res.status(429).json({ error: 'Google Maps API quota exceeded' });
+    } else {
+      console.error('Google Maps API error:', response.data);
+      res.status(500).json({ error: 'Failed to geocode address: ' + response.data.status });
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error.message);
+    res.status(500).json({ error: 'Failed to geocode address' });
+  }
 });
 
 // ============= IMAGE ENDPOINTS =============

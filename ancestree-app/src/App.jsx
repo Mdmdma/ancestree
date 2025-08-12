@@ -13,6 +13,7 @@ import ELK from 'elkjs/lib/elk.bundled.js';
 import PersonNode from './PersonNode';
 import NodeEditor from './NodeEditor';
 import ImageGallery from './ImageGallery';
+import MapView from './MapView';
 import PartnerEdge from './PartnerEdge';
 import BloodlineEdge from './BloodlineEdge';
 import BloodlineEdgeHidden from './BloodlineEdgeHidden';
@@ -76,8 +77,9 @@ const AddNodeOnEdgeDrop = () => {
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
-  const [activeTab, setActiveTab] = useState('editor'); // 'editor' or 'images'
+  const [activeTab, setActiveTab] = useState('editor'); // 'editor', 'images', or 'map'
   const [isTaggingMode, setIsTaggingMode] = useState(false);
+  const [isMapMode, setIsMapMode] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -780,8 +782,8 @@ const AddNodeOnEdgeDrop = () => {
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
-    // Only switch to editor tab if not in tagging mode
-    if (!isTaggingMode) {
+    // Only switch to editor tab if not in tagging mode or map mode
+    if (!isTaggingMode && !isMapMode) {
       setActiveTab('editor'); // Switch to editor tab when a node is selected
     }
     setNodes((nds) =>
@@ -790,7 +792,7 @@ const AddNodeOnEdgeDrop = () => {
         data: { ...n.data, isSelected: n.id === node.id }
       }))
     );
-  }, [setNodes, setSelectedNode, setActiveTab, isTaggingMode]);
+  }, [setNodes, setSelectedNode, setActiveTab, isTaggingMode, isMapMode]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
@@ -928,9 +930,37 @@ const AddNodeOnEdgeDrop = () => {
     }
   }, [nodes, setNodes, isTaggingMode]);
 
+  // Handle person selection from map - focus on tree location instead of opening editor
+  const handlePersonSelectFromMap = useCallback((personId) => {
+    const person = nodes.find(node => node.id === personId);
+    if (person) {
+      setSelectedNode(person);
+      // Focus the tree view on the selected person's position with a slight delay
+      setTimeout(() => {
+        fitView({
+          padding: 0.3,
+          duration: 1000,
+          nodes: [{ id: personId }] // Focus only on this node
+        });
+      }, 150);
+      
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          data: { ...n.data, isSelected: n.id === personId }
+        }))
+      );
+    }
+  }, [nodes, setNodes, fitView]);
+
   // Handle tagging mode changes from image gallery
   const handleTaggingModeChange = useCallback((isTagging) => {
     setIsTaggingMode(isTagging);
+  }, []);
+
+  // Handle map mode changes
+  const handleMapModeChange = useCallback((isMapActive) => {
+    setIsMapMode(isMapActive);
   }, []);
 
   const onConnectEnd = useCallback(
@@ -1181,7 +1211,7 @@ const AddNodeOnEdgeDrop = () => {
       </div>
       
       <div style={{ 
-        width: '300px', 
+        width: '20vw', 
         borderLeft: '1px solid #ccc', 
         backgroundColor: '#09380dff',
         padding: '0',
@@ -1229,6 +1259,22 @@ const AddNodeOnEdgeDrop = () => {
             }}
           >
             📸 Photos
+          </button>
+          <button
+            onClick={() => setActiveTab('map')}
+            style={{
+              flex: 1,
+              padding: '12px',
+              backgroundColor: activeTab === 'map' ? '#09380dff' : 'transparent',
+              color: 'white',
+              border: 'none',
+              borderBottom: activeTab === 'map' ? '2px solid #4CAF50' : '2px solid transparent',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: activeTab === 'map' ? 'bold' : 'normal'
+            }}
+          >
+            🗺️ Map
           </button>
         </div>
 
@@ -1392,6 +1438,15 @@ const AddNodeOnEdgeDrop = () => {
               selectedNode={selectedNode}
               onPersonSelect={handlePersonSelectFromGallery}
               onTaggingModeChange={handleTaggingModeChange}
+            />
+          )}
+          
+          {activeTab === 'map' && (
+            <MapView 
+              nodes={nodes}
+              selectedNode={selectedNode}
+              onPersonSelect={handlePersonSelectFromMap}
+              onMapModeChange={handleMapModeChange}
             />
           )}
         </div>

@@ -170,5 +170,21 @@ export const api = {
     }
     
     return response.json();
+  },
+
+  // Geocoding operations
+  async geocodeAddress(address) {
+    const response = await fetch(`${API_BASE_URL}/geocode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to geocode address');
+    }
+    
+    return response.json();
   }
 };
