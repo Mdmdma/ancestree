@@ -134,23 +134,62 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 2C10.84 2 6.67 6.17 6.67 11.33c0 7 9.33 17.33 9.33 17.33s9.33-10.33 9.33-17.33C25.33 6.17 21.16 2 16 2z" fill="${isSelected ? '#FF5722' : '#4CAF50'}" stroke="${isSelected ? '#D32F2F' : '#2E7D32'}" stroke-width="2"/>
+              <defs>
+                <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <feMerge> 
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/> 
+                  </feMerge>
+                </filter>
+              </defs>
+              <path d="M16 2C10.84 2 6.67 6.17 6.67 11.33c0 7 9.33 17.33 9.33 17.33s9.33-10.33 9.33-17.33C25.33 6.17 21.16 2 16 2z" 
+                    fill="${isSelected ? '#FF5722' : '#4CAF50'}" 
+                    stroke="${isSelected ? '#D32F2F' : '#2E7D32'}" 
+                    stroke-width="2"
+                    filter="${isSelected ? 'url(#glow)' : 'none'}"/>
               <circle cx="16" cy="11.33" r="3.33" fill="white"/>
               ${isSelected ? '<circle cx="16" cy="11.33" r="2" fill="#FF5722"/>' : ''}
+              ${isSelected ? '<circle cx="16" cy="11.33" r="1" fill="white" opacity="0.8"/>' : ''}
             </svg>
           `),
-          scaledSize: new window.google.maps.Size(isSelected ? 32 : 24, isSelected ? 32 : 24),
-          anchor: new window.google.maps.Point(isSelected ? 16 : 12, isSelected ? 32 : 24)
+          scaledSize: new window.google.maps.Size(isSelected ? 36 : 24, isSelected ? 36 : 24),
+          anchor: new window.google.maps.Point(isSelected ? 18 : 12, isSelected ? 36 : 24)
+        },
+        zIndex: isSelected ? 1000 : 100,
+        animation: null // Ensure no initial animation
+      });
+
+      // Add hover effects for better interactivity
+      marker.addListener('mouseover', () => {
+        if (!isSelected) {
+          marker.setIcon({
+            ...marker.getIcon(),
+            scaledSize: new window.google.maps.Size(28, 28),
+            anchor: new window.google.maps.Point(14, 28)
+          });
         }
       });
 
-      // Add click listener with slight delay to prevent flickering
+      marker.addListener('mouseout', () => {
+        if (!isSelected) {
+          marker.setIcon({
+            ...marker.getIcon(),
+            scaledSize: new window.google.maps.Size(24, 24),
+            anchor: new window.google.maps.Point(12, 24)
+          });
+        }
+      });
+
+      // Add click listener with enhanced animation
       marker.addListener('click', () => {
         if (onPersonSelect) {
-          // Small delay to prevent rapid successive calls
+          // Add a subtle click animation
+          marker.setAnimation(window.google.maps.Animation.DROP);
           setTimeout(() => {
+            marker.setAnimation(null);
             onPersonSelect(location.nodeId);
-          }, 50);
+          }, 100);
         }
       });
 
@@ -187,6 +226,183 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
     }
   }, [initializeMap]);
 
+  // Function to update marker selection without reinitializing the map
+  const updateMarkerSelection = useCallback(() => {
+    if (!window.google || !markers.length || !locations.length) return;
+
+    markers.forEach((marker, index) => {
+      const location = locations[index];
+      const isSelected = selectedNode && selectedNode.id === location.nodeId;
+      
+      // Create smooth transition by temporarily scaling the marker
+      const currentIcon = marker.getIcon();
+      const newIcon = {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/> 
+                </feMerge>
+              </filter>
+            </defs>
+            <path d="M16 2C10.84 2 6.67 6.17 6.67 11.33c0 7 9.33 17.33 9.33 17.33s9.33-10.33 9.33-17.33C25.33 6.17 21.16 2 16 2z" 
+                  fill="${isSelected ? '#FF5722' : '#4CAF50'}" 
+                  stroke="${isSelected ? '#D32F2F' : '#2E7D32'}" 
+                  stroke-width="2"
+                  filter="${isSelected ? 'url(#glow)' : 'none'}"/>
+            <circle cx="16" cy="11.33" r="3.33" fill="white"/>
+            ${isSelected ? '<circle cx="16" cy="11.33" r="2" fill="#FF5722"/>' : ''}
+            ${isSelected ? '<circle cx="16" cy="11.33" r="1" fill="white" opacity="0.8"/>' : ''}
+          </svg>
+        `),
+        scaledSize: new window.google.maps.Size(isSelected ? 36 : 24, isSelected ? 36 : 24),
+        anchor: new window.google.maps.Point(isSelected ? 18 : 12, isSelected ? 36 : 24)
+      };
+
+      // Apply the new icon with a smooth transition effect
+      if (isSelected && currentIcon?.scaledSize?.width !== newIcon.scaledSize.width) {
+        // Animate the selection change with a brief scale effect
+        const intermediateIcon = {
+          ...newIcon,
+          scaledSize: new window.google.maps.Size(28, 28),
+          anchor: new window.google.maps.Point(14, 28)
+        };
+        
+        marker.setIcon(intermediateIcon);
+        
+        // After a brief moment, set the final selected state
+        setTimeout(() => {
+          marker.setIcon(newIcon);
+        }, 100);
+      } else {
+        marker.setIcon(newIcon);
+      }
+      
+      // Add a subtle z-index change for selected markers
+      if (isSelected) {
+        marker.setZIndex(1000);
+      } else {
+        marker.setZIndex(100);
+      }
+    });
+  }, [markers, locations, selectedNode]);
+
+  // Animate the selected marker with a bounce effect
+  const animateSelectedMarker = useCallback((selectedLocation) => {
+    const selectedMarker = markers.find((marker, index) => {
+      const location = locations[index];
+      return location && location.nodeId === selectedLocation.nodeId;
+    });
+
+    if (selectedMarker) {
+      // Create bounce animation
+      let bounces = 0;
+      const maxBounces = 2;
+      
+      const bounce = () => {
+        if (bounces < maxBounces) {
+          // Animate up
+          selectedMarker.setAnimation(window.google.maps.Animation.BOUNCE);
+          
+          // Stop animation after one bounce cycle
+          setTimeout(() => {
+            selectedMarker.setAnimation(null);
+            bounces++;
+            if (bounces < maxBounces) {
+              setTimeout(bounce, 200); // Delay between bounces
+            }
+          }, 700); // Duration of one bounce
+        }
+      };
+      
+      bounce();
+
+      // Show a brief info window with smooth fade-in effect
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div style="
+            padding: 10px; 
+            font-family: Arial, sans-serif; 
+            text-align: center;
+            animation: fadeIn 0.3s ease-in-out;
+          ">
+            <div style="font-weight: bold; color: #FF5722; font-size: 14px;">
+              📍 ${selectedLocation.name} ${selectedLocation.surname}
+            </div>
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">
+              ${selectedLocation.address}
+            </div>
+          </div>
+          <style>
+            @keyframes fadeIn {
+              from { opacity: 0; transform: scale(0.8); }
+              to { opacity: 1; transform: scale(1); }
+            }
+          </style>
+        `,
+        position: { lat: selectedLocation.latitude, lng: selectedLocation.longitude }
+      });
+
+      // Open the info window
+      infoWindow.open(map);
+
+      // Auto-close after 3 seconds with fade-out effect
+      setTimeout(() => {
+        infoWindow.close();
+      }, 3000);
+    }
+  }, [markers, locations, map]);
+
+  // Smooth animation to selected location
+  const animateToLocation = useCallback((selectedLocation) => {
+    if (!map || !selectedLocation) return;
+
+    const targetPosition = { lat: selectedLocation.latitude, lng: selectedLocation.longitude };
+    const currentZoom = map.getZoom();
+    const targetZoom = currentZoom < 12 ? 13 : Math.max(currentZoom, 12);
+
+    // First, smoothly pan to the location
+    map.panTo(targetPosition);
+
+    // Then animate zoom if needed
+    if (currentZoom !== targetZoom) {
+      // Use smooth zoom animation
+      const zoomDifference = Math.abs(targetZoom - currentZoom);
+      const animationDuration = Math.min(zoomDifference * 200, 1000); // Max 1 second
+      
+      // Animate zoom smoothly
+      const startZoom = currentZoom;
+      const startTime = Date.now();
+      
+      const animateZoom = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / animationDuration, 1);
+        
+        // Use easing function for smooth animation
+        const easeProgress = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const currentAnimatedZoom = startZoom + (targetZoom - startZoom) * easeProgress;
+        
+        map.setZoom(currentAnimatedZoom);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateZoom);
+        }
+      };
+      
+      requestAnimationFrame(animateZoom);
+    }
+
+    // Update markers with animation after a short delay
+    setTimeout(() => {
+      updateMarkerSelection();
+      // Add bounce animation to the selected marker
+      animateSelectedMarker(selectedLocation);
+    }, 300); // Delay to let pan animation settle
+  }, [map, updateMarkerSelection, animateSelectedMarker]);
+
   // Reload locations when nodes change
   useEffect(() => {
     loadLocations();
@@ -197,41 +413,10 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
     if (map && selectedNode && locations.length > 0) {
       const selectedLocation = locations.find(loc => loc.nodeId === selectedNode.id);
       if (selectedLocation) {
-        // Smoothly pan to the selected location without excessive zooming
-        map.panTo({ lat: selectedLocation.latitude, lng: selectedLocation.longitude });
-        // Only zoom in if we're zoomed out too far, and don't zoom excessively
-        const currentZoom = map.getZoom();
-        if (currentZoom < 12) {
-          map.setZoom(13); // More moderate zoom level
-        }
-        
-        // Update markers to show selection (but don't reinitialize entire map)
-        updateMarkerSelection();
+        animateToLocation(selectedLocation);
       }
     }
-  }, [selectedNode, map, locations]);
-
-  // Function to update marker selection without reinitializing the map
-  const updateMarkerSelection = useCallback(() => {
-    if (!window.google || !markers.length || !locations.length) return;
-
-    markers.forEach((marker, index) => {
-      const location = locations[index];
-      const isSelected = selectedNode && selectedNode.id === location.nodeId;
-      
-      marker.setIcon({
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 2C10.84 2 6.67 6.17 6.67 11.33c0 7 9.33 17.33 9.33 17.33s9.33-10.33 9.33-17.33C25.33 6.17 21.16 2 16 2z" fill="${isSelected ? '#FF5722' : '#4CAF50'}" stroke="${isSelected ? '#D32F2F' : '#2E7D32'}" stroke-width="2"/>
-            <circle cx="16" cy="11.33" r="3.33" fill="white"/>
-            ${isSelected ? '<circle cx="16" cy="11.33" r="2" fill="#FF5722"/>' : ''}
-          </svg>
-        `),
-        scaledSize: new window.google.maps.Size(isSelected ? 32 : 24, isSelected ? 32 : 24),
-        anchor: new window.google.maps.Point(isSelected ? 16 : 12, isSelected ? 32 : 24)
-      });
-    });
-  }, [markers, locations, selectedNode]);
+  }, [selectedNode, map, locations, animateToLocation]);
 
   // Cleanup markers when component unmounts
   useEffect(() => {

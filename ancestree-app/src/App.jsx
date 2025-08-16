@@ -33,8 +33,15 @@ const edgeTypes = {
   bloodlinefake: BloodlineEdgeFake,
 };
 
-let id = 1;
-const getId = () => `${id++}`;
+// Replace incremental id generator with UUID-based generator
+const getId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments without crypto.randomUUID
+  return `id-${Math.random().toString(36).slice(2,9)}-${Date.now().toString(36)}`;
+};
+
 const nodeOrigin = [0.5, 0];
 
 // Function to calculate birth date based on relationship

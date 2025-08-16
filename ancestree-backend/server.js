@@ -186,6 +186,16 @@ function cleanupOrphanedImageReferences() {
     }
   });
   
+  // Clean up image_people entries that reference non-existent people/nodes
+  db.run(`DELETE FROM image_people 
+          WHERE person_id NOT IN (SELECT id FROM nodes)`, function(err) {
+    if (err) {
+      console.error('Error cleaning up orphaned image_people person references:', err.message);
+    } else if (this.changes > 0) {
+      console.log(`Cleaned up ${this.changes} orphaned image_people person references`);
+    }
+  });
+  
   // Clean up preferred_image_id references in nodes that point to non-existent images
   db.run(`UPDATE nodes 
           SET preferred_image_id = NULL 
@@ -464,6 +474,16 @@ app.post('/api/cleanup', (req, res) => {
   db.run(`DELETE FROM image_people WHERE image_id NOT IN (SELECT id FROM images)`, function(err) {
     if (err) {
       res.status(500).json({ error: 'Error cleaning orphaned image_people: ' + err.message });
+      return;
+    }
+    totalOrphanedImagesCleaned += this.changes;
+    checkComplete();
+  });
+
+  // Clean up image_people entries that reference non-existent people/nodes
+  db.run(`DELETE FROM image_people WHERE person_id NOT IN (SELECT id FROM nodes)`, function(err) {
+    if (err) {
+      res.status(500).json({ error: 'Error cleaning orphaned image_people person references: ' + err.message });
       return;
     }
     totalOrphanedImagesCleaned += this.changes;
