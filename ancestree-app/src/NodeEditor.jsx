@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useReactFlow } from '@xyflow/react';
 import PersonPictureSlideshow from './PersonPictureSlideshow';
 import { appConfig } from './config';
 
 function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = false, edges = [] }) {
+  const { deleteElements } = useReactFlow();
+  
   const [formData, setFormData] = useState({
     name: '',
     surname: '',
@@ -72,7 +75,8 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
     }
     
     if (window.confirm(`${appConfig.ui.nodeEditor.messages.confirmDeletePrefix}${formData.name} ${formData.surname}${appConfig.ui.nodeEditor.messages.confirmDeleteSuffix}${appConfig.ui.nodeEditor.messages.confirmDelete}`)) {
-      onDelete(node.id);
+      // Use React Flow's deleteElements method to trigger the same deletion as Delete key
+      deleteElements({ nodes: [{ id: node.id }] });
     }
   };
 

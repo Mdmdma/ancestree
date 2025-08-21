@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useReactFlow } from '@xyflow/react';
 
 export default function NodeDebugger({ nodes, edges, onUpdateNode, onDeleteNode }) {
+  const { deleteElements } = useReactFlow();
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [editingNode, setEditingNode] = useState(null);
   const [formData, setFormData] = useState({});
@@ -83,7 +85,8 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode, onDeleteNode 
     
     if (window.confirm(`Are you sure you want to delete node "${formData.name} ${formData.surname}"?`)) {
       try {
-        await onDeleteNode(editingNode.id);
+        // Use React Flow's deleteElements method to trigger the same deletion as Delete key
+        deleteElements({ nodes: [{ id: editingNode.id }] });
         setSelectedNodeId('');
       } catch (error) {
         console.error('Failed to delete node:', error);
