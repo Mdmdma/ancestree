@@ -175,6 +175,42 @@ const FamilyTree = ({
     loadData();
   }, [setNodes, setEdges]);
 
+  // Function to refresh data from database (for ensuring sync)
+  const refreshData = useCallback(async () => {
+    try {
+      const [nodesData, edgesData] = await Promise.all([
+        api.loadNodes(),
+        api.loadEdges()
+      ]);
+      
+      // Process nodes with React Flow properties
+      const processedNodes = nodesData.map(node => ({
+        ...node,
+        deletable: true,
+        selectable: true,
+        data: {
+          ...node.data,
+          bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
+          disabledHandles: node.data.disabledHandles || []
+        }
+      }));
+      
+      // Process edges with debug mode information
+      const processedEdges = edgesData.map(edge => ({
+        ...edge,
+        data: {
+          isDebugMode: showDebug,
+          ...edge.data
+        }
+      }));
+      
+      setNodes(processedNodes);
+      setEdges(processedEdges);
+    } catch (error) {
+      console.error('Failed to refresh data:', error);
+    }
+  }, [setNodes, setEdges, showDebug]);
+
   // Auto layout using ELK with Y-axis constraint based on birth year
   const autoLayout = useCallback(async () => {
     if (nodes.length === 0) return;
@@ -1365,6 +1401,28 @@ const FamilyTree = ({
     [screenToFlowPosition, setNodes, setEdges, showDebug, nodes, edges],
   );
 
+  // Function to update node data from parent component (for syncing sidebar changes)
+  const updateNode = useCallback((nodeId, newData, newPosition) => {
+    if (showDebug) {
+      console.log('FamilyTree: updateNode called for node', nodeId, 'with data:', newData, 'and position:', newPosition);
+    }
+    
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { 
+              ...node, 
+              data: { 
+                ...node.data, 
+                ...newData
+              },
+              ...(newPosition && { position: newPosition })
+            }
+          : node
+      )
+    );
+  }, [setNodes, showDebug]);
+
   // Expose tree operations to parent component
   useEffect(() => {
     if (onNodeUpdate) {
@@ -1372,10 +1430,12 @@ const FamilyTree = ({
         nodes,
         edges,
         autoLayout,
-        fitTreeToView
+        fitTreeToView,
+        updateNode,
+        refreshData
       });
     }
-  }, [nodes, edges, autoLayout, fitTreeToView, onNodeUpdate]);
+  }, [nodes, edges, autoLayout, fitTreeToView, updateNode, refreshData, onNodeUpdate]);
 
   if (loading) {
     return <div>Loading family tree...</div>;

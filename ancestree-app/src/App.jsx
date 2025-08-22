@@ -50,7 +50,9 @@ const AddNodeOnEdgeDrop = () => {
     setEdges(data.edges);
     setTreeOperations({
       autoLayout: data.autoLayout,
-      fitTreeToView: data.fitTreeToView
+      fitTreeToView: data.fitTreeToView,
+      updateNode: data.updateNode,
+      refreshData: data.refreshData
     });
   }, []);
 
@@ -58,52 +60,127 @@ const AddNodeOnEdgeDrop = () => {
   const updateNodeData = useCallback(async (nodeId, newData) => {
     try {
       const node = nodes.find(n => n.id === nodeId);
-      await api.updateNode(nodeId, { position: node.position, data: newData });
+      if (!node) {
+        console.error('Node not found:', nodeId);
+        return;
+      }
+
+      const response = await api.updateNode(nodeId, { position: node.position, data: newData });
       
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === nodeId
-            ? { 
-                ...node, 
-                data: { 
-                  ...node.data, 
-                  ...newData
-                } 
-              }
-            : node
-        )
-      );
+      if (response.success) {
+        // Update the local state
+        setNodes((nds) =>
+          nds.map((node) =>
+            node.id === nodeId
+              ? { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    ...newData
+                  } 
+                }
+              : node
+          )
+        );
+
+        // Update selectedNode if it's the same node being updated
+        if (selectedNode && selectedNode.id === nodeId) {
+          setSelectedNode((prevSelected) => ({
+            ...prevSelected,
+            data: {
+              ...prevSelected.data,
+              ...newData
+            }
+          }));
+        }
+
+        // Also update the tree operations if available to sync FamilyTree component
+        if (treeOperations?.updateNode) {
+          if (showDebug) {
+            console.log('App: Calling treeOperations.updateNode for node', nodeId, 'with data:', newData);
+          }
+          treeOperations.updateNode(nodeId, newData);
+        }
+      } else {
+        console.error('Failed to update node in database');
+        // Optionally refresh data from database to get current state
+        if (treeOperations?.refreshData) {
+          treeOperations.refreshData();
+        }
+      }
     } catch (error) {
       console.error('Failed to update node:', error);
+      // Optionally refresh data from database to get current state
+      if (treeOperations?.refreshData) {
+        treeOperations.refreshData();
+      }
     }
-  }, [nodes]);
+  }, [nodes, treeOperations]);
 
   const updateNodeDataAndPosition = useCallback(async (nodeId, newData, newPosition) => {
     try {
       const currentNode = nodes.find(n => n.id === nodeId);
+      if (!currentNode) {
+        console.error('Node not found:', nodeId);
+        return;
+      }
+
       const finalPosition = newPosition || currentNode.position;
       
-      await api.updateNode(nodeId, { position: finalPosition, data: newData });
+      const response = await api.updateNode(nodeId, { position: finalPosition, data: newData });
       
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === nodeId
-            ? { 
-                ...node, 
-                data: { 
-                  ...node.data, 
-                  ...newData
-                }, 
-                position: finalPosition 
-              }
-            : node
-        )
-      );
+      if (response.success) {
+        // Update the local state
+        setNodes((nds) =>
+          nds.map((node) =>
+            node.id === nodeId
+              ? { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    ...newData
+                  }, 
+                  position: finalPosition 
+                }
+              : node
+          )
+        );
+
+        // Update selectedNode if it's the same node being updated
+        if (selectedNode && selectedNode.id === nodeId) {
+          setSelectedNode((prevSelected) => ({
+            ...prevSelected,
+            data: {
+              ...prevSelected.data,
+              ...newData
+            },
+            position: finalPosition
+          }));
+        }
+
+        // Also update the tree operations if available to sync FamilyTree component
+        if (treeOperations?.updateNode) {
+          if (showDebug) {
+            console.log('App: Calling treeOperations.updateNode for node', nodeId, 'with data:', newData, 'and position:', finalPosition);
+          }
+          treeOperations.updateNode(nodeId, newData, finalPosition);
+        }
+      } else {
+        console.error('Failed to update node in database');
+        // Optionally refresh data from database to get current state
+        if (treeOperations?.refreshData) {
+          treeOperations.refreshData();
+        }
+      }http://localhost:5174/
     } catch (error) {
       console.error('Failed to update node:', error);
+      // Optionally refresh data from database to get current state
+      if (treeOperations?.refreshData) {
+        treeOperations.refreshData();
+      }
       throw error;
     }
-  }, [nodes]);
+  }, [nodes, treeOperations]);
 
   const deleteNode = useCallback(async (nodeId) => {
     try {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import PersonPictureSlideshow from './PersonPictureSlideshow';
 import { appConfig } from './config';
@@ -23,8 +23,39 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
   });
 
   const [showSlideshow, setShowSlideshow] = useState(false);
+  const updateTimeoutRef = useRef(null);
+
+  // Debounced update function
+  const debouncedUpdate = useCallback((nodeId, data, position) => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      if (position) {
+        onUpdate(nodeId, data, position);
+      } else {
+        onUpdate(nodeId, data);
+      }
+    }, 300); // 300ms debounce
+  }, [onUpdate]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
+    // Apply any pending updates from the previous node before switching
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
+    }
+
     if (node) {
       setFormData({
         name: node.data.name || '',
@@ -58,13 +89,13 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
       const dataWithoutPosition = { ...newData };
       delete dataWithoutPosition.positionX;
       delete dataWithoutPosition.positionY;
-      onUpdate(node.id, dataWithoutPosition, newPosition);
+      debouncedUpdate(node.id, dataWithoutPosition, newPosition);
     } else {
       // Regular data update (exclude position fields)
       const dataWithoutPosition = { ...newData };
       delete dataWithoutPosition.positionX;
       delete dataWithoutPosition.positionY;
-      onUpdate(node.id, dataWithoutPosition);
+      debouncedUpdate(node.id, dataWithoutPosition);
     }
   };
 
