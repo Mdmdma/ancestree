@@ -65,7 +65,7 @@ const ElkDebugOverlay = ({ elkDebugData, showDebug }) => {
 };
 
 const renderDebugContent = (popup, elkDebugData) => {
-  const { elkGraph, elkClusters, layoutedGraph } = elkDebugData;
+  const { elkGraph, elkClusters, layoutedGraph, edgeToPortMap } = elkDebugData;
   
   // Calculate total bounds for proper canvas sizing
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -90,7 +90,10 @@ const renderDebugContent = (popup, elkDebugData) => {
       </h2>
       
       ${renderClusters(layoutedGraph, elkClusters, elkGraph, offsetX, offsetY)}
-      ${renderEdges(elkGraph, layoutedGraph, offsetX, offsetY)}
+      
+      <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;">
+        ${renderEdges(elkGraph, layoutedGraph, offsetX, offsetY)}
+      </svg>
       
       <!-- Legend -->
       <div class="legend">
@@ -103,7 +106,15 @@ const renderDebugContent = (popup, elkDebugData) => {
         </div>
         <div style="display: flex; align-items: center; margin-bottom: 4px;">
           <div style="width: 12px; height: 12px; background: #4ecdc4; border: 2px solid #26a69a; border-radius: 50%; margin-right: 8px;"></div>
-          <span>Family Ports</span>
+          <span>Edge-specific Ports</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+          <div style="width: 8px; height: 8px; background: #e74c3c; border: 1px solid #c0392b; border-radius: 2px; margin-right: 10px;"></div>
+          <span>Family Node Position</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+          <div style="width: 16px; height: 3px; background: #ff9f43; margin-right: 6px; opacity: 0.7;"></div>
+          <span>Family→Port Connection</span>
         </div>
         <div style="display: flex; align-items: center; margin-bottom: 4px;">
           <div style="width: 16px; height: 12px; border: 1px solid #ffd93d; background: rgba(255, 217, 61, 0.2); margin-right: 6px;"></div>
@@ -156,20 +167,24 @@ const renderClusters = (layoutedGraph, elkClusters, elkGraph, offsetX, offsetY) 
           Cluster ${index} (Birth: ${cluster.birthYear})
         </div>
 
-        ${renderPorts(elkGraph.children[index], clusterX, clusterY)}
+        ${renderPorts(elkGraph.children[index], layoutedCluster, cluster, clusterX, clusterY)}
         ${renderInternalNodes(cluster, clusterX, clusterY)}
       </div>
     `;
   }).join('') || '';
 };
 
-const renderPorts = (elkCluster, clusterX, clusterY) => {
+const renderPorts = (elkCluster, layoutedCluster, cluster, clusterX, clusterY) => {
   return elkCluster?.ports?.map((port, portIndex) => {
     const anchorMatch = port.layoutOptions['elk.port.anchor']?.match(/\(([^,]+),([^)]+)\)/);
     if (!anchorMatch) return '';
     
     const portX = parseFloat(anchorMatch[1]);
     const portY = parseFloat(anchorMatch[2]);
+    
+    // Determine port side for visual styling
+    const portSide = port.layoutOptions['elk.port.side'] || 'SOUTH';
+    const isTopOrBottom = portSide === 'NORTH' || portSide === 'SOUTH';
     
     return `
       <!-- Port marker -->
@@ -182,24 +197,81 @@ const renderPorts = (elkCluster, clusterX, clusterY) => {
         background: #4ecdc4;
         border: 2px solid #26a69a;
         border-radius: 50%;
+        z-index: 10;
       "></div>
+      
+      <!-- Port group indicator -->
+      ${port.metadata?.familyNodes ? `
+        <div style="
+          position: absolute;
+          left: ${clusterX + portX - 8}px;
+          top: ${clusterY + portY - 8}px;
+          width: 16px;
+          height: 16px;
+          border: 2px dashed #ff9f43;
+          border-radius: 3px;
+          z-index: 9;
+        "></div>
+      ` : ''}
       
       <!-- Port label -->
       <div style="
         position: absolute;
-        left: ${clusterX + portX - 20}px;
-        top: ${clusterY + portY + 15}px;
-        font-size: 10px;
+        left: ${clusterX + portX - 35}px;
+        top: ${clusterY + portY + (isTopOrBottom ? 15 : -35)}px;
+        font-size: 9px;
         color: #26a69a;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 1px 4px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 2px 4px;
         border-radius: 3px;
         border: 1px solid #26a69a;
-        max-width: 40px;
+        max-width: 70px;
         text-align: center;
+        font-weight: bold;
+        z-index: 11;
       ">
-        P${portIndex}
+        ${port.metadata?.edgeId ? 
+          `Edge Port<br/>${port.metadata.edgeId.substring(0, 12)}...` : 
+          `Family Port<br/>${port.id.includes('port-family-') ? port.id.replace('port-family-', 'F:').substring(0, 10) + '...' : `Port ${portIndex}`}`
+        }
       </div>
+      
+      <!-- Family node position indicator -->
+      ${port.metadata?.familyNodeX !== undefined && port.metadata?.familyNodeY !== undefined ? `
+        <div style="
+          position: absolute;
+          left: ${clusterX + port.metadata.familyNodeX - cluster.bounds.minX + 45}px;
+          top: ${clusterY + port.metadata.familyNodeY - cluster.bounds.minY + 45}px;
+          width: 8px;
+          height: 8px;
+          background: #e74c3c;
+          border: 1px solid #c0392b;
+          border-radius: 2px;
+          z-index: 12;
+        "></div>
+        
+        <!-- Connection line from family node to port -->
+        <svg style="
+          position: absolute;
+          left: ${clusterX}px;
+          top: ${clusterY}px;
+          width: ${layoutedCluster.width}px;
+          height: ${layoutedCluster.height}px;
+          pointer-events: none;
+          z-index: 8;
+        ">
+          <line
+            x1="${port.metadata.familyNodeX - cluster.bounds.minX + 50}"
+            y1="${port.metadata.familyNodeY - cluster.bounds.minY + 50}"
+            x2="${portX}"
+            y2="${portY}"
+            stroke="#ff9f43"
+            stroke-width="2"
+            stroke-dasharray="3,3"
+            opacity="0.7"
+          />
+        </svg>
+      ` : ''}
     `;
   }).join('') || '';
 };
@@ -241,66 +313,136 @@ const renderInternalNodes = (cluster, clusterX, clusterY) => {
 };
 
 const renderEdges = (elkGraph, layoutedGraph, offsetX, offsetY) => {
-  return elkGraph?.edges?.map((elkEdge, edgeIndex) => {
-    const sourceIndex = parseInt(elkEdge.sources[0].replace('cluster-', ''));
-    const targetIndex = parseInt(elkEdge.targets[0].replace('cluster-', ''));
-    
-    const sourceCluster = layoutedGraph?.children?.[sourceIndex];
-    const targetCluster = layoutedGraph?.children?.[targetIndex];
-    
-    if (!sourceCluster || !targetCluster) return '';
+  // Helper to find a port's absolute position using anchor coordinates
+  const findPortPosition = (portId) => {
+    for (let clusterIndex = 0; clusterIndex < layoutedGraph.children.length; clusterIndex++) {
+      const cluster = layoutedGraph.children[clusterIndex];
+      const elkCluster = elkGraph.children[clusterIndex];
+      
+      const port = elkCluster?.ports?.find(p => p.id === portId);
+      if (port) {
+        // Extract coordinates from anchor format: "(x,y)"
+        const anchorMatch = port.layoutOptions['elk.port.anchor']?.match(/\(([^,]+),([^)]+)\)/);
+        if (anchorMatch) {
+          const portX = parseFloat(anchorMatch[1]);
+          const portY = parseFloat(anchorMatch[2]);
+          
+          return {
+            x: cluster.x + portX + offsetX,
+            y: cluster.y + portY + offsetY,
+            clusterIndex,
+            portId: port.id,
+            edgeId: port.metadata?.edgeId
+          };
+        }
+      }
+    }
+    return null;
+  };
 
-    const sourceX = sourceCluster.x + sourceCluster.width / 2 + offsetX;
-    const sourceY = sourceCluster.y + sourceCluster.height + offsetY;
-    const targetX = targetCluster.x + targetCluster.width / 2 + offsetX;
-    const targetY = targetCluster.y + offsetY;
+  console.log('Debug: ELK Edges to render:', elkGraph.edges?.length || 0);
+  
+  return elkGraph.edges?.map((elkEdge, edgeIndex) => {
+    const sourceId = elkEdge.sources[0];
+    const targetId = elkEdge.targets[0];
     
+    console.log(`Debug Edge ${edgeIndex}: ${sourceId} -> ${targetId}`);
+
+    let sourcePos = findPortPosition(sourceId);
+    let targetPos = findPortPosition(targetId);
+
+    // Enhanced fallback with better cluster center calculation
+    if (!sourcePos) {
+      console.log(`Warning: Source port ${sourceId} not found, using cluster fallback`);
+      const sourceCluster = layoutedGraph.children.find(c => c.id === sourceId);
+      if (sourceCluster) {
+        sourcePos = {
+          x: sourceCluster.x + sourceCluster.width / 2 + offsetX,
+          y: sourceCluster.y + sourceCluster.height / 2 + offsetY,
+          clusterIndex: -1,
+          portId: sourceId,
+          edgeId: 'cluster-fallback'
+        };
+      }
+    }
+    
+    if (!targetPos) {
+      console.log(`Warning: Target port ${targetId} not found, using cluster fallback`);
+      const targetCluster = layoutedGraph.children.find(c => c.id === targetId);
+      if (targetCluster) {
+        targetPos = {
+          x: targetCluster.x + targetCluster.width / 2 + offsetX,
+          y: targetCluster.y + targetCluster.height / 2 + offsetY,
+          clusterIndex: -1,
+          portId: targetId,
+          edgeId: 'cluster-fallback'
+        };
+      }
+    }
+
+    if (!sourcePos || !targetPos) {
+      console.log(`Error: Could not find positions for edge ${sourceId} -> ${targetId}`);
+      return '';
+    }
+
+    const { x: sourceX, y: sourceY } = sourcePos;
+    const { x: targetX, y: targetY } = targetPos;
+
     const dx = targetX - sourceX;
     const dy = targetY - sourceY;
     const length = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
+    // Extract original edge ID from the ELK edge ID for better labeling
+    const originalEdgeId = elkEdge.id.replace('edge-inter-', '');
+
     return `
-      <!-- Edge line -->
-      <div style="
-        position: absolute;
-        left: ${sourceX}px;
-        top: ${sourceY}px;
-        width: ${length}px;
-        height: 3px;
-        background: #6c5ce7;
-        transform-origin: 0 50%;
-        transform: rotate(${angle}deg);
-        opacity: 0.7;
-      "></div>
-      
-      <!-- Edge arrow -->
-      <div style="
-        position: absolute;
-        left: ${targetX - 5}px;
-        top: ${targetY - 5}px;
-        width: 0;
-        height: 0;
-        border-left: 5px solid #6c5ce7;
-        border-top: 5px solid transparent;
-        border-bottom: 5px solid transparent;
-        transform: rotate(${angle - 90}deg);
-      "></div>
-      
-      <!-- Edge label -->
-      <div style="
-        position: absolute;
-        left: ${sourceX + dx/2 - 15}px;
-        top: ${sourceY + dy/2 - 10}px;
-        font-size: 10px;
-        color: #6c5ce7;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 1px 4px;
-        border-radius: 3px;
-        border: 1px solid #6c5ce7;
-      ">
-        E${edgeIndex}
-      </div>
+      <g>
+        <!-- Edge line -->
+        <line
+          x1="${sourceX}"
+          y1="${sourceY}"
+          x2="${targetX}"
+          y2="${targetY}"
+          stroke="#6c5ce7"
+          stroke-width="3"
+          opacity="0.8"
+          stroke-dasharray="none"
+        />
+        
+        <!-- Edge arrow -->
+        <path 
+          d="M -8 -4 L 0 0 L -8 4 z" 
+          fill="#6c5ce7"
+          transform="translate(${targetX}, ${targetY}) rotate(${angle})"
+          opacity="0.9"
+        />
+        
+        <!-- Edge label with original edge info -->
+        <text 
+          x="${sourceX + dx / 2}" 
+          y="${sourceY + dy / 2 - 8}" 
+          font-size="11" 
+          fill="#6c5ce7" 
+          text-anchor="middle"
+          font-weight="bold"
+          style="text-shadow: 1px 1px 2px rgba(255,255,255,0.8);"
+        >
+          ${originalEdgeId.substring(0, 8)}
+        </text>
+        
+        <!-- Debug info showing port IDs -->
+        <text 
+          x="${sourceX + dx / 2}" 
+          y="${sourceY + dy / 2 + 8}" 
+          font-size="8" 
+          fill="#666" 
+          text-anchor="middle"
+          opacity="0.7"
+        >
+          ${sourcePos.portId.substring(sourcePos.portId.lastIndexOf('-') + 1, sourcePos.portId.lastIndexOf('-') + 4)}→${targetPos.portId.substring(targetPos.portId.lastIndexOf('-') + 1, targetPos.portId.lastIndexOf('-') + 4)}
+        </text>
+      </g>
     `;
   }).join('') || '';
 };

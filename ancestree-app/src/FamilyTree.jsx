@@ -412,14 +412,85 @@ const FamilyTree = ({
         // Sort family nodes by their X position for consistent port ordering
         familyNodesInCluster.sort((a, b) => a.x - b.x);
         
-        const ports = familyNodesInCluster.map((familyNode, portIndex) => ({
-          id: `port-family-${familyNode.id}`,
-          layoutOptions: {
-            'elk.port.side': 'SOUTH',
-            'elk.port.index': `${portIndex}`,
-            'elk.port.anchor': `(${familyNode.x - cluster.bounds.minX + 50}, ${familyNode.y - cluster.bounds.minY + 50})`
-          }
-        }));
+        // Create individual ports for each external edge from family nodes
+        const ports = [];
+        let portIndex = 0;
+        
+        familyNodesInCluster.forEach(familyNode => {
+          // Find all edges connected to this family node that go outside the cluster
+          const externalEdges = edges.filter(edge => {
+            const isConnectedToFamily = edge.source === familyNode.id || edge.target === familyNode.id;
+            if (!isConnectedToFamily) return false;
+            
+            // Check if the other end of the edge is outside this cluster
+            const otherNodeId = edge.source === familyNode.id ? edge.target : edge.source;
+            const isOtherNodeInCluster = cluster.clusterNodes.some(n => n.id === otherNodeId);
+            return !isOtherNodeInCluster;
+          });
+          
+          // Create a dedicated port for each external edge
+          externalEdges.forEach((edge, edgeIndex) => {
+            const otherNodeId = edge.source === familyNode.id ? edge.target : edge.source;
+            const targetClusterIndex = elkClusters.findIndex(c => 
+              c.clusterNodes.some(n => n.id === otherNodeId)
+            );
+            
+            let primaryTargetCluster = null;
+            let primaryTargetType = 'external';
+            
+            if (targetClusterIndex !== -1) {
+              primaryTargetCluster = elkClusters[targetClusterIndex];
+              primaryTargetType = `cluster-${targetClusterIndex}`;
+            }
+            
+            // Determine port side and position based on family node position and target direction
+            let portSide = 'SOUTH';
+            let basePortX = familyNode.x - cluster.bounds.minX + 50;
+            let portY = cluster.bounds.height + 100;
+            
+            if (primaryTargetCluster) {
+              if (primaryTargetCluster.birthYear > cluster.birthYear) {
+                // Target is younger - port on bottom edge
+                portSide = 'SOUTH';
+                portY = cluster.bounds.height + 100;
+              } else {
+                // Target is older - port on top edge  
+                portSide = 'NORTH';
+                portY = 0;
+              }
+            }
+            
+            // Calculate port X position with spacing for multiple ports from same family node
+            const portSpacing = 25; // Distance between ports from the same family node
+            const portOffset = (edgeIndex - (externalEdges.length - 1) / 2) * portSpacing;
+            let portX = basePortX + portOffset;
+            
+            // Ensure port X position is within cluster bounds with some padding
+            portX = Math.max(15, Math.min(cluster.bounds.width + 85, portX));
+            
+            // Create port for this specific edge
+            ports.push({
+              id: `port-family-${familyNode.id}-edge-${edge.id}`,
+              layoutOptions: {
+                'elk.port.side': portSide,
+                'elk.port.index': `${portIndex}`,
+                'elk.port.anchor': `(${portX}, ${portY})`
+              },
+              // Store metadata for debug purposes and edge mapping
+              metadata: {
+                familyNodes: [familyNode.id],
+                targetGroup: primaryTargetType,
+                groupSize: 1,
+                familyNodeX: familyNode.x,
+                familyNodeY: familyNode.y,
+                edgeId: edge.id, // Store the edge ID for mapping
+                targetNodeId: otherNodeId
+              }
+            });
+            
+            portIndex++;
+          });
+        });
         
         elkGraph.children.push({
           id: `cluster-${index}`,
@@ -435,13 +506,27 @@ const FamilyTree = ({
         });
       });
 
-      // Add edges between clusters based on bloodline connections with port usage
-      const clusterConnections = new Map();
-      const edgeWeights = new Map();
+      // Create mapping from edges to their specific ports
+      const edgeToPortMap = new Map();
+      elkGraph.children.forEach((elkCluster, clusterIndex) => {
+        elkCluster.ports?.forEach(port => {
+          if (port.metadata?.edgeId) {
+            edgeToPortMap.set(port.metadata.edgeId, {
+              clusterId: `cluster-${clusterIndex}`,
+              portId: port.id,
+              targetGroup: port.metadata.targetGroup,
+              familyNodeId: port.metadata.familyNodes[0]
+            });
+          }
+        });
+      });
       
-      // Find connections between clusters and calculate weights
+      // Create individual edges for each inter-cluster connection involving family nodes
       edges.forEach(edge => {
         if (edge.type === 'bloodline' || edge.type === 'bloodlinehidden') {
+          const sourceNode = nodes.find(n => n.id === edge.source);
+          const targetNode = nodes.find(n => n.id === edge.target);
+          
           const sourceClusterIndex = elkClusters.findIndex(c => 
             c.clusterNodes.some(n => n.id === edge.source)
           );
@@ -449,151 +534,54 @@ const FamilyTree = ({
             c.clusterNodes.some(n => n.id === edge.target)
           );
           
-          if (sourceClusterIndex !== -1 && targetClusterIndex !== -1 && sourceClusterIndex !== targetClusterIndex) {
-            const connectionKey = `${sourceClusterIndex}-${targetClusterIndex}`;
-            const reverseKey = `${targetClusterIndex}-${sourceClusterIndex}`;
+          // Only process inter-cluster edges
+          if (sourceClusterIndex !== -1 && targetClusterIndex !== -1 && 
+              sourceClusterIndex !== targetClusterIndex) {
             
-            if (!clusterConnections.has(connectionKey) && !clusterConnections.has(reverseKey)) {
-              // Determine direction based on birth years (older -> younger)
-              const sourceCluster = elkClusters[sourceClusterIndex];
-              const targetCluster = elkClusters[targetClusterIndex];
-              const isDownward = sourceCluster.birthYear <= targetCluster.birthYear;
-              
-              const finalSourceIndex = isDownward ? sourceClusterIndex : targetClusterIndex;
-              const finalTargetIndex = isDownward ? targetClusterIndex : sourceClusterIndex;
-              const finalKey = `${finalSourceIndex}-${finalTargetIndex}`;
-              
-              clusterConnections.set(finalKey, true);
-              edgeWeights.set(finalKey, (edgeWeights.get(finalKey) || 0) + 1);
-              
-              // Check if the connection involves family nodes and use appropriate ports
-              const sourceNode = nodes.find(n => n.id === edge.source);
-              const targetNode = nodes.find(n => n.id === edge.target);
-              
-              let sourcePort = null;
-              let targetPort = null;
-              
-              // If source is a family node, use its port
-              if (sourceNode && sourceNode.type === 'family') {
-                sourcePort = `port-family-${sourceNode.id}`;
-              }
-              
-              // If target is a family node, use its port
-              if (targetNode && targetNode.type === 'family') {
-                targetPort = `port-family-${targetNode.id}`;
-              }
-              
-              const elkEdge = {
-                id: `edge-${finalSourceIndex}-${finalTargetIndex}`,
-                sources: [`cluster-${finalSourceIndex}`],
-                targets: [`cluster-${finalTargetIndex}`],
-                layoutOptions: {
-                  'elk.layered.priority': `${10 - edgeWeights.get(finalKey)}`,
-                  'elk.layered.crossingMinimization.positionChoiceConstraint': '0'
-                }
-              };
-              
-              // Add port specifications if family nodes are involved
-              if (sourcePort) {
-                elkEdge.sourcePort = sourcePort;
-              }
-              if (targetPort) {
-                elkEdge.targetPort = targetPort;
-              }
-              
-              elkGraph.edges.push(elkEdge);
-            }
-          }
-        }
-      });
+            // Determine direction based on birth years (older -> younger)
+            const sourceCluster = elkClusters[sourceClusterIndex];
+            const targetCluster = elkClusters[targetClusterIndex];
+            const isDownward = sourceCluster.birthYear <= targetCluster.birthYear;
+            
+            const finalSourceIndex = isDownward ? sourceClusterIndex : targetClusterIndex;
+            const finalTargetIndex = isDownward ? targetClusterIndex : sourceClusterIndex;
+            
+            // Determine which nodes are involved in the correctly oriented edge
+            const effectiveSourceNode = isDownward ? sourceNode : targetNode;
+            const effectiveTargetNode = isDownward ? targetNode : sourceNode;
+            
+            // Find appropriate ports for this specific edge by looking through all ports
+            let sourcePort = null;
+            let targetPort = null;
 
-      // Add edges for children connecting to family nodes through ports
-      // This handles connections from family nodes to children in other clusters
-      edges.forEach(edge => {
-        if (edge.type === 'bloodline' || edge.type === 'bloodlinehidden') {
-          const sourceNode = nodes.find(n => n.id === edge.source);
-          const targetNode = nodes.find(n => n.id === edge.target);
-          
-          // Handle family to child connections (family childrenconnection -> person parent)
-          if (sourceNode && sourceNode.type === 'family' && 
-              targetNode && targetNode.type === 'person' &&
-              edge.sourceHandle === 'childrenconnection' && edge.targetHandle === 'parent') {
-            
-            const sourceClusterIndex = elkClusters.findIndex(c => 
-              c.clusterNodes.some(n => n.id === edge.source)
-            );
-            const targetClusterIndex = elkClusters.findIndex(c => 
-              c.clusterNodes.some(n => n.id === edge.target)
-            );
-            
-            // Only create inter-cluster edges (intra-cluster is handled by positioning)
-            if (sourceClusterIndex !== -1 && targetClusterIndex !== -1 && 
-                sourceClusterIndex !== targetClusterIndex) {
-              
-              const sourceCluster = elkClusters[sourceClusterIndex];
-              const targetCluster = elkClusters[targetClusterIndex];
-              const isDownward = sourceCluster.birthYear <= targetCluster.birthYear;
-              
-              const finalSourceIndex = isDownward ? sourceClusterIndex : targetClusterIndex;
-              const finalTargetIndex = isDownward ? targetClusterIndex : sourceClusterIndex;
-              
-              // Create edge using family port
-              const childEdgeId = `edge-child-${edge.id}`;
-              const childEdge = {
-                id: childEdgeId,
-                sources: [`cluster-${finalSourceIndex}`],
-                targets: [`cluster-${finalTargetIndex}`],
-                sourcePort: isDownward ? `port-family-${sourceNode.id}` : null,
-                targetPort: !isDownward ? `port-family-${sourceNode.id}` : null,
-                layoutOptions: {
-                  'elk.layered.priority': '5',
-                  'elk.layered.crossingMinimization.positionChoiceConstraint': '1'
+            elkGraph.children.forEach(cluster => {
+              cluster.ports?.forEach(port => {
+                if (port.metadata?.edgeId === edge.id) {
+                  // This port is for our current edge. Is it for the source or target?
+                  const portIsForSource = effectiveSourceNode && port.metadata.familyNodes[0] === effectiveSourceNode.id;
+                  const portIsForTarget = effectiveTargetNode && port.metadata.familyNodes[0] === effectiveTargetNode.id;
+
+                  if (portIsForSource) {
+                    sourcePort = port.id;
+                  } else if (portIsForTarget) {
+                    targetPort = port.id;
+                  }
                 }
-              };
-              
-              elkGraph.edges.push(childEdge);
-            }
-          }
-          
-          // Handle child to family connections (person child -> family parentconnection)
-          if (sourceNode && sourceNode.type === 'person' && 
-              targetNode && targetNode.type === 'family' &&
-              edge.sourceHandle === 'child' && edge.targetHandle === 'parentconnection') {
+              });
+            });
             
-            const sourceClusterIndex = elkClusters.findIndex(c => 
-              c.clusterNodes.some(n => n.id === edge.source)
-            );
-            const targetClusterIndex = elkClusters.findIndex(c => 
-              c.clusterNodes.some(n => n.id === edge.target)
-            );
+            // Create edge with unique ID based on the original edge
+            const elkEdge = {
+              id: `edge-inter-${edge.id}`,
+              sources: [sourcePort ? `${sourcePort}` : `cluster-${finalSourceIndex}`],
+              targets: [targetPort ? `${targetPort}` : `cluster-${finalTargetIndex}`],
+              layoutOptions: {
+                'elk.layered.priority': '5',
+                'elk.layered.crossingMinimization.positionChoiceConstraint': '0'
+              }
+            };
             
-            // Only create inter-cluster edges (intra-cluster is handled by positioning)
-            if (sourceClusterIndex !== -1 && targetClusterIndex !== -1 && 
-                sourceClusterIndex !== targetClusterIndex) {
-              
-              const sourceCluster = elkClusters[sourceClusterIndex];
-              const targetCluster = elkClusters[targetClusterIndex];
-              const isDownward = sourceCluster.birthYear <= targetCluster.birthYear;
-              
-              const finalSourceIndex = isDownward ? sourceClusterIndex : targetClusterIndex;
-              const finalTargetIndex = isDownward ? targetClusterIndex : sourceClusterIndex;
-              
-              // Create edge using family port
-              const childEdgeId = `edge-child-${edge.id}`;
-              const childEdge = {
-                id: childEdgeId,
-                sources: [`cluster-${finalSourceIndex}`],
-                targets: [`cluster-${finalTargetIndex}`],
-                sourcePort: !isDownward ? `port-family-${targetNode.id}` : null,
-                targetPort: isDownward ? `port-family-${targetNode.id}` : null,
-                layoutOptions: {
-                  'elk.layered.priority': '5',
-                  'elk.layered.crossingMinimization.positionChoiceConstraint': '1'
-                }
-              };
-              
-              elkGraph.edges.push(childEdge);
-            }
+            elkGraph.edges.push(elkEdge);
           }
         }
       });
@@ -605,7 +593,8 @@ const FamilyTree = ({
       setElkDebugData({
         elkGraph,
         elkClusters,
-        layoutedGraph
+        layoutedGraph,
+        edgeToPortMap // Include edge-to-port mapping for debug visualization
       });
 
       // Apply ELK layout results to clusters while preserving internal structure
