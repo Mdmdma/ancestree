@@ -289,7 +289,7 @@ const FamilyTree = ({
             id: partner.node.id,
             width: 150,
             height: 60,
-            x: -(index + 1) * 220, // Increased spacing
+            x: -(index + 1) * 180, // Reduced spacing for more compact layout
             y: 0
           });
           processedNodes.add(partner.node.id);
@@ -309,7 +309,7 @@ const FamilyTree = ({
             id: partner.node.id,
             width: 150,
             height: 60,
-            x: (index + 1) * 220, // Increased spacing
+            x: (index + 1) * 180, // Reduced spacing for more compact layout
             y: 0
           });
           processedNodes.add(partner.node.id);
@@ -416,7 +416,7 @@ const FamilyTree = ({
       const minBirthYear = Math.min(...elkClusters.map(c => c.birthYear));
       const maxBirthYear = Math.max(...elkClusters.map(c => c.birthYear));
       const yearRange = maxBirthYear - minBirthYear || 1;
-      const ySpacing = 100; // Pixels per year
+      const ySpacing = 70; // Reduced pixels per year for more compact layout
       const baseY = 0;
 
       // Create ELK graph with clusters as nodes and bloodline connections as edges
@@ -425,15 +425,12 @@ const FamilyTree = ({
         layoutOptions: {
           'elk.algorithm': 'layered',
           'elk.direction': 'DOWN',
-          'elk.spacing.nodeNode': '120',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '150',
-          'elk.spacing.componentComponent': '150',
           'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
           'elk.layered.crossingMinimization.semiInteractive': 'true',
           'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
           'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
           'elk.separateConnectedComponents': 'false',
-          'elk.layered.thoroughness': '7'
+          'elk.layered.thoroughness': '1'
         },
         children: [],
         edges: []
@@ -654,8 +651,8 @@ const FamilyTree = ({
         // Apply the cluster position while preserving the internal relative positions
         cluster.clusterNodes.forEach(clusterNode => {
           finalPositions.set(clusterNode.id, {
-            x: clusterX + clusterNode.x - cluster.bounds.minX + 50, // Add padding
-            y: clusterY + clusterNode.y - cluster.bounds.minY + 50  // Add padding
+            x: clusterX + clusterNode.x - cluster.bounds.minX + 20, // Reduced padding
+            y: clusterY + clusterNode.y - cluster.bounds.minY + 20  // Reduced padding
           });
         });
       });
