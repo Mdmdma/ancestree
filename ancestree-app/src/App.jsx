@@ -171,7 +171,7 @@ const AddNodeOnEdgeDrop = () => {
         if (treeOperations?.refreshData) {
           treeOperations.refreshData();
         }
-      }http://localhost:5174/
+      }
     } catch (error) {
       console.error('Failed to update node:', error);
       // Optionally refresh data from database to get current state
