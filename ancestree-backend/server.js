@@ -361,6 +361,12 @@ app.delete('/api/nodes/:id', (req, res) => {
 app.post('/api/edges', (req, res) => {
   const { id, source, target, sourceHandle, targetHandle, type } = req.body;
   
+  // Basic validation
+  if (!id || !source || !target || !type) {
+    res.status(400).json({ error: 'Missing required fields: id, source, target, type' });
+    return;
+  }
+  
   // Create edge normally without partner validation
   db.run(`INSERT INTO edges (id, source, target, source_handle, target_handle, type)
     VALUES (?, ?, ?, ?, ?, ?)`, [id, source, target, sourceHandle, targetHandle, type], function(err) {
@@ -368,7 +374,7 @@ app.post('/api/edges', (req, res) => {
       res.status(500).json({ error: err.message });
       return;
     }
-    res.json({ success: true, id: this.lastID });
+    res.json({ success: true, edgeId: id });
   });
 });
 

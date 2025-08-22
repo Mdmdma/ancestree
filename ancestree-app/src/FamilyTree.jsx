@@ -153,7 +153,17 @@ const FamilyTree = ({
         }));
         
         setNodes(processedNodes);
-        setEdges(edgesData);
+        
+        // Ensure edges have proper React Flow properties
+        const processedEdges = edgesData.map(edge => ({
+          ...edge,
+          data: {
+            isDebugMode: showDebug,
+            ...edge.data // Preserve any existing data
+          }
+        }));
+        
+        setEdges(processedEdges);
         
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -758,6 +768,7 @@ const FamilyTree = ({
       
       const newEdge = { 
         ...params, 
+        id: getId(), // Generate unique ID for the edge
         type: edgeType, 
         data: { isDebugMode: showDebug } 
       };
