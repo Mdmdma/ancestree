@@ -1575,7 +1575,7 @@ const FamilyTree = ({
           style={{
             position: 'absolute',
             top: '10px',
-            left: '10px', // Moved to top-left (was ELK debug button position)
+            left: '10px',
             padding: '8px 16px',
             backgroundColor: isCollaborating ? '#4CAF50' : '#FFC107',
             color: 'white',
@@ -1603,6 +1603,33 @@ const FamilyTree = ({
             : appConfig.ui.collaboration.userOnline.replace('{count}', userCount)
           }
         </div>
+      )}
+      
+      {/* ELK Debug Button - only visible when debug mode is on */}
+      {showDebug && (
+        <button
+          onClick={() => setShowElkDebug(!showElkDebug)}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: isConnected ? '250px' : '10px', // Position next to collaboration indicator if present
+            padding: '8px 16px',
+            backgroundColor: showElkDebug ? '#FF5722' : '#2196F3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            zIndex: 1001,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          🔍 {showElkDebug ? 'Hide ELK Debug' : 'Show ELK Debug'}
+        </button>
       )}
       
       {/* ELK Debug Overlay */}

@@ -16,7 +16,7 @@ export const appConfig = {
 
     // Collaboration
     collaboration: {
-      usersCollaborating: "🤝 {count} Familienmitglieder arbeiten zusammen",
+      usersCollaborating: "🤝 {count} online",
       userOnline: "👤 {count} Familienmitglieder online"
     },
 
