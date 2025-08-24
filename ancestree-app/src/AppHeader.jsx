@@ -1,4 +1,5 @@
 import React from 'react';
+import { appConfig } from './config';
 
 const AppHeader = () => {
   return (
@@ -6,11 +7,31 @@ const AppHeader = () => {
       display: 'flex', 
       flexDirection: 'column', 
       alignItems: 'center', 
-      padding: '10px' 
+      padding: '5px 10px',
+      margin: 0
     }}>
-      <h1>Familie Inntertal</h1>
-      <p>Verbindungen über generationen</p>
-      <p>Hilf jetzt mit unseren Stammbaum zu vervollständigen</p>
+      <h1 style={{ 
+        margin: '0 0 5px 0', 
+        fontSize: '2rem',
+        lineHeight: '1.2'
+      }}>
+        {appConfig.header.title}
+      </h1>
+      <p style={{ 
+        margin: '0 0 3px 0', 
+        fontSize: '0.9rem',
+        lineHeight: '1.2'
+      }}>
+        {appConfig.header.subtitle}
+      </p>
+      <p style={{ 
+        margin: '0', 
+        fontSize: '0.8rem',
+        lineHeight: '1.2',
+        opacity: 0.8
+      }}>
+        {appConfig.header.description}
+      </p>
     </article>
   );
 };

@@ -8,6 +8,7 @@ import {
   useReactFlow,
   useUpdateNodeInternals,
 } from '@xyflow/react';
+import { appConfig } from './config';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import PersonNode from './PersonNode';
 import FamilyNode from './FamilyNode';
@@ -1193,7 +1194,7 @@ const FamilyTree = ({
               }
               
               const familyNodeData = {
-                name: `Familie ${familyEstablishmentYear}`,
+                name: `${appConfig.ui.defaultNames.family} ${familyEstablishmentYear}`,
                 surname: sourceNode.data.surname || '',
                 birthDate: `${familyEstablishmentYear}-01-01`,
                 street: sourceNode.data.street || '',
@@ -1287,7 +1288,7 @@ const FamilyTree = ({
               }
               
               const newNodeData = {
-                name: 'Partner',
+                name: appConfig.ui.defaultNames.partner,
                 surname: sourceNode.data.surname || '',
                 birthDate: `${partnerBirthYear}-01-01`,
                 deathDate: '',
@@ -1348,9 +1349,9 @@ const FamilyTree = ({
             // Determine name based on source handle
             let personName;
             if (sourceHandle === 'childrenconnection') {
-              personName = 'Kind';
+              personName = appConfig.ui.defaultNames.child;
             } else {
-              personName = 'Eltern';
+              personName = appConfig.ui.defaultNames.parent;
             }
             
             // Calculate birth year based on family establishment year
@@ -1377,6 +1378,7 @@ const FamilyTree = ({
               zip: sourceNode.data.zip || '',
               country: sourceNode.data.country || '',
               phone: '',
+              gender: 'male',
               numberOfPartners: 0,
               isSelected: false,
               bloodline: true,
@@ -1541,7 +1543,7 @@ const FamilyTree = ({
   }, [nodes, edges, autoLayout, fitTreeToView, updateNode, refreshData, onNodeUpdate]);
 
   if (loading) {
-    return <div>Loading family tree...</div>;
+    return <div>{appConfig.ui.loading.familyTree}</div>;
   }
 
   return (
@@ -1597,8 +1599,8 @@ const FamilyTree = ({
             }}
           />
           {isCollaborating 
-            ? `🤝 ${userCount} users collaborating`
-            : `👤 ${userCount} user online`
+            ? appConfig.ui.collaboration.usersCollaborating.replace('{count}', userCount)
+            : appConfig.ui.collaboration.userOnline.replace('{count}', userCount)
           }
         </div>
       )}

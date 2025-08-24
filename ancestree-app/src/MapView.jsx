@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { appConfig } from './config';
 import { api } from './api';
 
 const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
@@ -47,7 +48,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
           
           return {
             nodeId: node.id,
-            name: node.data.name || 'Unknown',
+            name: node.data.name || appConfig.ui.mapView.unknownName,
             surname: node.data.surname || '',
             address: address,
             latitude: coordinates.lat,
@@ -64,7 +65,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
       
       setLocations(validLocations);
     } catch (error) {
-      setError('Failed to load locations');
+      setError(appConfig.ui.mapView.errors.failedToLoad);
       console.error('Error loading locations:', error);
     } finally {
       setLoading(false);
@@ -205,7 +206,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
     const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     
     if (!googleMapsApiKey || googleMapsApiKey === 'your_google_maps_api_key_here') {
-      setError('Google Maps API key not configured. Please check the setup documentation.');
+      setError(appConfig.ui.mapView.errors.apiKeyNotConfigured);
       return;
     }
 
@@ -218,7 +219,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
         initializeMap();
       };
       script.onerror = () => {
-        setError('Failed to load Google Maps. Please check your API key and internet connection.');
+        setError(appConfig.ui.mapView.errors.googleMapsLoad);
       };
       document.head.appendChild(script);
     } else {
@@ -330,7 +331,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
             animation: fadeIn 0.3s ease-in-out;
           ">
             <div style="font-weight: bold; color: #FF5722; font-size: 14px;">
-              📍 ${selectedLocation.name} ${selectedLocation.surname}
+              ${appConfig.ui.mapView.selectedPersonAddress} ${selectedLocation.name} ${selectedLocation.surname}
             </div>
             <div style="font-size: 12px; color: #666; margin-top: 5px;">
               ${selectedLocation.address}
@@ -444,7 +445,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
         backgroundColor: '#0a4b11ff'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>🗺️ Family Locations</h3>
+          <h3 style={{ margin: 0 }}>{appConfig.ui.mapView.title}</h3>
           <button 
             onClick={handleRefresh}
             disabled={loading}
@@ -458,7 +459,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
               fontSize: '14px'
             }}
           >
-            {loading ? '🔄' : '↻'} Refresh
+            {loading ? '🔄' : '↻'} {appConfig.ui.mapView.refreshButton}
           </button>
         </div>
         
@@ -472,7 +473,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
             border: '2px solid #4CAF50'
           }}>
             <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
-              📍 {selectedNode.data.name} {selectedNode.data.surname}
+              {appConfig.ui.mapView.selectedPersonAddress} {selectedNode.data.name} {selectedNode.data.surname}
             </div>
             {(selectedNode.data.street || selectedNode.data.city) ? (
               <div style={{ fontSize: '14px', opacity: 0.9 }}>
@@ -485,7 +486,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
               </div>
             ) : (
               <div style={{ fontSize: '14px', opacity: 0.7, fontStyle: 'italic' }}>
-                No address information available
+                {appConfig.ui.mapView.noAddressAvailable}
               </div>
             )}
           </div>
@@ -502,19 +503,15 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
             {error}
             {error.includes('API key not configured') && (
               <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.9 }}>
-                <strong>Setup Instructions:</strong><br/>
-                1. Get a Google Maps API key from Google Cloud Console<br/>
-                2. Add it to your .env file as VITE_GOOGLE_MAPS_API_KEY<br/>
-                3. Enable Maps JavaScript API and Geocoding API<br/>
-                See GOOGLE_MAPS_SETUP.md for detailed instructions.
+                <strong>{appConfig.ui.mapView.errors.setupInstructions.title}</strong><br/>
+                {appConfig.ui.mapView.errors.setupInstructions.step1}<br/>
+                {appConfig.ui.mapView.errors.setupInstructions.step2}<br/>
+                {appConfig.ui.mapView.errors.setupInstructions.step3}<br/>
+                {appConfig.ui.mapView.errors.setupInstructions.seeDocumentation}
               </div>
             )}
           </div>
         )}
-        
-        <div style={{ fontSize: '14px', marginTop: '10px', opacity: 0.8 }}>
-          Showing {locations.length} locations from {nodes.filter(n => n.data.street || n.data.city).length} people with addresses
-        </div>
       </div>
 
       {/* Map Container */}
@@ -534,7 +531,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
             color: 'white',
             fontSize: '18px'
           }}>
-            🔄 Loading locations...
+            {appConfig.ui.mapView.loadingLocations}
           </div>
         )}
         
@@ -553,10 +550,10 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
             textAlign: 'center',
             padding: '20px'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '20px' }}>🗺️</div>
-            <h3>No Locations Found</h3>
+            <div style={{ fontSize: '48px', marginBottom: '20px' }}>{appConfig.ui.mapView.mapIcon}</div>
+            <h3>{appConfig.ui.mapView.noLocationsTitle}</h3>
             <p style={{ opacity: 0.8 }}>
-              Add street and city information to people in the editor to see them on the map.
+              {appConfig.ui.mapView.noLocationsMessage}
             </p>
           </div>
         )}
@@ -570,39 +567,6 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
           }}
         />
       </div>
-
-      {/* Location List */}
-      {locations.length > 0 && (
-        <div style={{ 
-          maxHeight: '200px', 
-          overflowY: 'auto', 
-          borderTop: '1px solid #0a4b11ff',
-          backgroundColor: '#0a4b11ff'
-        }}>
-          {locations.map((location, index) => (
-            <div 
-              key={location.nodeId}
-              onClick={() => onPersonSelect && onPersonSelect(location.nodeId)}
-              style={{
-                padding: '12px 20px',
-                borderBottom: index < locations.length - 1 ? '1px solid #09380dff' : 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-                backgroundColor: selectedNode?.id === location.nodeId ? '#09380dff' : 'transparent'
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#09380dff'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = selectedNode?.id === location.nodeId ? '#09380dff' : 'transparent'}
-            >
-              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-                📍 {location.name} {location.surname}
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
-                {location.address}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

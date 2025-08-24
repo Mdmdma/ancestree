@@ -9,12 +9,24 @@ export const appConfig = {
   
   // UI text configuration
   ui: {
+    // Loading states
+    loading: {
+      familyTree: "Lade Stammbaum ..."
+    },
+
+    // Collaboration
+    collaboration: {
+      usersCollaborating: "🤝 {count} Familienmitglieder arbeiten zusammen",
+      userOnline: "👤 {count} Familienmitglieder online"
+    },
+
     // Tab labels
     tabs: {
       editor: "👤 Editor",
-      photos: "📸 Fotos"
+      photos: "📸 Fotos",
+      map: "🗺️ Karte"
     },
-    
+
     // Editor section text
     editor: {
       selectPersonTitle: "Wähle eine Person",
@@ -23,12 +35,17 @@ export const appConfig = {
       
       // Button labels
       buttons: {
-        autoLayout: "🔄 Automatisches Layout",
-        fitToView: "🔍 Ansicht anpassen",
-        showDebug: "🔧 Debug anzeigen",
-        hideDebug: "🚫 Debug ausblenden"
+        autoLayout: "🔄 Auto Layout",
+        fitToView: "🔍 Fit to View",
       },
-      
+
+      // Keyboard shortcuts help text
+      shortcutsHelp: {
+        autoLayout: "Auto Layout: Strg+L (Cmd+L)",
+        fitToView: "Fit to View: Strg+F (Cmd+F)",
+        debugMode: "Debug Mode: Strg+Shift+D (Cmd+Shift+D)"
+      },
+
       // Connection rules
       connectionRules: {
         title: "Verbindungsregeln:",
@@ -36,16 +53,10 @@ export const appConfig = {
         child: "🟠 Orange (unten): Kinder hinzufügen",
         partner: "🔵 Blau (links/rechts): Partner hinzufügen"
       },
-      
-      // Keyboard shortcuts
-      shortcuts: {
-        autoLayout: "Strg-A",
-        fitToView: "Str-F"
-      },
-      
+
       // Debug information
       debug: {
-        title: "🔧 ELK Debug Info",
+        title: "🔧 ELK Debug Information",
         overview: "Übersicht:",
         totalNodes: "Gesamt Knoten:",
         bloodlineNodes: "Blutlinien-Knoten (in ELK):",
@@ -275,6 +286,41 @@ export const appConfig = {
       next: "Weiter",
       previous: "Zurück",
       close: "Schließen"
+    },
+
+    // Map View component
+    mapView: {
+      title: "🗺️ Wer wohnt wo",
+      refreshButton: "",
+      loadingLocations: "🔄 Standorte werden geladen...",
+      unknownName: "Unbekannt",
+      selectedPersonAddress: "📍",
+      noAddressAvailable: "Keine Adresse verfügbar",
+      showingLocations: "Showing {count} locations from {total} people with addresses",
+      noLocationsTitle: "No Locations Found",
+      noLocationsMessage: "Add street and city information to people in the editor to see them on the map.",
+      mapIcon: "🗺️",
+      errors: {
+        failedToLoad: "Fehler beim Laden der Standorte",
+        googleMapsLoad: "Fehler beim Laden von Google Maps. Bitte überprüfe deinen API-Schlüssel und die Internetverbindung.",
+        apiKeyNotConfigured: "Google Maps API key not configured. Please check the setup documentation.",
+        setupInstructions: {
+          title: "Setup Instructions:",
+          step1: "1. Get a Google Maps API key from Google Cloud Console",
+          step2: "2. Add it to your .env file as VITE_GOOGLE_MAPS_API_KEY", 
+          step3: "3. Enable Maps JavaScript API and Geocoding API",
+          seeDocumentation: "See GOOGLE_MAPS_SETUP.md for detailed instructions."
+        }
+      },
+      noLocations: "Keine Standorte gefunden"
+    },
+
+    // Default node names for auto-generated nodes
+    defaultNames: {
+      partner: "Partner",
+      child: "Kind", 
+      parent: "Eltern",
+      family: "Familie" // Template for family nodes (year will be appended)
     }
   }
 };

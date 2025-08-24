@@ -3,6 +3,7 @@ import NodeEditor from './NodeEditor';
 import ImageGallery from './ImageGallery';
 import MapView from './MapView';
 import ElkDebugOverlay from './ElkDebugOverlay';
+import { appConfig } from './config';
 
 const Sidebar = ({ 
   activeTab, 
@@ -57,39 +58,39 @@ const Sidebar = ({
             fontWeight: activeTab === 'editor' ? 'bold' : 'normal'
           }}
         >
-          👤 Editor
+          {appConfig.ui.tabs.editor}
         </button>
         <button
           onClick={() => setActiveTab('images')}
           style={{
             flex: 1,
-            padding: '12px',
+            padding: '10px',
             backgroundColor: activeTab === 'images' ? '#09380dff' : 'transparent',
             color: 'white',
             border: 'none',
             borderBottom: activeTab === 'images' ? '2px solid #4CAF50' : '2px solid transparent',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '16px',
             fontWeight: activeTab === 'images' ? 'bold' : 'normal'
           }}
         >
-          📸 Photos
+          {appConfig.ui.tabs.photos}
         </button>
         <button
           onClick={() => setActiveTab('map')}
           style={{
             flex: 1,
-            padding: '12px',
+            padding: '10px',
             backgroundColor: activeTab === 'map' ? '#09380dff' : 'transparent',
             color: 'white',
             border: 'none',
             borderBottom: activeTab === 'map' ? '2px solid #4CAF50' : '2px solid transparent',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '16px',
             fontWeight: activeTab === 'map' ? 'bold' : 'normal'
           }}
         >
-          🗺️ Map
+          {appConfig.ui.tabs.map}
         </button>
       </div>
 
@@ -115,9 +116,9 @@ const Sidebar = ({
               />
             ) : (
               <div style={{ color: 'white' }}>
-                <h3>Wähle eine Person</h3>
-                <p>Klicke auf eine beliebige Person, um ihre Informationen zu bearbeiten.</p>
-                <p>Ziehe von einem farbigen Punkt ins leere, um eine neue Person hinzuzufügen.</p>
+                <h3>{appConfig.ui.editor.selectPersonTitle}</h3>
+                <p>{appConfig.ui.editor.selectPersonDescription}</p>
+                <p>{appConfig.ui.editor.addPersonDescription}</p>
                 
                 <div style={{ marginTop: '30px' }}>
                   <button 
@@ -136,7 +137,7 @@ const Sidebar = ({
                     onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
                     onMouseOut={(e) => e.target.style.backgroundColor = '#4CAF50'}
                   >
-                    🔄 Auto Layout
+                    {appConfig.ui.editor.buttons.autoLayout}
                   </button>
                   
                   <button 
@@ -155,27 +156,27 @@ const Sidebar = ({
                     onMouseOver={(e) => e.target.style.backgroundColor = '#1976D2'}
                     onMouseOut={(e) => e.target.style.backgroundColor = '#2196F3'}
                   >
-                    🔍 Fit to View
+                    {appConfig.ui.editor.buttons.fitToView}
                   </button>
                   
                   <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
-                    Auto Layout: Strg+L (Cmd+L)<br/>
-                    Fit to View: Strg+F (Cmd+F)
+                    {appConfig.ui.editor.shortcutsHelp.autoLayout}<br/>
+                    {appConfig.ui.editor.shortcutsHelp.fitToView}
                   </p>
                   
                   {showDebug && (
                     <div style={{ marginTop: '15px' }}>
-                      <h4 style={{ color: 'white', marginBottom: '10px' }}>🔧 ELK Debug Information</h4>
+                      <h4 style={{ color: 'white', marginBottom: '10px' }}>{appConfig.ui.editor.debug.title}</h4>
                       <ElkDebugOverlay debugInfo={debugInfo} />
                     </div>
                   )}
                 </div>
                 
                 <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-                  <h4>Verbindungsregeln:</h4>
-                  <p>🔴 Rot (oben): Eltern hinzufügen</p>
-                  <p>🟠 Orange (unten): Kinder hinzufügen</p>
-                  <p>🔵 Blau (links/rechts): Partner hinzufügen</p>
+                  <h4>{appConfig.ui.editor.connectionRules.title}</h4>
+                  <p>{appConfig.ui.editor.connectionRules.parent}</p>
+                  <p>{appConfig.ui.editor.connectionRules.child}</p>
+                  <p>{appConfig.ui.editor.connectionRules.partner}</p>
                 </div>
               </div>
             )}
