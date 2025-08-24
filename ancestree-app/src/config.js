@@ -296,9 +296,8 @@ export const appConfig = {
       unknownName: "Unbekannt",
       selectedPersonAddress: "📍",
       noAddressAvailable: "Keine Adresse verfügbar",
-      showingLocations: "Showing {count} locations from {total} people with addresses",
-      noLocationsTitle: "No Locations Found",
-      noLocationsMessage: "Add street and city information to people in the editor to see them on the map.",
+      noLocationsTitle: "Keine Standorte gefunden",
+      noLocationsMessage: "Füge Straßen- und Stadtinformationen zu Personen im Editor hinzu, um sie auf der Karte zu sehen.",
       mapIcon: "🗺️",
       errors: {
         failedToLoad: "Fehler beim Laden der Standorte",
@@ -306,10 +305,10 @@ export const appConfig = {
         apiKeyNotConfigured: "Google Maps API key not configured. Please check the setup documentation.",
         setupInstructions: {
           title: "Setup Instructions:",
-          step1: "1. Get a Google Maps API key from Google Cloud Console",
-          step2: "2. Add it to your .env file as VITE_GOOGLE_MAPS_API_KEY", 
-          step3: "3. Enable Maps JavaScript API and Geocoding API",
-          seeDocumentation: "See GOOGLE_MAPS_SETUP.md for detailed instructions."
+          step1: "1. Google Maps API-Schlüssel in der Google Cloud Console erstellen",
+          step2: "2. Füge ihn deiner .env-Datei als VITE_GOOGLE_MAPS_API_KEY hinzu",
+          step3: "3. Aktiviere die Maps JavaScript API und die Geocoding API",
+          seeDocumentation: "Siehe GOOGLE_MAPS_SETUP.md für detaillierte Anweisungen."
         }
       },
       noLocations: "Keine Standorte gefunden"
