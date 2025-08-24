@@ -38,6 +38,11 @@ const AddNodeOnEdgeDrop = () => {
           treeOperations.fitTreeToView();
         }
       }
+      // Toggle debug mode with Ctrl+Shift+D or Cmd+Shift+D
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'D') {
+        event.preventDefault();
+        setShowDebug(prev => !prev);
+      }
     };
 
     window.addEventListener('keydown', handleKeyPress);
@@ -268,7 +273,6 @@ const AddNodeOnEdgeDrop = () => {
         nodes={nodes}
         edges={edges}
         showDebug={showDebug}
-        setShowDebug={setShowDebug}
         debugInfo={debugInfo}
         treeOperations={treeOperations}
         onPersonSelectFromGallery={handlePersonSelectFromGallery}

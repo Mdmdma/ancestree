@@ -2,7 +2,6 @@ import React from 'react';
 import NodeEditor from './NodeEditor';
 import ImageGallery from './ImageGallery';
 import MapView from './MapView';
-import DebugControls from './DebugControls';
 import ElkDebugOverlay from './ElkDebugOverlay';
 
 const Sidebar = ({ 
@@ -12,7 +11,6 @@ const Sidebar = ({
   nodes,
   edges,
   showDebug,
-  setShowDebug,
   debugInfo,
   treeOperations,
   onPersonSelectFromGallery,
@@ -159,11 +157,6 @@ const Sidebar = ({
                   >
                     🔍 Fit to View
                   </button>
-                  
-                  <DebugControls 
-                    showDebug={showDebug}
-                    setShowDebug={setShowDebug}
-                  />
                   
                   <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
                     Auto Layout: Strg+L (Cmd+L)<br/>

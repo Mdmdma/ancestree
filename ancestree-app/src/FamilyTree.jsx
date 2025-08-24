@@ -853,14 +853,6 @@ const FamilyTree = ({
         }
       }
 
-      // Fit view after layout
-      setTimeout(() => {
-        fitView({ 
-          padding: 0.2,
-          duration: 1000
-        });
-      }, 100);
-
     } catch (error) {
       console.error('Auto layout failed:', error);
     }
@@ -945,13 +937,13 @@ const FamilyTree = ({
           };
           
           await api.createEdge(replacementEdge);
-          setEdges((eds) => 
-            eds.map(e => e.id === existingHiddenEdge.id ? replacementEdge : e)
-          );
+          // Edge replacement will be handled by socket listeners:
+          // 1. Deletion event will remove the old edge
+          // 2. Creation event will add the new edge
         } else {
           // Create new edge normally
           await api.createEdge(newEdge);
-          setEdges((eds) => addEdge(newEdge, eds));
+          // Note: Edge will be added to state via socket listener when backend confirms creation
         }
         
         // Special case: When connecting two bloodline nodes with partner edge
@@ -1000,10 +992,9 @@ const FamilyTree = ({
                     
                     api.createEdge(updatedFamilyEdge);
                     
-                    // Update edges array
-                    updatedEdges = updatedEdges.map(e => 
-                      e.id === familyEdge.id ? updatedFamilyEdge : e
-                    );
+                    // Note: Edge updates will be handled by socket listeners
+                    // Remove old edge from local state immediately to prevent display issues
+                    updatedEdges = updatedEdges.filter(e => e.id !== familyEdge.id);
                     
                     // Collect family node for hidden edge creation
                     const familyNodeId = familyEdge.source === targetNode.id ? familyEdge.target : familyEdge.source;
@@ -1054,7 +1045,7 @@ const FamilyTree = ({
                     
                     if (hiddenEdge) {
                       api.createEdge(hiddenEdge);
-                      updatedEdges.push(hiddenEdge);
+                      // Note: Hidden edge will be added to state via socket listener
                     }
                   }
                 });
@@ -1445,7 +1436,7 @@ const FamilyTree = ({
             setTimeout(async () => {
               try {
                 await api.createEdge(newEdge);
-                setEdges((eds) => [...eds, newEdge]);
+                // Note: Edge will be added to state via socket listener when backend confirms creation
                 
                 // Special case: If creating family from partner node, also create hidden bloodline edge from connected bloodline node
                 if (newNode.type === 'family' && sourceNode.type === 'person' && !isBloodlineNode(sourceNode)) {
@@ -1492,7 +1483,7 @@ const FamilyTree = ({
                       setTimeout(async () => {
                         try {
                           await api.createEdge(hiddenEdge);
-                          setEdges((eds) => [...eds, hiddenEdge]);
+                          // Note: Edge will be added to state via socket listener when backend confirms creation
                         } catch (error) {
                           console.error('Failed to create hidden bloodline edge:', error);
                         }
@@ -1612,41 +1603,6 @@ const FamilyTree = ({
             : `👤 ${userCount} user online`
           }
         </div>
-      )}
-      
-      {/* ELK Debug Button - only show when debug mode is active */}
-      {showDebug && (
-        <button
-          onClick={() => setShowElkDebug(!showElkDebug)}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            left: '180px', // Moved to the right (was the collaboration indicator position)
-            padding: '8px 16px',
-            backgroundColor: showElkDebug ? '#ff6b6b' : '#4ecdc4',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            zIndex: 1001,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseOver={(e) => {
-            e.target.style.backgroundColor = showElkDebug ? '#e55555' : '#26a69a';
-            e.target.style.transform = 'translateY(-1px)';
-            e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
-          }}
-          onMouseOut={(e) => {
-            e.target.style.backgroundColor = showElkDebug ? '#ff6b6b' : '#4ecdc4';
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-          }}
-        >
-          {showElkDebug ? '🔍 Hide ELK Debug' : '🔍 Show ELK Debug'}
-        </button>
       )}
       
       {/* ELK Debug Overlay */}
