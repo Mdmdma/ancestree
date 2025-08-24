@@ -171,17 +171,10 @@ export const appConfig = {
         zip: "PLZ",
         country: "Land",
         phone: "Telefon",
-        gender: "Geschlecht",
         bloodline: "Blutlinie",
         position: "Position",
         positionX: "X:",
         positionY: "Y:"
-      },
-      
-      // Gender options
-      gender: {
-        male: "Männlich",
-        female: "Weiblich"
       },
       
       // Buttons
@@ -237,8 +230,7 @@ export const appConfig = {
         street: 'Straße:',
         city: 'Stadt:',
         zip: 'PLZ:',
-        country: 'Land (Code):',
-        gender: 'Geschlecht:'
+        country: 'Land (Code):'
       },
       placeholders: {
         phone: 'z.B. +43 5287 87123',
@@ -246,10 +238,6 @@ export const appConfig = {
         city: 'z.B. Innsbruck',
         zip: '6020',
         country: 'z.B. AT, DE, CH'
-      },
-      genderOptions: {
-        male: 'Männlich',
-        female: 'Weiblich'
       },
       debug: {
         title: '🔧 Debug Felder',

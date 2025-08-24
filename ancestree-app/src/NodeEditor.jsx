@@ -16,7 +16,6 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
     zip: '',
     country: '',
     phone: '',
-    gender: 'male',
     bloodline: false,
     positionX: 0,
     positionY: 0
@@ -24,6 +23,8 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
 
   const [showSlideshow, setShowSlideshow] = useState(false);
   const updateTimeoutRef = useRef(null);
+  const nameInputRef = useRef(null);
+  const previousNodeIdRef = useRef(null);
 
   // Debounced update function
   const debouncedUpdate = useCallback((nodeId, data, position) => {
@@ -57,6 +58,9 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
     }
 
     if (node) {
+      // Check if this is a newly selected node (different from previous)
+      const isNewlySelected = node.id !== previousNodeIdRef.current;
+      
       setFormData({
         name: node.data.name || '',
         surname: node.data.surname || '',
@@ -67,12 +71,27 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
         zip: node.data.zip || '',
         country: node.data.country || '',
         phone: node.data.phone || '',
-        gender: node.data.gender || 'male',
         bloodline: node.data.bloodline || false,
         preferredImageId: node.data.preferredImageId || null,
         positionX: node.position?.x || 0,
         positionY: node.position?.y || 0
       });
+      
+      // Only focus and select text when a new node is selected
+      if (isNewlySelected) {
+        setTimeout(() => {
+          if (nameInputRef.current) {
+            nameInputRef.current.focus();
+            nameInputRef.current.select(); // Also select the text for easy editing
+          }
+        }, 100); // Small delay to ensure the component is rendered
+      }
+      
+      // Update the previous node ID reference
+      previousNodeIdRef.current = node.id;
+    } else {
+      // Clear the previous node ID when no node is selected
+      previousNodeIdRef.current = null;
     }
   }, [node]);
 
@@ -139,6 +158,7 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
       
       <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.name}</label>
       <input
+        ref={nameInputRef}
         type="text"
         value={formData.name}
         onChange={(e) => handleInputChange('name', e.target.value)}
@@ -219,16 +239,6 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
         placeholder={appConfig.ui.nodeEditor.placeholders.country}
         maxLength="2"
       />
-
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.gender}</label>
-      <select
-        value={formData.gender}
-        onChange={(e) => handleInputChange('gender', e.target.value)}
-        style={inputStyle}
-      >
-        <option value="male">{appConfig.ui.nodeEditor.genderOptions.male}</option>
-        <option value="female">{appConfig.ui.nodeEditor.genderOptions.female}</option>
-      </select>
 
       {isDebugMode && (
         <div style={{ marginTop: '20px', borderTop: '1px solid #444', paddingTop: '15px' }}>

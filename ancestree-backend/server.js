@@ -11,18 +11,8 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const db = require('./database');
 const axios = require('axios'); // Add axios for API calls
-const http = require('http');
-const { Server } = require('socket.io');
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
-    methods: ["GET", "POST"]
-  }
-});
-
 const PORT = 3001;
 
 // Configure AWS S3
@@ -229,63 +219,6 @@ setTimeout(cleanupNullKeys, 5000); // Wait 5 seconds after server start
 app.use(cors());
 app.use(bodyParser.json());
 
-// Make io instance available to routes
-app.set('io', io);
-
-// Socket.IO connection handling for real-time collaboration
-const connectedUsers = new Map();
-
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
-  
-  // Join the main family tree room (single tree for now)
-  const roomName = 'family-tree-main';
-  socket.join(roomName);
-  
-  // Track user info
-  connectedUsers.set(socket.id, {
-    id: socket.id,
-    room: roomName,
-    connectedAt: new Date()
-  });
-  
-  // Notify others about user count
-  const userCount = Array.from(connectedUsers.values())
-    .filter(user => user.room === roomName).length;
-  
-  io.to(roomName).emit('user:count', userCount);
-  
-  console.log(`User ${socket.id} joined room ${roomName}. Total users: ${userCount}`);
-  
-  // Handle position updates (throttled on client side)
-  socket.on('node:position', (data) => {
-    socket.to(roomName).emit('node:position', {
-      ...data,
-      updatedBy: socket.id
-    });
-  });
-  
-  // Handle cursor position updates (optional)
-  socket.on('user:cursor', (data) => {
-    socket.to(roomName).emit('user:cursor', {
-      ...data,
-      userId: socket.id
-    });
-  });
-  
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-    connectedUsers.delete(socket.id);
-    
-    const userCount = Array.from(connectedUsers.values())
-      .filter(user => user.room === roomName).length;
-    
-    io.to(roomName).emit('user:count', userCount);
-    console.log(`User ${socket.id} left room ${roomName}. Total users: ${userCount}`);
-  });
-});
-
 // Get all nodes
 app.get('/api/nodes', (req, res) => {
   db.all("SELECT * FROM nodes", (err, rows) => {
@@ -308,7 +241,6 @@ app.get('/api/nodes', (req, res) => {
         zip: row.zip,
         country: row.country,
         phone: row.phone,
-        gender: row.gender,
         bloodline: Boolean(row.bloodline),
         preferredImageId: row.preferred_image_id,
         isSelected: false
@@ -346,27 +278,16 @@ app.post('/api/nodes', (req, res) => {
   
   db.run(`INSERT INTO nodes (
     id, type, position_x, position_y, name, surname, birth_date, death_date,
-    street, city, zip, country, phone, gender, bloodline, preferred_image_id
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    street, city, zip, country, phone, bloodline, preferred_image_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     id, type, position.x, position.y, data.name, data.surname, data.birthDate,
-    data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender,
+    data.deathDate, data.street, data.city, data.zip, data.country, data.phone,
     data.bloodline ? 1 : 0, data.preferredImageId || null
   ], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
-    
-    // Create the full node object for broadcasting
-    const newNode = {
-      id, type, position, data,
-      deletable: true,
-      selectable: true
-    };
-    
-    // Broadcast to other users in the room
-    req.app.get('io').to('family-tree-main').emit('node:created', newNode);
-    
     res.json({ success: true, id: this.lastID });
   });
 });
@@ -378,28 +299,17 @@ app.put('/api/nodes/:id', (req, res) => {
   
   db.run(`UPDATE nodes SET 
     position_x = ?, position_y = ?, name = ?, surname = ?, birth_date = ?,
-    death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?, gender = ?,
+    death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?,
     bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?`, [
     position?.x, position?.y, data.name, data.surname, data.birthDate,
-    data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.gender,
+    data.deathDate, data.street, data.city, data.zip, data.country, data.phone,
     data.bloodline ? 1 : 0, data.preferredImageId || null, id
   ], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
-    
-    // Broadcast the update to other users in the room
-    const updatedNode = {
-      id,
-      position,
-      data,
-      type: req.body.type // Include if provided
-    };
-    
-    req.app.get('io').to('family-tree-main').emit('node:updated', updatedNode);
-    
     res.json({ success: true, changes: this.changes });
   });
 });
@@ -441,10 +351,6 @@ app.delete('/api/nodes/:id', (req, res) => {
         res.status(500).json({ error: err.message });
         return;
       }
-      
-      // Broadcast the deletion to other users
-      req.app.get('io').to('family-tree-main').emit('node:deleted', { id });
-      
       res.json({ success: true, changes: this.changes });
     });
   });
@@ -467,16 +373,6 @@ app.post('/api/edges', (req, res) => {
       res.status(500).json({ error: err.message });
       return;
     }
-    
-    // Create the full edge object for broadcasting
-    const newEdge = {
-      id, source, target, sourceHandle, targetHandle, type,
-      data: req.body.data || {}
-    };
-    
-    // Broadcast to other users in the room
-    req.app.get('io').to('family-tree-main').emit('edge:created', newEdge);
-    
     res.json({ success: true, edgeId: id });
   });
 });
@@ -490,10 +386,6 @@ app.delete('/api/edges/:id', (req, res) => {
       res.status(500).json({ error: err.message });
       return;
     }
-    
-    // Broadcast the deletion to other users
-    req.app.get('io').to('family-tree-main').emit('edge:deleted', { id });
-    
     res.json({ success: true, changes: this.changes });
   });
 });
@@ -1143,7 +1035,6 @@ app.get('/api/people/:personId/images', (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Socket.IO enabled for real-time collaboration`);
 });

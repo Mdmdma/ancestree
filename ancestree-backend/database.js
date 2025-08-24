@@ -21,7 +21,6 @@ db.serialize(() => {
     zip TEXT,
     country TEXT,
     phone TEXT,
-    gender TEXT,
     bloodline BOOLEAN DEFAULT 1,
     preferred_image_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -105,10 +104,10 @@ db.serialize(() => {
     if (row.count === 0) {
       db.run(`INSERT INTO nodes (
         id, type, position_x, position_y, name, surname, birth_date, death_date,
-        street, city, zip, country, phone, gender, bloodline
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        street, city, zip, country, phone, bloodline
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
         '0', 'person', 0, 50, 'Moidal', 'Erler', '1890-01-01', '1950-01-01',
-        'Hauptstraße 123', 'Tux', '6293', 'AT', '+43 5287 87123', 'female', 1
+        'Hauptstraße 123', 'Tux', '6293', 'AT', '+43 5287 87123', 1
       ]);
     }
   });

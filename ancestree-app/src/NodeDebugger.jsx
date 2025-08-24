@@ -24,10 +24,8 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode, onDeleteNode 
           zip: node.data.zip || '',
           country: node.data.country || '',
           phone: node.data.phone || '',
-          gender: node.data.gender || 'male',
           bloodline: node.data.bloodline || false,
-          positionX: node.position.x || 0,
-          positionY: node.position.y || 0
+          disabledHandles: node.data.disabledHandles || [],
         });
       }
     } else {
@@ -56,7 +54,6 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode, onDeleteNode 
       zip: formData.zip,
       country: formData.country,
       phone: formData.phone,
-      gender: formData.gender,
       bloodline: formData.bloodline,
       isSelected: editingNode.data.isSelected
     };
@@ -199,16 +196,6 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode, onDeleteNode 
               onChange={(e) => handleInputChange('surname', e.target.value)}
               style={inputStyle}
             />
-
-            <label style={labelStyle}>Gender:</label>
-            <select
-              value={formData.gender}
-              onChange={(e) => handleInputChange('gender', e.target.value)}
-              style={{...inputStyle, cursor: 'pointer'}}
-            >
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-            </select>
 
             <label style={labelStyle}>Bloodline:</label>
             <input

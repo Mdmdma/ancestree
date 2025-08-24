@@ -3,7 +3,7 @@ import { Position } from "@xyflow/react";
 import CustomHandle from "./CustomHandle";
 
 export default function PersonNode({ data }) {
-  const { name, surname, birthDate, deathDate, street, city, zip, country, phone, gender, isSelected, disabledHandles = [] } = data;
+  const { name, surname, birthDate, deathDate, street, city, zip, country, phone, isSelected, disabledHandles = [] } = data;
 
   // Format address display
   const formatAddress = () => {
@@ -78,7 +78,6 @@ export default function PersonNode({ data }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "1.5rem" }}>{gender === "male" ? "👨" : "👩"}</span>
           <div style={{ fontWeight: "bold", fontSize: "0.9rem" }}>
             {name} {surname}
           </div>
@@ -106,9 +105,6 @@ export default function PersonNode({ data }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-        <div>
-          <span style={{ fontSize: "2rem" }}>{gender === "male" ? "👨" : "👩"}</span>
-        </div>
         <div style={{ flex: "1" }}>
           <div style={{ fontWeight: "bold", fontSize: "1rem" }}>
             {name} {surname}

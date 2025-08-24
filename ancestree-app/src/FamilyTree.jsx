@@ -1296,7 +1296,6 @@ const FamilyTree = ({
                 zip: sourceNode.data.zip || '',
                 country: sourceNode.data.country || '',
                 phone: '',
-                gender: sourceNode.data.gender === 'male' ? 'female' : 'male', // Opposite gender
                 numberOfPartners: 0,
                 isSelected: false,
                 bloodline: false,
@@ -1378,7 +1377,6 @@ const FamilyTree = ({
               zip: sourceNode.data.zip || '',
               country: sourceNode.data.country || '',
               phone: '',
-              gender: 'male',
               numberOfPartners: 0,
               isSelected: false,
               bloodline: true,
