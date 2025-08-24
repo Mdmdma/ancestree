@@ -51,25 +51,13 @@ export default function FamilyNode({ data }) {
           />
         );
       })}
-      {/* Routing ports for inter-cluster connections */}
-      <CustomHandle 
-        type="target" 
-        position={Position.Left} 
-        id="routing-in"
-        style={handleStyles.routingIn}
-      />
-      <CustomHandle 
-        type="source" 
-        position={Position.Right} 
-        id="routing-out"
-        style={handleStyles.routingOut}
-      />
+      {/* Routing ports for inter-cluster connections - REMOVED */}
     </>
   );
 
-  // Circle size based on selection state
-  const circleSize = isSelected ? 80 : 60;
-  const fontSize = isSelected ? "14px" : "12px";
+  // Circle size - no longer changes based on selection since not selectable
+  const circleSize = 40;
+  const fontSize = "12px";
 
   return (
     <div
@@ -80,11 +68,10 @@ export default function FamilyNode({ data }) {
         justifyContent: "center",
         width: `${circleSize}px`,
         height: `${circleSize}px`,
-        borderRadius: "50%",
-        backgroundColor: isSelected ? "#fef3c7" : "#f3f4f6",
-        border: isSelected ? "3px solid #f59e0b" : "2px solid #9ca3af",
-        cursor: "pointer",
-        boxShadow: isSelected ? "0 4px 12px rgba(245, 158, 11, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.1)"
+        borderRadius: "100%",
+        backgroundColor: "#f3f4f6",
+        border: "2px solid #9ca3af",
+        boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
       }}
     >
       <div 
@@ -92,12 +79,11 @@ export default function FamilyNode({ data }) {
           fontWeight: "bold", 
           fontSize: fontSize,
           textAlign: "center",
-          color: isSelected ? "#92400e" : "#374151",
+          color: "#374151",
           wordBreak: "break-word",
           padding: "4px"
         }}
       >
-        {name || "Family"}
       </div>
       <HandleComponent />
     </div>

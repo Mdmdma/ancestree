@@ -78,7 +78,7 @@ export default function PersonNode({ data }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ fontWeight: "bold", fontSize: "0.9rem" }}>
+          <div style={{ fontWeight: "bold", fontSize: "1.2rem", color : "#374151" }}>
             {name} {surname}
           </div>
         </div>
@@ -106,16 +106,16 @@ export default function PersonNode({ data }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
         <div style={{ flex: "1" }}>
-          <div style={{ fontWeight: "bold", fontSize: "1rem" }}>
+          <div style={{ fontWeight: "bold", fontSize: "1rem", color: "#222" }}>
             {name} {surname}
           </div>
           {birthDate && (
-            <div style={{ fontSize: "0.75rem", color: "#666" }}>
+            <div style={{ fontSize: "0.75rem", color: "#333" }}>
               * {birthDate}
             </div>
           )}
           {deathDate && (
-            <div style={{ fontSize: "0.75rem", color: "#666" }}>
+            <div style={{ fontSize: "0.75rem", color: "#333" }}>
               † {deathDate}
             </div>
           )}
@@ -124,7 +124,7 @@ export default function PersonNode({ data }) {
       
       {address && (
         <div style={{ width: "100%" }}>
-          <div style={{ fontSize: "0.75rem", color: "#888" }}>
+          <div style={{ fontSize: "0.75rem", color: "#444" }}>
             📍 {address}
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function PersonNode({ data }) {
       
       {phone && (
         <div style={{ width: "100%" }}>
-          <div style={{ fontSize: "0.75rem", color: "#888" }}>
+          <div style={{ fontSize: "0.75rem", color: "#444" }}>
             📞 {phone}
           </div>
         </div>
