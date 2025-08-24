@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import {
   Background,
   ReactFlow,
@@ -17,6 +17,8 @@ import BloodlineEdgeHidden from './BloodlineEdgeHidden';
 import BloodlineEdgeFake from './BloodlineEdgeFake';
 import ElkDebugOverlay from './ElkDebugOverlay';
 import { api } from './api';
+import { useSocket } from './hooks/useSocket';
+import { useDebounce } from './hooks/useDebounce';
 
 import '@xyflow/react/dist/style.css';
 
@@ -66,6 +68,17 @@ const FamilyTree = ({
   const { screenToFlowPosition, fitView } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
 
+  // Real-time collaboration setup
+  const { socket, isConnected, userCount, isCollaborating } = useSocket('http://localhost:3001');
+  const [recentChanges, setRecentChanges] = useState(new Set());
+
+  // Debounced position update for real-time collaboration
+  const [debouncedPositionUpdate] = useDebounce((nodeId, position) => {
+    if (socket && isCollaborating) {
+      socket.emit('node:position', { nodeId, position });
+    }
+  }, 300);
+
   // Update edges with debug mode information when showDebug changes
   useEffect(() => {
     setEdges((currentEdges) =>
@@ -82,24 +95,126 @@ const FamilyTree = ({
     }
   }, [showDebug, setEdges]);
 
+  // Real-time collaboration event listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    // Helper function to add visual feedback for recent changes
+    const addRecentChangeIndicator = (nodeId) => {
+      setRecentChanges(prev => new Set([...prev, nodeId]));
+      setTimeout(() => {
+        setRecentChanges(prev => {
+          const next = new Set(prev);
+          next.delete(nodeId);
+          return next;
+        });
+        // Clear the visual indicator from node data
+        setNodes(nds => nds.map(n => 
+          n.id === nodeId 
+            ? { ...n, data: { ...n.data, isRecentChange: false } }
+            : n
+        ));
+      }, 2000);
+    };
+
+    // Listen for remote node creation
+    socket.on('node:created', (remoteNode) => {
+      console.log('Remote node created:', remoteNode);
+      setNodes(nds => {
+        // Check if node already exists to prevent duplicates
+        if (nds.find(n => n.id === remoteNode.id)) return nds;
+        return [...nds, remoteNode];
+      });
+      addRecentChangeIndicator(remoteNode.id);
+    });
+
+    // Listen for remote node updates
+    socket.on('node:updated', (remoteNode) => {
+      console.log('Remote node updated:', remoteNode);
+      setNodes(nds => nds.map(n => 
+        n.id === remoteNode.id 
+          ? { 
+              ...n, 
+              ...remoteNode, 
+              data: { 
+                ...n.data, 
+                ...remoteNode.data, 
+                isRecentChange: true 
+              } 
+            }
+          : n
+      ));
+      addRecentChangeIndicator(remoteNode.id);
+    });
+
+    // Listen for remote node deletions
+    socket.on('node:deleted', ({ id }) => {
+      console.log('Remote node deleted:', id);
+      setNodes(nds => nds.filter(n => n.id !== id));
+    });
+
+    // Listen for remote node position updates
+    socket.on('node:position', ({ nodeId, position, updatedBy }) => {
+      // Don't apply our own position updates
+      if (updatedBy === socket.id) return;
+      
+      setNodes(nds => nds.map(n => 
+        n.id === nodeId 
+          ? { ...n, position }
+          : n
+      ));
+    });
+
+    // Listen for remote edge creation
+    socket.on('edge:created', (remoteEdge) => {
+      console.log('Remote edge created:', remoteEdge);
+      setEdges(eds => {
+        // Check if edge already exists to prevent duplicates
+        if (eds.find(e => e.id === remoteEdge.id)) return eds;
+        return [...eds, remoteEdge];
+      });
+    });
+
+    // Listen for remote edge deletions
+    socket.on('edge:deleted', ({ id }) => {
+      console.log('Remote edge deleted:', id);
+      setEdges(eds => eds.filter(e => e.id !== id));
+    });
+
+    // Cleanup listeners on unmount
+    return () => {
+      socket.off('node:created');
+      socket.off('node:updated');
+      socket.off('node:deleted');
+      socket.off('node:position');
+      socket.off('edge:created');
+      socket.off('edge:deleted');
+    };
+  }, [socket, setNodes, setEdges]);
+
   // Handle node changes including position updates
   const handleNodesChange = useCallback(async (changes) => {
     onNodesChange(changes);
     
     // Handle different types of node changes
     for (const change of changes) {
-      if (change.type === 'position' && change.position && !change.dragging) {
-        // Update database for position changes
-        try {
-          const node = nodes.find(n => n.id === change.id);
-          if (node) {
-            await api.updateNode(change.id, { 
-              position: change.position, 
-              data: node.data 
-            });
+      if (change.type === 'position' && change.position) {
+        if (change.dragging) {
+          // During drag: only emit to other users, don't save to DB yet
+          debouncedPositionUpdate(change.id, change.position);
+        } else {
+          // After drag: save to database
+          try {
+            const node = nodes.find(n => n.id === change.id);
+            if (node) {
+              await api.updateNode(change.id, { 
+                position: change.position, 
+                data: node.data 
+              });
+            }
+          } catch (error) {
+            console.error('Failed to update node position:', error);
           }
-        } catch (error) {
-          console.error('Failed to update node position:', error);
         }
       } else if (change.type === 'remove') {
         // Handle node deletions - only delete from database
@@ -111,7 +226,7 @@ const FamilyTree = ({
         }
       }
     }
-  }, [onNodesChange, nodes]);
+  }, [onNodesChange, nodes, debouncedPositionUpdate]);
 
   // Handle edge changes including deletions
   const handleEdgesChange = useCallback(async (changes) => {
@@ -148,7 +263,8 @@ const FamilyTree = ({
             // Provide defaults for new fields if they don't exist
             // Family nodes are always on the bloodline
             bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-            disabledHandles: node.data.disabledHandles || []
+            disabledHandles: node.data.disabledHandles || [],
+            isRecentChange: false // Initialize recent change indicator
           }
         }));
         
@@ -191,7 +307,8 @@ const FamilyTree = ({
         data: {
           ...node.data,
           bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-          disabledHandles: node.data.disabledHandles || []
+          disabledHandles: node.data.disabledHandles || [],
+          isRecentChange: false // Initialize recent change indicator
         }
       }));
       
@@ -503,7 +620,7 @@ const FamilyTree = ({
               }
             }
             
-            // Calculate port X position with spacing for multiple ports from same family node
+            // Calculate port X position with spacing for multiple ports from the same family node
             const portSpacing = 25; // Distance between ports from the same family node
             const portOffset = (edgeIndex - (externalEdges.length - 1) / 2) * portSpacing;
             let portX = basePortX + portOffset;
@@ -1461,6 +1578,42 @@ const FamilyTree = ({
         <Background />
       </ReactFlow>
       
+      {/* Real-time Collaboration Indicator */}
+      {isConnected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px', // Moved to top-left (was ELK debug button position)
+            padding: '8px 16px',
+            backgroundColor: isCollaborating ? '#4CAF50' : '#FFC107',
+            color: 'white',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            zIndex: 1001,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <div 
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: isCollaborating ? '#66BB6A' : '#FFD54F',
+              animation: isCollaborating ? 'pulse 2s infinite' : 'none'
+            }}
+          />
+          {isCollaborating 
+            ? `🤝 ${userCount} users collaborating`
+            : `👤 ${userCount} user online`
+          }
+        </div>
+      )}
+      
       {/* ELK Debug Button - only show when debug mode is active */}
       {showDebug && (
         <button
@@ -1468,7 +1621,7 @@ const FamilyTree = ({
           style={{
             position: 'absolute',
             top: '10px',
-            left: '10px',
+            left: '180px', // Moved to the right (was the collaboration indicator position)
             padding: '8px 16px',
             backgroundColor: showElkDebug ? '#ff6b6b' : '#4ecdc4',
             color: 'white',
