@@ -17,7 +17,7 @@ import BloodlineEdge from './BloodlineEdge';
 import BloodlineEdgeHidden from './BloodlineEdgeHidden';
 import BloodlineEdgeFake from './BloodlineEdgeFake';
 import ElkDebugOverlay from './ElkDebugOverlay';
-import { api } from './api';
+import { api, getSocketServerUrl } from './api';
 import { useSocket } from './hooks/useSocket';
 import { useDebounce } from './hooks/useDebounce';
 
@@ -70,7 +70,7 @@ const FamilyTree = ({
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Real-time collaboration setup
-  const { socket, isConnected, userCount, isCollaborating } = useSocket('http://localhost:3001');
+  const { socket, isConnected, userCount, isCollaborating } = useSocket(getSocketServerUrl());
   const [recentChanges, setRecentChanges] = useState(new Set());
 
   // Debounced position update for real-time collaboration

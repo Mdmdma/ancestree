@@ -121,6 +121,9 @@ S3_BUCKET_NAME=your-bucket-name
 
 # Frontend URL for CORS (use your domain or IP)
 FRONTEND_URL=http://YOUR_STATIC_IP
+
+# Note: The WebSocket connection will automatically use the same URL as VITE_API_BASE_URL
+# This ensures real-time collaboration works across all devices
 ```
 
 ## Step 7: Start the Application
@@ -229,6 +232,26 @@ pm2 restart ancestree
 ```
 
 ## Troubleshooting
+
+### WebSocket Connection Issues
+If you see errors like "WebSocket connection to 'ws://localhost:3001/socket.io/' failed":
+
+1. **Check your environment configuration**:
+   ```bash
+   cat .env | grep VITE_API_BASE_URL
+   ```
+   Should show your server IP/domain, not localhost.
+
+2. **Verify CORS configuration**:
+   Make sure `FRONTEND_URL` in your `.env` matches the URL users access your app from.
+
+3. **Test WebSocket connection**:
+   ```bash
+   # Check if Socket.IO is responding
+   curl -I http://YOUR_STATIC_IP:3001/socket.io/
+   ```
+
+4. **For HTTPS deployments**: Update `VITE_API_BASE_URL` to use `https://` instead of `http://`.
 
 ### Check logs
 ```bash
