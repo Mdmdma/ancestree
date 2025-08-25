@@ -16,14 +16,40 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure CORS origins based on environment
+const getCorsOrigins = () => {
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  
+  if (isDevelopment) {
+    return [
+      "http://localhost:5173", 
+      "http://localhost:5174",
+      "http://192.168.1.43:5173", // Network access
+      /^http:\/\/192\.168\.1\.\d+:5173$/, // Allow any device on 192.168.1.x network
+      /^http:\/\/10\.\d+\.\d+\.\d+:5173$/, // Allow 10.x.x.x networks
+      /^http:\/\/172\.16\.\d+\.\d+:5173$/ // Allow 172.16.x.x networks
+    ];
+  }
+  
+  // Production origins - add your domain(s) here
+  return [
+    process.env.FRONTEND_URL || "https://yourfamilytree.com",
+    /^https:\/\/.*\.yourfamilytree\.com$/, // Allow subdomains
+    // Add your Lightsail static IP if needed
+    // "http://YOUR_LIGHTSAIL_IP"
+  ];
+};
+
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
-    methods: ["GET", "POST"]
+    origin: getCorsOrigins(),
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // Configure AWS S3
 AWS.config.update({
@@ -228,6 +254,11 @@ setTimeout(cleanupNullKeys, 5000); // Wait 5 seconds after server start
 
 app.use(cors());
 app.use(bodyParser.json());
+
+// Serve static files from the React app build directory (for production)
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../ancestree-app/dist')));
+}
 
 // Make io instance available to routes
 app.set('io', io);
@@ -1142,7 +1173,16 @@ app.get('/api/people/:personId/images', (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
+// Catch-all handler: send back React's index.html file for production
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../ancestree-app/dist/index.html'));
+  });
+}
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server also available on local network at http://[your-ip]:${PORT}`);
   console.log(`Socket.IO enabled for real-time collaboration`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
