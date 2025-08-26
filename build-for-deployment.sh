@@ -48,6 +48,9 @@ cp -r ancestree-app/dist ancestree-deploy/
 # Copy environment template
 cp ancestree-app/.env.production ancestree-deploy/.env.example
 
+# Copy diagnostic script
+cp diagnose-collaboration.sh ancestree-deploy/
+
 echo "✅ Deployment package created in ./ancestree-deploy/"
 echo ""
 echo "📋 Next steps for AWS Lightsail deployment:"

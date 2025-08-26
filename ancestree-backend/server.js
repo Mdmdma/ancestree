@@ -32,13 +32,28 @@ const getCorsOrigins = () => {
     ];
   }
   
-  // Production origins - add your domain(s) here
-  return [
-    process.env.FRONTEND_URL || "https://yourfamilytree.com",
-    /^https:\/\/.*\.yourfamilytree\.com$/, // Allow subdomains
-    // Add your Lightsail static IP if needed
-    // "http://YOUR_LIGHTSAIL_IP"
-  ];
+  // Production origins
+  const origins = [];
+  
+  // Add configured frontend URL
+  if (process.env.FRONTEND_URL) {
+    origins.push(process.env.FRONTEND_URL);
+  }
+  
+  // Add domain patterns if using custom domain
+  origins.push(/^https:\/\/.*\.yourfamilytree\.com$/);
+  
+  // For Lightsail deployments, also allow connections from the same origin
+  // This handles cases where the frontend is served from the same server
+  origins.push(/^http:\/\/.*:3001$/);  // Allow any IP:3001
+  origins.push(/^https:\/\/.*:3001$/); // Allow any IP:3001 with HTTPS
+  
+  // Allow common AWS IP patterns for Lightsail
+  origins.push(/^http:\/\/\d+\.\d+\.\d+\.\d+:3001$/);  // IPv4:3001
+  origins.push(/^https:\/\/\d+\.\d+\.\d+\.\d+:3001$/); // IPv4:3001 with HTTPS
+  
+  console.log('Production CORS origins configured:', origins);
+  return origins;
 };
 
 const io = new Server(server, {
@@ -47,6 +62,14 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true
   }
+});
+
+// Add error handling for Socket.IO
+io.engine.on("connection_error", (err) => {
+  console.log("Socket.IO connection error:", err.req);      // the request object
+  console.log("Socket.IO error code:", err.code);           // the error code, for example 1
+  console.log("Socket.IO error message:", err.message);     // the error message, for example "Session ID unknown"
+  console.log("Socket.IO error context:", err.context);     // some additional error context
 });
 
 const PORT = process.env.PORT || 3001;
