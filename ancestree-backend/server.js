@@ -13,9 +13,82 @@ const db = require('./database');
 const axios = require('axios'); // Add axios for API calls
 const http = require('http');
 const { Server } = require('socket.io');
+const crypto = require('crypto'); // For address hashing
 
 const app = express();
 const server = http.createServer(app);
+
+// Helper function to generate address hash for geocoding optimization
+const generateAddressHash = (street, city, zip, country) => {
+  const addressString = [street, city, zip, country]
+    .filter(Boolean)
+    .map(part => part.toString().trim().toLowerCase())
+    .join('|');
+  return crypto.createHash('md5').update(addressString).digest('hex');
+};
+
+// Helper function to perform smart geocoding (only when address changes)
+const performSmartGeocoding = async (nodeData, currentNode = null) => {
+  const { street, city, zip, country } = nodeData;
+  
+  // Generate new address hash
+  const newAddressHash = generateAddressHash(street, city, zip, country);
+  
+  // If we have a current node and the address hash hasn't changed, keep existing coordinates
+  if (currentNode && currentNode.address_hash === newAddressHash && 
+      currentNode.latitude !== null && currentNode.longitude !== null) {
+    return {
+      latitude: currentNode.latitude,
+      longitude: currentNode.longitude,
+      address_hash: newAddressHash
+    };
+  }
+  
+  // If no valid address components, return null coordinates
+  if (!street && !city && !zip && !country) {
+    return {
+      latitude: null,
+      longitude: null,
+      address_hash: null
+    };
+  }
+  
+  // Perform geocoding for new/changed address
+  try {
+    const address = [street, city, zip, country].filter(Boolean).join(', ');
+    const geocodeResponse = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+      params: {
+        address: address,
+        key: process.env.GOOGLE_MAPS_API_KEY
+      }
+    });
+    
+    if (geocodeResponse.data.status === 'OK' && geocodeResponse.data.results.length > 0) {
+      const location = geocodeResponse.data.results[0].geometry.location;
+      console.log(`Geocoded address "${address}" to: ${location.lat}, ${location.lng}`);
+      
+      return {
+        latitude: location.lat,
+        longitude: location.lng,
+        address_hash: newAddressHash
+      };
+    } else {
+      console.log(`Geocoding failed for address "${address}": ${geocodeResponse.data.status}`);
+      return {
+        latitude: null,
+        longitude: null,
+        address_hash: newAddressHash
+      };
+    }
+  } catch (error) {
+    console.error('Error during geocoding:', error.message);
+    return {
+      latitude: null,
+      longitude: null,
+      address_hash: newAddressHash
+    };
+  }
+};
 
 // Configure CORS origins based on environment
 const getCorsOrigins = () => {
@@ -35,6 +108,8 @@ const getCorsOrigins = () => {
   // Production origins - add your domain(s) here
   return [
     process.env.FRONTEND_URL || "https://yourfamilytree.com",
+    "https://ancestree.ch",
+    "https://www.ancestree.ch",
     /^https:\/\/.*\.yourfamilytree\.com$/, // Allow subdomains
     // Add your Lightsail static IP if needed
     // "http://YOUR_LIGHTSAIL_IP"
@@ -341,6 +416,10 @@ app.get('/api/nodes', (req, res) => {
         zip: row.zip,
         country: row.country,
         phone: row.phone,
+        email: row.email,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        address_hash: row.address_hash,
         bloodline: Boolean(row.bloodline),
         preferredImageId: row.preferred_image_id,
         isSelected: false
@@ -373,67 +452,110 @@ app.get('/api/edges', (req, res) => {
 });
 
 // Create new node
-app.post('/api/nodes', (req, res) => {
+app.post('/api/nodes', async (req, res) => {
   const { id, type, position, data } = req.body;
   
-  db.run(`INSERT INTO nodes (
-    id, type, position_x, position_y, name, surname, birth_date, death_date,
-    street, city, zip, country, phone, bloodline, preferred_image_id
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    id, type, position.x, position.y, data.name, data.surname, data.birthDate,
-    data.deathDate, data.street, data.city, data.zip, data.country, data.phone,
-    data.bloodline ? 1 : 0, data.preferredImageId || null
-  ], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    // Perform smart geocoding for address
+    const geocodingResult = await performSmartGeocoding(data);
     
-    // Create the full node object for broadcasting
-    const newNode = {
-      id, type, position, data,
-      deletable: true,
-      selectable: true
-    };
+    db.run(`INSERT INTO nodes (
+      id, type, position_x, position_y, name, surname, birth_date, death_date,
+      street, city, zip, country, phone, email, latitude, longitude, address_hash,
+      bloodline, preferred_image_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      id, type, position.x, position.y, data.name, data.surname, data.birthDate,
+      data.deathDate, data.street, data.city, data.zip, data.country, data.phone,
+      data.email, geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
+      data.bloodline ? 1 : 0, data.preferredImageId || null
+    ], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // Create the full node object for broadcasting
+      const newNode = {
+        id, type, position, 
+        data: {
+          ...data,
+          latitude: geocodingResult.latitude,
+          longitude: geocodingResult.longitude,
+          address_hash: geocodingResult.address_hash
+        },
+        deletable: true,
+        selectable: true
+      };
     
-    // Broadcast to other users in the room
-    req.app.get('io').to('family-tree-main').emit('node:created', newNode);
-    
-    res.json({ success: true, id: this.lastID });
-  });
+      // Broadcast to other users in the room
+      req.app.get('io').to('family-tree-main').emit('node:created', newNode);
+      
+      res.json({ success: true, id: this.lastID });
+    });
+  } catch (error) {
+    console.error('Error creating node:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Update node
-app.put('/api/nodes/:id', (req, res) => {
+app.put('/api/nodes/:id', async (req, res) => {
   const { id } = req.params;
   const { position, data } = req.body;
   
-  db.run(`UPDATE nodes SET 
-    position_x = ?, position_y = ?, name = ?, surname = ?, birth_date = ?,
-    death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?,
-    bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?`, [
-    position?.x, position?.y, data.name, data.surname, data.birthDate,
-    data.deathDate, data.street, data.city, data.zip, data.country, data.phone,
-    data.bloodline ? 1 : 0, data.preferredImageId || null, id
-  ], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    
-    // Broadcast the update to other users in the room
-    const updatedNode = {
-      id,
-      position,
-      data,
-      type: req.body.type // Include if provided
+  try {
+    // First, get the current node to check if geocoding is needed
+    const getCurrentNode = () => {
+      return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM nodes WHERE id = ?', [id], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
     };
     
-    req.app.get('io').to('family-tree-main').emit('node:updated', updatedNode);
+    const currentNode = await getCurrentNode();
     
-    res.json({ success: true, changes: this.changes });
-  });
+    // Perform smart geocoding (only if address changed)
+    const geocodingResult = await performSmartGeocoding(data, currentNode);
+    
+    db.run(`UPDATE nodes SET 
+      position_x = ?, position_y = ?, name = ?, surname = ?, birth_date = ?,
+      death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
+      latitude = ?, longitude = ?, address_hash = ?,
+      bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?`, [
+      position?.x, position?.y, data.name, data.surname, data.birthDate,
+      data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.email,
+      geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
+      data.bloodline ? 1 : 0, data.preferredImageId || null, id
+    ], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // Broadcast the update to other users in the room
+      const updatedNode = {
+        id,
+        position,
+        data: {
+          ...data,
+          latitude: geocodingResult.latitude,
+          longitude: geocodingResult.longitude,
+          address_hash: geocodingResult.address_hash
+        },
+        type: req.body.type // Include if provided
+      };
+    
+      req.app.get('io').to('family-tree-main').emit('node:updated', updatedNode);
+      
+      res.json({ success: true, changes: this.changes });
+    });
+  } catch (error) {
+    console.error('Error updating node:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Set preferred image for a person

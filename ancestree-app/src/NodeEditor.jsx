@@ -16,6 +16,7 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
     zip: '',
     country: '',
     phone: '',
+    email: '',
     bloodline: false,
     positionX: 0,
     positionY: 0
@@ -71,6 +72,7 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
         zip: node.data.zip || '',
         country: node.data.country || '',
         phone: node.data.phone || '',
+        email: node.data.email || '',
         bloodline: node.data.bloodline || false,
         preferredImageId: node.data.preferredImageId || null,
         positionX: node.position?.x || 0,
@@ -196,6 +198,15 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
         onChange={(e) => handleInputChange('phone', e.target.value)}
         style={inputStyle}
         placeholder={appConfig.ui.nodeEditor.placeholders.phone}
+      />
+
+      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.email}</label>
+      <input
+        type="email"
+        value={formData.email}
+        onChange={(e) => handleInputChange('email', e.target.value)}
+        style={inputStyle}
+        placeholder={appConfig.ui.nodeEditor.placeholders.email}
       />
 
       <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.street}</label>

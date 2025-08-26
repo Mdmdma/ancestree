@@ -238,6 +238,7 @@ export const appConfig = {
         birthDate: 'Geburtsdatum:',
         deathDate: 'Todestag:',
         phone: 'Telefon:',
+        email: 'E-Mail:',
         street: 'Straße:',
         city: 'Stadt:',
         zip: 'PLZ:',
@@ -245,6 +246,7 @@ export const appConfig = {
       },
       placeholders: {
         phone: 'z.B. +43 5287 87123',
+        email: 'z.B. name@beispiel.com',
         street: 'z.B. Hauptstraße 123',
         city: 'z.B. Innsbruck',
         zip: '6020',

@@ -80,7 +80,7 @@ const FamilyTree = ({
     }
   }, 300);
 
-  // Update edges with debug mode information when showDebug changes
+  // Update edges and nodes with debug mode information when showDebug changes
   useEffect(() => {
     setEdges((currentEdges) =>
       currentEdges.map((edge) => ({
@@ -89,12 +89,19 @@ const FamilyTree = ({
       }))
     );
     
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => ({
+        ...node,
+        data: { ...node.data, isDebugMode: showDebug }
+      }))
+    );
+    
     // Clear ELK debug data when debug mode is turned off
     if (!showDebug) {
       setElkDebugData(null);
       setShowElkDebug(false);
     }
-  }, [showDebug, setEdges]);
+  }, [showDebug, setEdges, setNodes]);
 
   // Real-time collaboration event listeners
   useEffect(() => {
@@ -265,7 +272,8 @@ const FamilyTree = ({
             // Family nodes are always on the bloodline
             bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
             disabledHandles: node.data.disabledHandles || [],
-            isRecentChange: false // Initialize recent change indicator
+            isRecentChange: false, // Initialize recent change indicator
+            isDebugMode: showDebug // Add debug mode to node data
           }
         }));
         
@@ -309,7 +317,8 @@ const FamilyTree = ({
           ...node.data,
           bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
           disabledHandles: node.data.disabledHandles || [],
-          isRecentChange: false // Initialize recent change indicator
+          isRecentChange: false, // Initialize recent change indicator
+          isDebugMode: showDebug // Add debug mode to node data
         }
       }));
       

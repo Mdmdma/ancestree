@@ -6,6 +6,10 @@ export { API_BASE_URL };
 
 // Helper function to get the Socket.IO server URL from the API base URL
 export const getSocketServerUrl = () => {
+  // In production, if using relative API URL, use the current origin
+  if (API_BASE_URL.startsWith('/')) {
+    return window.location.origin;
+  }
   // Remove '/api' suffix if present to get the base server URL
   return API_BASE_URL.replace('/api', '');
 };

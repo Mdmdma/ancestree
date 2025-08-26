@@ -80,20 +80,67 @@ db.serialize(() => {
     }
   });
   
-  // Check if preferred_image_id column exists, if not add it
+  // Check if new columns exist, if not add them
   db.all(`PRAGMA table_info(nodes)`, (err, columns) => {
     if (err) {
       console.error('Error checking table columns:', err);
       return;
     }
     
-    const hasPreferredImageId = columns.some(col => col.name === 'preferred_image_id');
+    const columnNames = columns.map(col => col.name);
+    
+    const hasPreferredImageId = columnNames.includes('preferred_image_id');
+    const hasEmail = columnNames.includes('email');
+    const hasLatitude = columnNames.includes('latitude');
+    const hasLongitude = columnNames.includes('longitude');
+    const hasAddressHash = columnNames.includes('address_hash');
+    
     if (!hasPreferredImageId) {
       db.run(`ALTER TABLE nodes ADD COLUMN preferred_image_id TEXT REFERENCES images(id) ON DELETE SET NULL`, (alterErr) => {
         if (alterErr) {
           console.error('Error adding preferred_image_id column:', alterErr);
         } else {
           console.log('Successfully added preferred_image_id column to nodes table');
+        }
+      });
+    }
+    
+    if (!hasEmail) {
+      db.run(`ALTER TABLE nodes ADD COLUMN email TEXT`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding email column:', alterErr);
+        } else {
+          console.log('Successfully added email column to nodes table');
+        }
+      });
+    }
+    
+    if (!hasLatitude) {
+      db.run(`ALTER TABLE nodes ADD COLUMN latitude REAL`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding latitude column:', alterErr);
+        } else {
+          console.log('Successfully added latitude column to nodes table');
+        }
+      });
+    }
+    
+    if (!hasLongitude) {
+      db.run(`ALTER TABLE nodes ADD COLUMN longitude REAL`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding longitude column:', alterErr);
+        } else {
+          console.log('Successfully added longitude column to nodes table');
+        }
+      });
+    }
+    
+    if (!hasAddressHash) {
+      db.run(`ALTER TABLE nodes ADD COLUMN address_hash TEXT`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding address_hash column:', alterErr);
+        } else {
+          console.log('Successfully added address_hash column to nodes table');
         }
       });
     }
