@@ -6,7 +6,7 @@ export const getSocketServerUrl = () => {
   // Remove '/api' suffix if present to get the base server URL
   return API_BASE_URL.replace('/api', '');
 };
-
+//test
 export const api = {
   // Load initial data
   async loadNodes() {
