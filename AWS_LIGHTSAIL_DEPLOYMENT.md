@@ -119,14 +119,8 @@ AWS_SECRET_ACCESS_KEY=your_secret_key
 AWS_REGION=us-east-1
 S3_BUCKET_NAME=your-bucket-name
 
-# Frontend URL for CORS - IMPORTANT for WebSocket collaboration!
-# This should match how users access your app
-FRONTEND_URL=http://YOUR_STATIC_IP:3001
-
-# Examples:
-# For IP access: FRONTEND_URL=http://54.123.45.67:3001
-# For domain: FRONTEND_URL=https://yourfamilytree.com
-# For domain with port: FRONTEND_URL=https://yourfamilytree.com:3001
+# Frontend URL for CORS (use your domain or IP)
+FRONTEND_URL=http://YOUR_STATIC_IP
 
 # Note: The WebSocket connection will automatically use the same URL as VITE_API_BASE_URL
 # This ensures real-time collaboration works across all devices
@@ -245,17 +239,11 @@ If you see errors like "WebSocket connection to 'ws://localhost:3001/socket.io/'
 1. **Check your environment configuration**:
    ```bash
    cat .env | grep VITE_API_BASE_URL
-   cat .env | grep FRONTEND_URL
    ```
-   Both should show your server IP/domain, not localhost.
+   Should show your server IP/domain, not localhost.
 
 2. **Verify CORS configuration**:
-   Make sure `FRONTEND_URL` in your `.env` matches exactly how users access your app:
-   ```bash
-   # Examples of correct FRONTEND_URL:
-   FRONTEND_URL=http://54.123.45.67:3001    # For IP access
-   FRONTEND_URL=https://yourfamilytree.com  # For domain with reverse proxy
-   ```
+   Make sure `FRONTEND_URL` in your `.env` matches the URL users access your app from.
 
 3. **Test WebSocket connection**:
    ```bash
@@ -263,33 +251,7 @@ If you see errors like "WebSocket connection to 'ws://localhost:3001/socket.io/'
    curl -I http://YOUR_STATIC_IP:3001/socket.io/
    ```
 
-4. **Check collaboration features**:
-   ```bash
-   # Look for CORS and Socket.IO errors in logs
-   pm2 logs ancestree | grep -i "cors\|socket\|connection"
-   ```
-
-5. **For HTTPS deployments**: Update both URLs to use `https://`:
-   ```env
-   VITE_API_BASE_URL=https://yourfamilytree.com/api
-   FRONTEND_URL=https://yourfamilytree.com
-   ```
-
-### Collaboration Not Working
-If the user counter shows 0 or changes aren't synced between users:
-
-1. **Check both environment variables are set correctly**:
-   ```bash
-   echo "API URL: $(grep VITE_API_BASE_URL .env)"
-   echo "Frontend URL: $(grep FRONTEND_URL .env)"
-   ```
-
-2. **Restart the application after changing .env**:
-   ```bash
-   pm2 restart ancestree
-   ```
-
-3. **Test from multiple devices/browsers** to verify collaboration
+4. **For HTTPS deployments**: Update `VITE_API_BASE_URL` to use `https://` instead of `http://`.
 
 ### Check logs
 ```bash
