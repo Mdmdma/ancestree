@@ -4,6 +4,31 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 // Export the base URL for use in other components
 export { API_BASE_URL };
 
+// Authentication token management
+let authToken = localStorage.getItem('authToken');
+
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return headers;
+};
+
+// Set auth token
+export const setAuthToken = (token) => {
+  authToken = token;
+  if (token) {
+    localStorage.setItem('authToken', token);
+  } else {
+    localStorage.removeItem('authToken');
+  }
+};
+
+// Get auth token
+export const getAuthToken = () => authToken;
+
 // Helper function to get the Socket.IO server URL from the API base URL
 export const getSocketServerUrl = () => {
   // In production, if using relative API URL, use the current origin
@@ -15,14 +40,76 @@ export const getSocketServerUrl = () => {
 };
 
 export const api = {
+  // Authentication operations
+  async checkAuthStatus() {
+    const response = await fetch(`${API_BASE_URL}/auth/status`);
+    return response.json();
+  },
+
+  async login(familyName, password) {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName, password })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Login failed');
+    }
+    
+    // Store the token
+    setAuthToken(result.token);
+    return result;
+  },
+
+  async register(familyName, password) {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName, password })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Registration failed');
+    }
+    
+    // Store the token
+    setAuthToken(result.token);
+    return result;
+  },
+
+  async verifyToken() {
+    const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Token verification failed');
+    }
+    
+    return response.json();
+  },
+
+  logout() {
+    setAuthToken(null);
+  },
+
   // Load initial data
   async loadNodes() {
-    const response = await fetch(`${API_BASE_URL}/nodes`);
+    const response = await fetch(`${API_BASE_URL}/nodes`, {
+      headers: getAuthHeaders()
+    });
     return response.json();
   },
 
   async loadEdges() {
-    const response = await fetch(`${API_BASE_URL}/edges`);
+    const response = await fetch(`${API_BASE_URL}/edges`, {
+      headers: getAuthHeaders()
+    });
     return response.json();
   },
 
@@ -30,7 +117,7 @@ export const api = {
   async createNode(node) {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(node)
     });
     return response.json();
@@ -39,7 +126,7 @@ export const api = {
   async updateNode(id, updates) {
     const response = await fetch(`${API_BASE_URL}/nodes/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(updates)
     });
     return response.json();
@@ -47,7 +134,8 @@ export const api = {
 
   async deleteNode(id) {
     const response = await fetch(`${API_BASE_URL}/nodes/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return response.json();
   },
@@ -56,7 +144,7 @@ export const api = {
   async createEdge(edge) {
     const response = await fetch(`${API_BASE_URL}/edges`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(edge)
     });
     
@@ -71,7 +159,8 @@ export const api = {
 
   async deleteEdge(id) {
     const response = await fetch(`${API_BASE_URL}/edges/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return response.json();
   },
@@ -80,7 +169,7 @@ export const api = {
   async resetDatabase() {
     const response = await fetch(`${API_BASE_URL}/reset`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: getAuthHeaders()
     });
     return response.json();
   },
@@ -88,7 +177,7 @@ export const api = {
   async cleanupDatabase() {
     const response = await fetch(`${API_BASE_URL}/cleanup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: getAuthHeaders()
     });
     return response.json();
   },
@@ -100,27 +189,35 @@ export const api = {
     formData.append('description', description);
     formData.append('uploaded_by', uploadedBy);
 
+    const authHeaders = getAuthHeaders();
+    delete authHeaders['Content-Type']; // Remove Content-Type for FormData
+
     const response = await fetch(`${API_BASE_URL}/images/upload`, {
       method: 'POST',
+      headers: authHeaders,
       body: formData
     });
     return response.json();
   },
 
   async loadImages() {
-    const response = await fetch(`${API_BASE_URL}/images`);
+    const response = await fetch(`${API_BASE_URL}/images`, {
+      headers: getAuthHeaders()
+    });
     return response.json();
   },
 
   async getImage(id) {
-    const response = await fetch(`${API_BASE_URL}/images/${id}`);
+    const response = await fetch(`${API_BASE_URL}/images/${id}`, {
+      headers: getAuthHeaders()
+    });
     return response.json();
   },
 
   async updateImageDescription(id, description) {
     const response = await fetch(`${API_BASE_URL}/images/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ description })
     });
     return response.json();
@@ -128,7 +225,8 @@ export const api = {
 
   async deleteImage(id) {
     const response = await fetch(`${API_BASE_URL}/images/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return response.json();
   },
@@ -137,7 +235,7 @@ export const api = {
   async tagPersonInImage(imageId, personId, positionX = null, positionY = null, width = null, height = null) {
     const response = await fetch(`${API_BASE_URL}/images/${imageId}/people`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ 
         personId, 
         positionX, 
@@ -151,7 +249,8 @@ export const api = {
 
   async removePersonFromImage(imageId, personId) {
     const response = await fetch(`${API_BASE_URL}/images/${imageId}/people/${personId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return response.json();
   },
@@ -159,7 +258,7 @@ export const api = {
   async updatePersonPositionInImage(imageId, personId, positionX, positionY, width, height) {
     const response = await fetch(`${API_BASE_URL}/images/${imageId}/people/${personId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ 
         positionX, 
         positionY, 
@@ -174,7 +273,7 @@ export const api = {
   async setPreferredImage(personId, imageId) {
     const response = await fetch(`${API_BASE_URL}/nodes/${personId}/preferred-image`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ imageId })
     });
     
@@ -190,7 +289,7 @@ export const api = {
   async geocodeAddress(address) {
     const response = await fetch(`${API_BASE_URL}/geocode`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ address })
     });
     

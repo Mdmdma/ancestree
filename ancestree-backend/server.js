@@ -9,14 +9,52 @@ const multerS3 = require('multer-s3');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const db = require('./database');
+const { db, insertDefaultNodeForFamily, ensureFamilyHasNodes } = require('./database');
 const axios = require('axios'); // Add axios for API calls
 const http = require('http');
 const { Server } = require('socket.io');
 const crypto = require('crypto'); // For address hashing
+const bcrypt = require('bcrypt'); // For password hashing
+const jwt = require('jsonwebtoken'); // For JWT tokens
 
 const app = express();
 const server = http.createServer(app);
+
+// JWT secret for token signing
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (token == null) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Optional authentication middleware (allows both authenticated and unauthenticated access)
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token) {
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      if (!err) {
+        req.user = user;
+      }
+    });
+  }
+  next();
+};
 
 // Helper function to generate address hash for geocoding optimization
 const generateAddressHash = (street, city, zip, country) => {
@@ -340,63 +378,247 @@ if (process.env.NODE_ENV === 'production') {
 // Make io instance available to routes
 app.set('io', io);
 
+// ============= AUTHENTICATION ENDPOINTS =============
+
+// Login endpoint
+app.post('/api/auth/login', async (req, res) => {
+  const { familyName, password } = req.body;
+
+  if (!familyName || !password) {
+    return res.status(400).json({ error: 'Family name and password are required' });
+  }
+
+  try {
+    // Check if user exists
+    db.get('SELECT * FROM users WHERE family_name = ?', [familyName], async (err, user) => {
+      if (err) {
+        console.error('Database error during login:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid family name or password' });
+      }
+
+      // Verify password
+      const passwordMatch = await bcrypt.compare(password, user.password_hash);
+      if (!passwordMatch) {
+        return res.status(401).json({ error: 'Invalid family name or password' });
+      }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { 
+          id: user.id, 
+          familyName: user.family_name 
+        },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      res.json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          familyName: user.family_name
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Register endpoint (for family registration)
+app.post('/api/auth/register', async (req, res) => {
+  const { familyName, password } = req.body;
+
+  if (!familyName || !password) {
+    return res.status(400).json({ error: 'Family name and password are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+
+  try {
+    // Check if family name already exists
+    db.get('SELECT id FROM users WHERE family_name = ?', [familyName], async (err, existingUser) => {
+      if (err) {
+        console.error('Database error during registration:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (existingUser) {
+        return res.status(400).json({ error: 'Family name already exists. Please choose a different name.' });
+      }
+
+      try {
+        // Hash password
+        const saltRounds = 10;
+        const passwordHash = await bcrypt.hash(password, saltRounds);
+
+        // Create user
+        db.run('INSERT INTO users (family_name, password_hash) VALUES (?, ?)', 
+          [familyName, passwordHash], 
+          function(err) {
+            if (err) {
+              console.error('Database error during user creation:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+
+            const familyId = this.lastID;
+
+            // Create a default node for the new family
+            insertDefaultNodeForFamily(familyId);
+
+            // Generate JWT token
+            const token = jwt.sign(
+              { 
+                id: familyId, 
+                familyName 
+              },
+              JWT_SECRET,
+              { expiresIn: '24h' }
+            );
+
+            res.status(201).json({
+              success: true,
+              token,
+              user: {
+                id: familyId,
+                familyName
+              }
+            });
+          }
+        );
+      } catch (hashError) {
+        console.error('Password hashing error:', hashError);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Check if family is already registered
+app.get('/api/auth/status', (req, res) => {
+  db.get('SELECT COUNT(*) as count FROM users', [], (err, result) => {
+    if (err) {
+      console.error('Database error during status check:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    res.json({
+      registered: result.count > 0,
+      requiresSetup: result.count === 0
+    });
+  });
+});
+
+// Verify token endpoint
+app.get('/api/auth/verify', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    user: {
+      id: req.user.id,
+      familyName: req.user.familyName
+    }
+  });
+});
+
+// ============= PROTECTED API ENDPOINTS =============
+
 // Socket.IO connection handling for real-time collaboration
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
   
-  // Join the main family tree room (single tree for now)
-  const roomName = 'family-tree-main';
-  socket.join(roomName);
-  
-  // Track user info
-  connectedUsers.set(socket.id, {
-    id: socket.id,
-    room: roomName,
-    connectedAt: new Date()
+  // Handle authentication for socket connection
+  socket.on('authenticate', (token) => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const familyId = decoded.id;
+      const familyName = decoded.familyName;
+      
+      // Join the family-specific room
+      const roomName = `family-${familyId}`;
+      socket.join(roomName);
+      
+      // Track user info
+      connectedUsers.set(socket.id, {
+        id: socket.id,
+        familyId: familyId,
+        familyName: familyName,
+        room: roomName,
+        connectedAt: new Date()
+      });
+      
+      // Notify others about user count in this family
+      const userCount = Array.from(connectedUsers.values())
+        .filter(user => user.room === roomName).length;
+      
+      io.to(roomName).emit('user:count', userCount);
+      
+      console.log(`User ${socket.id} authenticated and joined family room ${roomName}. Total users: ${userCount}`);
+      
+      // Send authentication success
+      socket.emit('authenticated', { familyId, familyName, room: roomName });
+      
+    } catch (error) {
+      console.log(`Authentication failed for socket ${socket.id}:`, error.message);
+      socket.emit('authentication_error', { message: 'Invalid token' });
+      socket.disconnect();
+    }
   });
-  
-  // Notify others about user count
-  const userCount = Array.from(connectedUsers.values())
-    .filter(user => user.room === roomName).length;
-  
-  io.to(roomName).emit('user:count', userCount);
-  
-  console.log(`User ${socket.id} joined room ${roomName}. Total users: ${userCount}`);
   
   // Handle position updates (throttled on client side)
   socket.on('node:position', (data) => {
-    socket.to(roomName).emit('node:position', {
-      ...data,
-      updatedBy: socket.id
-    });
+    const user = connectedUsers.get(socket.id);
+    if (user && user.room) {
+      socket.to(user.room).emit('node:position', {
+        ...data,
+        updatedBy: socket.id
+      });
+    }
   });
   
   // Handle cursor position updates (optional)
   socket.on('user:cursor', (data) => {
-    socket.to(roomName).emit('user:cursor', {
-      ...data,
-      userId: socket.id
-    });
+    const user = connectedUsers.get(socket.id);
+    if (user && user.room) {
+      socket.to(user.room).emit('user:cursor', {
+        ...data,
+        userId: socket.id
+      });
+    }
   });
   
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
+    const user = connectedUsers.get(socket.id);
     connectedUsers.delete(socket.id);
     
-    const userCount = Array.from(connectedUsers.values())
-      .filter(user => user.room === roomName).length;
-    
-    io.to(roomName).emit('user:count', userCount);
-    console.log(`User ${socket.id} left room ${roomName}. Total users: ${userCount}`);
+    if (user && user.room) {
+      const userCount = Array.from(connectedUsers.values())
+        .filter(u => u.room === user.room).length;
+      
+      io.to(user.room).emit('user:count', userCount);
+      console.log(`User ${socket.id} left family room ${user.room}. Total users: ${userCount}`);
+    }
   });
 });
 
 // Get all nodes
-app.get('/api/nodes', (req, res) => {
-  db.all("SELECT * FROM nodes", (err, rows) => {
+app.get('/api/nodes', authenticateToken, (req, res) => {
+  const familyId = req.user.id;
+  db.all("SELECT * FROM nodes WHERE family_id = ?", [familyId], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -431,8 +653,9 @@ app.get('/api/nodes', (req, res) => {
 });
 
 // Get all edges
-app.get('/api/edges', (req, res) => {
-  db.all("SELECT * FROM edges", (err, rows) => {
+app.get('/api/edges', authenticateToken, (req, res) => {
+  const familyId = req.user.id;
+  db.all("SELECT * FROM edges WHERE family_id = ?", [familyId], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -452,8 +675,9 @@ app.get('/api/edges', (req, res) => {
 });
 
 // Create new node
-app.post('/api/nodes', async (req, res) => {
+app.post('/api/nodes', authenticateToken, async (req, res) => {
   const { id, type, position, data } = req.body;
+  const familyId = req.user.id;
   
   try {
     // Perform smart geocoding for address
@@ -462,12 +686,12 @@ app.post('/api/nodes', async (req, res) => {
     db.run(`INSERT INTO nodes (
       id, type, position_x, position_y, name, surname, birth_date, death_date,
       street, city, zip, country, phone, email, latitude, longitude, address_hash,
-      bloodline, preferred_image_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      bloodline, preferred_image_id, family_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       id, type, position.x, position.y, data.name, data.surname, data.birthDate,
       data.deathDate, data.street, data.city, data.zip, data.country, data.phone,
       data.email, geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
-      data.bloodline ? 1 : 0, data.preferredImageId || null
+      data.bloodline ? 1 : 0, data.preferredImageId || null, familyId
     ], function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -487,8 +711,8 @@ app.post('/api/nodes', async (req, res) => {
         selectable: true
       };
     
-      // Broadcast to other users in the room
-      req.app.get('io').to('family-tree-main').emit('node:created', newNode);
+      // Broadcast to other users in the family room
+      req.app.get('io').to(`family-${familyId}`).emit('node:created', newNode);
       
       res.json({ success: true, id: this.lastID });
     });
@@ -499,15 +723,16 @@ app.post('/api/nodes', async (req, res) => {
 });
 
 // Update node
-app.put('/api/nodes/:id', async (req, res) => {
+app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { position, data } = req.body;
+  const familyId = req.user.id;
   
   try {
     // First, get the current node to check if geocoding is needed
     const getCurrentNode = () => {
       return new Promise((resolve, reject) => {
-        db.get('SELECT * FROM nodes WHERE id = ?', [id], (err, row) => {
+        db.get('SELECT * FROM nodes WHERE id = ? AND family_id = ?', [id, familyId], (err, row) => {
           if (err) reject(err);
           else resolve(row);
         });
@@ -515,6 +740,10 @@ app.put('/api/nodes/:id', async (req, res) => {
     };
     
     const currentNode = await getCurrentNode();
+    
+    if (!currentNode) {
+      return res.status(404).json({ error: 'Node not found or access denied' });
+    }
     
     // Perform smart geocoding (only if address changed)
     const geocodingResult = await performSmartGeocoding(data, currentNode);
@@ -524,18 +753,18 @@ app.put('/api/nodes/:id', async (req, res) => {
       death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
       latitude = ?, longitude = ?, address_hash = ?,
       bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?`, [
+      WHERE id = ? AND family_id = ?`, [
       position?.x, position?.y, data.name, data.surname, data.birthDate,
       data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.email,
       geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
-      data.bloodline ? 1 : 0, data.preferredImageId || null, id
+      data.bloodline ? 1 : 0, data.preferredImageId || null, id, familyId
     ], function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
       
-      // Broadcast the update to other users in the room
+      // Broadcast the update to other users in the family room
       const updatedNode = {
         id,
         position,
@@ -548,7 +777,7 @@ app.put('/api/nodes/:id', async (req, res) => {
         type: req.body.type // Include if provided
       };
     
-      req.app.get('io').to('family-tree-main').emit('node:updated', updatedNode);
+      req.app.get('io').to(`family-${familyId}`).emit('node:updated', updatedNode);
       
       res.json({ success: true, changes: this.changes });
     });
@@ -559,12 +788,14 @@ app.put('/api/nodes/:id', async (req, res) => {
 });
 
 // Set preferred image for a person
-app.put('/api/nodes/:personId/preferred-image', (req, res) => {
+app.put('/api/nodes/:personId/preferred-image', authenticateToken, (req, res) => {
   const { personId } = req.params;
   const { imageId } = req.body;
+  const familyId = req.user.id;
   
-  db.run(`UPDATE nodes SET preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, 
-  [imageId || null, personId], function(err) {
+  db.run(`UPDATE nodes SET preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP 
+          WHERE id = ? AND family_id = ?`, 
+  [imageId || null, personId, familyId], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -579,34 +810,56 @@ app.put('/api/nodes/:personId/preferred-image', (req, res) => {
 });
 
 // Delete node
-app.delete('/api/nodes/:id', (req, res) => {
+app.delete('/api/nodes/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
+  const familyId = req.user.id;
   
-  // First delete all edges connected to this node
-  db.run("DELETE FROM edges WHERE source = ? OR target = ?", [id, id], function(err) {
+  // First check if this family will have any nodes left after deletion
+  db.get("SELECT COUNT(*) as count FROM nodes WHERE family_id = ?", [familyId], (err, result) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    // Then delete the node
-    db.run("DELETE FROM nodes WHERE id = ?", [id], function(err) {
+    if (result.count <= 1) {
+      res.status(400).json({ 
+        error: 'Cannot delete the last node in a family tree. At least one person must remain.' 
+      });
+      return;
+    }
+    
+    // First delete all edges connected to this node (within the same family)
+    db.run("DELETE FROM edges WHERE (source = ? OR target = ?) AND family_id = ?", [id, id, familyId], function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
       
-      // Broadcast the deletion to other users
-      req.app.get('io').to('family-tree-main').emit('node:deleted', { id });
-      
-      res.json({ success: true, changes: this.changes });
+      // Then delete the node (ensure it belongs to this family)
+      db.run("DELETE FROM nodes WHERE id = ? AND family_id = ?", [id, familyId], function(err) {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        if (this.changes === 0) {
+          res.status(404).json({ error: 'Node not found or access denied' });
+          return;
+        }
+        
+        // Broadcast the deletion to other users in the family room
+        req.app.get('io').to(`family-${familyId}`).emit('node:deleted', { id });
+        
+        res.json({ success: true, changes: this.changes });
+      });
     });
   });
 });
 
 // Create new edge
-app.post('/api/edges', (req, res) => {
+app.post('/api/edges', authenticateToken, (req, res) => {
   const { id, source, target, sourceHandle, targetHandle, type } = req.body;
+  const familyId = req.user.id;
   
   // Basic validation
   if (!id || !source || !target || !type) {
@@ -615,8 +868,8 @@ app.post('/api/edges', (req, res) => {
   }
   
   // Create edge normally without partner validation
-  db.run(`INSERT INTO edges (id, source, target, source_handle, target_handle, type)
-    VALUES (?, ?, ?, ?, ?, ?)`, [id, source, target, sourceHandle, targetHandle, type], function(err) {
+  db.run(`INSERT INTO edges (id, source, target, source_handle, target_handle, type, family_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`, [id, source, target, sourceHandle, targetHandle, type, familyId], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -628,25 +881,26 @@ app.post('/api/edges', (req, res) => {
       data: req.body.data || {}
     };
     
-    // Broadcast to other users in the room
-    req.app.get('io').to('family-tree-main').emit('edge:created', newEdge);
+    // Broadcast to other users in the family room
+    req.app.get('io').to(`family-${familyId}`).emit('edge:created', newEdge);
     
     res.json({ success: true, edgeId: id });
   });
 });
 
 // Delete edge
-app.delete('/api/edges/:id', (req, res) => {
+app.delete('/api/edges/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
+  const familyId = req.user.id;
   
-  db.run("DELETE FROM edges WHERE id = ?", [id], function(err) {
+  db.run("DELETE FROM edges WHERE id = ? AND family_id = ?", [id, familyId], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    // Broadcast the deletion to other users
-    req.app.get('io').to('family-tree-main').emit('edge:deleted', { id });
+    // Broadcast the deletion to other users in the family room
+    req.app.get('io').to(`family-${familyId}`).emit('edge:deleted', { id });
     
     res.json({ success: true, changes: this.changes });
   });
@@ -922,12 +1176,13 @@ app.post('/api/geocode', async (req, res) => {
 // ============= IMAGE ENDPOINTS =============
 
 // Upload image
-app.post('/api/images/upload', upload.single('image'), (req, res) => {
+app.post('/api/images/upload', authenticateToken, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image file provided' });
   }
 
   const imageId = uuidv4();
+  const familyId = req.user.id;
   const imageData = {
     id: imageId,
     filename: req.file.key.split('/').pop(), // Extract filename from S3 key
@@ -937,13 +1192,14 @@ app.post('/api/images/upload', upload.single('image'), (req, res) => {
     description: req.body.description || '',
     file_size: req.file.size,
     mime_type: req.file.mimetype,
-    uploaded_by: req.body.uploaded_by || 'anonymous'
+    uploaded_by: req.body.uploaded_by || 'anonymous',
+    family_id: familyId
   };
 
   db.run(`INSERT INTO images (
     id, filename, original_filename, s3_key, s3_url, description, 
-    file_size, mime_type, uploaded_by
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    file_size, mime_type, uploaded_by, family_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     imageData.id,
     imageData.filename,
     imageData.original_filename,
@@ -952,7 +1208,8 @@ app.post('/api/images/upload', upload.single('image'), (req, res) => {
     imageData.description,
     imageData.file_size,
     imageData.mime_type,
-    imageData.uploaded_by
+    imageData.uploaded_by,
+    imageData.family_id
   ], function(err) {
     if (err) {
       console.error('Database error:', err);
@@ -967,7 +1224,8 @@ app.post('/api/images/upload', upload.single('image'), (req, res) => {
 });
 
 // Get all images
-app.get('/api/images', (req, res) => {
+app.get('/api/images', authenticateToken, (req, res) => {
+  const familyId = req.user.id;
   db.all(`SELECT i.*, 
     json_group_array(
       CASE 
@@ -985,11 +1243,12 @@ app.get('/api/images', (req, res) => {
       END
     ) as people
     FROM images i
-    LEFT JOIN image_people ip ON i.id = ip.image_id
-    LEFT JOIN nodes n ON ip.person_id = n.id
+    LEFT JOIN image_people ip ON i.id = ip.image_id AND ip.family_id = ?
+    LEFT JOIN nodes n ON ip.person_id = n.id AND n.family_id = ?
+    WHERE i.family_id = ?
     GROUP BY i.id
     ORDER BY i.created_at DESC`, 
-  (err, rows) => {
+  [familyId, familyId, familyId], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -1038,10 +1297,11 @@ app.get('/api/images', (req, res) => {
 });
 
 // Get specific image with people
-app.get('/api/images/:id', (req, res) => {
+app.get('/api/images/:id', authenticateToken, (req, res) => {
   const imageId = req.params.id;
+  const familyId = req.user.id;
   
-  db.get(`SELECT * FROM images WHERE id = ?`, [imageId], (err, imageRow) => {
+  db.get(`SELECT * FROM images WHERE id = ? AND family_id = ?`, [imageId, familyId], (err, imageRow) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -1054,7 +1314,8 @@ app.get('/api/images/:id', (req, res) => {
     db.all(`SELECT ip.*, n.name, n.surname 
             FROM image_people ip 
             JOIN nodes n ON ip.person_id = n.id 
-            WHERE ip.image_id = ?`, [imageId], (err, peopleRows) => {
+            WHERE ip.image_id = ? AND ip.family_id = ? AND n.family_id = ?`, 
+    [imageId, familyId, familyId], (err, peopleRows) => {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -1091,17 +1352,18 @@ app.get('/api/images/:id', (req, res) => {
 });
 
 // Add person to image (tag person in image)
-app.post('/api/images/:imageId/people', (req, res) => {
+app.post('/api/images/:imageId/people', authenticateToken, (req, res) => {
   const { imageId } = req.params;
   const { personId, positionX, positionY, width, height } = req.body;
+  const familyId = req.user.id;
 
   if (!personId) {
     return res.status(400).json({ error: 'Person ID is required' });
   }
 
-  db.run(`INSERT INTO image_people (image_id, person_id, position_x, position_y, width, height)
-          VALUES (?, ?, ?, ?, ?, ?)`, 
-  [imageId, personId, positionX, positionY, width, height], function(err) {
+  db.run(`INSERT INTO image_people (image_id, person_id, position_x, position_y, width, height, family_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+  [imageId, personId, positionX, positionY, width, height, familyId], function(err) {
     if (err) {
       if (err.message.includes('UNIQUE constraint failed')) {
         return res.status(400).json({ error: 'Person is already tagged in this image' });
@@ -1123,11 +1385,12 @@ app.post('/api/images/:imageId/people', (req, res) => {
 });
 
 // Remove person from image
-app.delete('/api/images/:imageId/people/:personId', (req, res) => {
+app.delete('/api/images/:imageId/people/:personId', authenticateToken, (req, res) => {
   const { imageId, personId } = req.params;
+  const familyId = req.user.id;
 
-  db.run(`DELETE FROM image_people WHERE image_id = ? AND person_id = ?`, 
-  [imageId, personId], function(err) {
+  db.run(`DELETE FROM image_people WHERE image_id = ? AND person_id = ? AND family_id = ?`, 
+  [imageId, personId, familyId], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -1235,18 +1498,19 @@ app.delete('/api/images/:id', (req, res) => {
 });
 
 // Fetch images for a specific person
-app.get('/api/people/:personId/images', (req, res) => {
+app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
   const { personId } = req.params;
+  const familyId = req.user.id;
 
   const query = `
     SELECT i.id, i.s3_url, i.description, i.original_filename, i.created_at
     FROM images i
     INNER JOIN image_people ip ON i.id = ip.image_id
-    WHERE ip.person_id = ?
+    WHERE ip.person_id = ? AND i.family_id = ? AND ip.family_id = ?
     ORDER BY i.created_at DESC
   `;
 
-  db.all(query, [personId], (err, rows) => {
+  db.all(query, [personId, familyId, familyId], (err, rows) => {
     if (err) {
       console.error('Database error in /api/people/:personId/images:', err.message);
       res.status(500).json({ error: err.message });

@@ -70,7 +70,7 @@ const FamilyTree = ({
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Real-time collaboration setup
-  const { socket, isConnected, userCount, isCollaborating } = useSocket(getSocketServerUrl());
+  const { socket, isConnected, userCount, isCollaborating, isSocketAuthenticated } = useSocket(getSocketServerUrl(), true);
   const [recentChanges, setRecentChanges] = useState(new Set());
 
   // Debounced position update for real-time collaboration

@@ -4,11 +4,45 @@ const path = require('path');
 const dbPath = path.join(__dirname, 'ancestree.db');
 const db = new sqlite3.Database(dbPath);
 
+// Helper function to insert a default node for a family
+const insertDefaultNodeForFamily = (familyId, callback) => {
+  db.run(`INSERT INTO nodes (
+    id, family_id, type, position_x, position_y, name, surname, birth_date, death_date,
+    street, city, zip, country, phone, bloodline
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    `default-${familyId}-${Date.now()}`, familyId, 'person', 0, 50, 'Family', 'Ancestor', '1900-01-01', null,
+    null, null, null, null, null, 1
+  ], function(insertErr) {
+    if (insertErr) {
+      console.error('Error inserting default node for family', familyId, ':', insertErr);
+    } else {
+      console.log('Inserted default node for family', familyId);
+    }
+    if (callback) callback(insertErr);
+  });
+};
+
+// Function to check and ensure family has at least one node
+const ensureFamilyHasNodes = (familyId) => {
+  db.get("SELECT COUNT(*) as count FROM nodes WHERE family_id = ?", [familyId], (err, row) => {
+    if (err) {
+      console.error('Error checking node count for family', familyId, ':', err);
+      return;
+    }
+    
+    if (row && row.count === 0) {
+      console.log('Family', familyId, 'has no nodes, inserting default node');
+      insertDefaultNodeForFamily(familyId);
+    }
+  });
+};
+
 // Initialize database tables
 db.serialize(() => {
   // Nodes table
   db.run(`CREATE TABLE IF NOT EXISTS nodes (
     id TEXT PRIMARY KEY,
+    family_id INTEGER NOT NULL,
     type TEXT NOT NULL,
     position_x REAL NOT NULL,
     position_y REAL NOT NULL,
@@ -25,18 +59,21 @@ db.serialize(() => {
     preferred_image_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (family_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (preferred_image_id) REFERENCES images (id) ON DELETE SET NULL
   )`);
 
   // Edges table
   db.run(`CREATE TABLE IF NOT EXISTS edges (
     id TEXT PRIMARY KEY,
+    family_id INTEGER NOT NULL,
     source TEXT NOT NULL,
     target TEXT NOT NULL,
     source_handle TEXT,
     target_handle TEXT,
     type TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (family_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (source) REFERENCES nodes (id) ON DELETE CASCADE,
     FOREIGN KEY (target) REFERENCES nodes (id) ON DELETE CASCADE
   )`);
@@ -44,6 +81,7 @@ db.serialize(() => {
   // Images table
   db.run(`CREATE TABLE IF NOT EXISTS images (
     id TEXT PRIMARY KEY,
+    family_id INTEGER NOT NULL,
     filename TEXT NOT NULL,
     original_filename TEXT NOT NULL,
     s3_key TEXT NOT NULL,
@@ -54,12 +92,14 @@ db.serialize(() => {
     mime_type TEXT,
     uploaded_by TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (family_id) REFERENCES users (id) ON DELETE CASCADE
   )`);
 
   // Image people associations table (many-to-many relationship)
   db.run(`CREATE TABLE IF NOT EXISTS image_people (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_id INTEGER NOT NULL,
     image_id TEXT NOT NULL,
     person_id TEXT NOT NULL,
     position_x REAL,
@@ -67,9 +107,19 @@ db.serialize(() => {
     width REAL,
     height REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (family_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
     FOREIGN KEY (person_id) REFERENCES nodes (id) ON DELETE CASCADE,
     UNIQUE(image_id, person_id)
+  )`);
+
+  // Users table for authentication
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_name TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
   // Add preferred_image_id column to nodes table if it doesn't exist
@@ -94,6 +144,7 @@ db.serialize(() => {
     const hasLatitude = columnNames.includes('latitude');
     const hasLongitude = columnNames.includes('longitude');
     const hasAddressHash = columnNames.includes('address_hash');
+    const hasFamilyId = columnNames.includes('family_id');
     
     if (!hasPreferredImageId) {
       db.run(`ALTER TABLE nodes ADD COLUMN preferred_image_id TEXT REFERENCES images(id) ON DELETE SET NULL`, (alterErr) => {
@@ -144,20 +195,154 @@ db.serialize(() => {
         }
       });
     }
+    
+    if (!hasFamilyId) {
+      db.run(`ALTER TABLE nodes ADD COLUMN family_id INTEGER REFERENCES users(id) ON DELETE CASCADE`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding family_id column to nodes:', alterErr);
+        } else {
+          console.log('Successfully added family_id column to nodes table');
+          
+          // Set family_id = 1 for existing nodes (assuming first family)
+          db.run(`UPDATE nodes SET family_id = 1 WHERE family_id IS NULL`, (updateErr) => {
+            if (updateErr) {
+              console.error('Error updating existing nodes with family_id:', updateErr);
+            } else {
+              console.log('Updated existing nodes with family_id = 1');
+            }
+          });
+        }
+      });
+    }
   });
 
-  // Insert initial data if empty
+  // Add family_id to edges table
+  db.all(`PRAGMA table_info(edges)`, (err, columns) => {
+    if (err) {
+      console.error('Error checking edges table columns:', err);
+      return;
+    }
+    
+    const columnNames = columns.map(col => col.name);
+    const hasFamilyId = columnNames.includes('family_id');
+    
+    if (!hasFamilyId) {
+      db.run(`ALTER TABLE edges ADD COLUMN family_id INTEGER REFERENCES users(id) ON DELETE CASCADE`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding family_id column to edges:', alterErr);
+        } else {
+          console.log('Successfully added family_id column to edges table');
+          
+          // Set family_id = 1 for existing edges
+          db.run(`UPDATE edges SET family_id = 1 WHERE family_id IS NULL`, (updateErr) => {
+            if (updateErr) {
+              console.error('Error updating existing edges with family_id:', updateErr);
+            } else {
+              console.log('Updated existing edges with family_id = 1');
+            }
+          });
+        }
+      });
+    }
+  });
+
+  // Add family_id to images table
+  db.all(`PRAGMA table_info(images)`, (err, columns) => {
+    if (err) {
+      console.error('Error checking images table columns:', err);
+      return;
+    }
+    
+    const columnNames = columns.map(col => col.name);
+    const hasFamilyId = columnNames.includes('family_id');
+    
+    if (!hasFamilyId) {
+      db.run(`ALTER TABLE images ADD COLUMN family_id INTEGER REFERENCES users(id) ON DELETE CASCADE`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding family_id column to images:', alterErr);
+        } else {
+          console.log('Successfully added family_id column to images table');
+          
+          // Set family_id = 1 for existing images
+          db.run(`UPDATE images SET family_id = 1 WHERE family_id IS NULL`, (updateErr) => {
+            if (updateErr) {
+              console.error('Error updating existing images with family_id:', updateErr);
+            } else {
+              console.log('Updated existing images with family_id = 1');
+            }
+          });
+        }
+      });
+    }
+  });
+
+  // Add family_id to image_people table
+  db.all(`PRAGMA table_info(image_people)`, (err, columns) => {
+    if (err) {
+      console.error('Error checking image_people table columns:', err);
+      return;
+    }
+    
+    const columnNames = columns.map(col => col.name);
+    const hasFamilyId = columnNames.includes('family_id');
+    
+    if (!hasFamilyId) {
+      db.run(`ALTER TABLE image_people ADD COLUMN family_id INTEGER REFERENCES users(id) ON DELETE CASCADE`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding family_id column to image_people:', alterErr);
+        } else {
+          console.log('Successfully added family_id column to image_people table');
+          
+          // Set family_id = 1 for existing image_people records
+          db.run(`UPDATE image_people SET family_id = 1 WHERE family_id IS NULL`, (updateErr) => {
+            if (updateErr) {
+              console.error('Error updating existing image_people with family_id:', updateErr);
+            } else {
+              console.log('Updated existing image_people with family_id = 1');
+            }
+          });
+        }
+      });
+    }
+  });
+
+  // Ensure all families have at least one node
   db.get("SELECT COUNT(*) as count FROM nodes", (err, row) => {
-    if (row.count === 0) {
-      db.run(`INSERT INTO nodes (
-        id, type, position_x, position_y, name, surname, birth_date, death_date,
-        street, city, zip, country, phone, bloodline
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-        '0', 'person', 0, 50, 'Moidal', 'Erler', '1890-01-01', '1950-01-01',
-        'Hauptstraße 123', 'Tux', '6293', 'AT', '+43 5287 87123', 1
-      ]);
+    if (err) {
+      console.error('Error checking total node count:', err);
+      return;
+    }
+
+    if (row && row.count === 0) {
+      // No nodes at all, check if there are any families and add default nodes
+      db.all("SELECT id FROM users", (err, users) => {
+        if (err) {
+          console.error('Error getting users:', err);
+          return;
+        }
+        
+        users.forEach(user => {
+          insertDefaultNodeForFamily(user.id);
+        });
+      });
+    } else {
+      // Some nodes exist, check each family individually to ensure they all have nodes
+      db.all("SELECT id FROM users", (err, users) => {
+        if (err) {
+          console.error('Error getting users for node check:', err);
+          return;
+        }
+        
+        users.forEach(user => {
+          ensureFamilyHasNodes(user.id);
+        });
+      });
     }
   });
 });
 
-module.exports = db;
+module.exports = {
+  db,
+  insertDefaultNodeForFamily,
+  ensureFamilyHasNodes
+};

@@ -3,7 +3,8 @@ import { ReactFlowProvider, useReactFlow, useNodesState, useEdgesState, useUpdat
 import FamilyTree from './FamilyTree';
 import AppHeader from './AppHeader';
 import Sidebar from './Sidebar';
-import { api } from './api';
+import Login from './Login';
+import { api, getAuthToken } from './api';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
 import '@xyflow/react/dist/style.css';
@@ -18,8 +19,51 @@ const AddNodeOnEdgeDrop = () => {
   const [treeOperations, setTreeOperations] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isLoginExpanded, setIsLoginExpanded] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const { fitView } = useReactFlow();
+
+  // Check authentication on app load
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = getAuthToken();
+      if (token) {
+        try {
+          const result = await api.verifyToken();
+          setIsAuthenticated(true);
+          setUser(result.user);
+        } catch (error) {
+          console.log('Token invalid, please login again');
+          api.logout();
+          setIsAuthenticated(false);
+          setIsLoginExpanded(true);
+        }
+      } else {
+        setIsLoginExpanded(true);
+      }
+      setCheckingAuth(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  // Handle successful login
+  const handleLoginSuccess = (userData) => {
+    setIsAuthenticated(true);
+    setUser(userData);
+    setIsLoginExpanded(false);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    api.logout();
+    setIsAuthenticated(false);
+    setUser(null);
+    setIsLoginExpanded(true);
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -247,43 +291,85 @@ const AddNodeOnEdgeDrop = () => {
       boxSizing: 'border-box',
       overflow: 'hidden'
     }}>
+      {/* Login Component */}
+      <Login 
+        onLoginSuccess={handleLoginSuccess}
+        isExpanded={isLoginExpanded}
+        onToggleExpanded={() => setIsLoginExpanded(!isLoginExpanded)}
+      />
+
+      {/* Main Content */}
       <div style={{ 
         flex: 1, 
         minWidth: 0,
-        overflow: 'hidden'
+        overflow: 'hidden',
+        marginLeft: isLoginExpanded ? '320px' : '60px',
+        transition: 'margin-left 0.3s ease'
       }}>
-        <AppHeader />
-        <div style={{ width: '100%', height: 'calc(100vh - 120px)' }}>
-          <FamilyTree 
-            selectedNode={selectedNode}
-            setSelectedNode={setSelectedNode}
-            showDebug={showDebug}
-            setDebugInfo={setDebugInfo}
-            isTaggingMode={isTaggingMode}
-            isMapMode={isMapMode}
-            onNodeUpdate={handleTreeUpdate}
-          />
-        </div>
+        {checkingAuth ? (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            fontSize: '18px',
+            color: '#666'
+          }}>
+            Checking authentication...
+          </div>
+        ) : !isAuthenticated ? (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            flexDirection: 'column',
+            gap: '20px',
+            fontSize: '18px',
+            color: '#666'
+          }}>
+            <div>🔐</div>
+            <div>Please login to access your family tree</div>
+          </div>
+        ) : (
+          <>
+            <AppHeader user={user} onLogout={handleLogout} />
+            <div style={{ width: '100%', height: 'calc(100vh - 120px)' }}>
+              <FamilyTree 
+                selectedNode={selectedNode}
+                setSelectedNode={setSelectedNode}
+                showDebug={showDebug}
+                setDebugInfo={setDebugInfo}
+                isTaggingMode={isTaggingMode}
+                isMapMode={isMapMode}
+                onNodeUpdate={handleTreeUpdate}
+              />
+            </div>
+          </>
+        )}
       </div>
       
-      <Sidebar 
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        selectedNode={selectedNode}
-        nodes={nodes}
-        edges={edges}
-        showDebug={showDebug}
-        debugInfo={debugInfo}
-        treeOperations={treeOperations}
-        onPersonSelectFromGallery={handlePersonSelectFromGallery}
-        onPersonSelectFromMap={handlePersonSelectFromMap}
-        onTaggingModeChange={handleTaggingModeChange}
-        onMapModeChange={handleMapModeChange}
-        updateNodeData={updateNodeData}
-        updateNodeDataAndPosition={updateNodeDataAndPosition}
-        deleteNode={deleteNode}
-        nodeHasConnections={nodeHasConnections}
-      />
+      {/* Sidebar - only show when authenticated */}
+      {isAuthenticated && (
+        <Sidebar 
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          selectedNode={selectedNode}
+          nodes={nodes}
+          edges={edges}
+          showDebug={showDebug}
+          debugInfo={debugInfo}
+          treeOperations={treeOperations}
+          onPersonSelectFromGallery={handlePersonSelectFromGallery}
+          onPersonSelectFromMap={handlePersonSelectFromMap}
+          onTaggingModeChange={handleTaggingModeChange}
+          onMapModeChange={handleMapModeChange}
+          updateNodeData={updateNodeData}
+          updateNodeDataAndPosition={updateNodeDataAndPosition}
+          deleteNode={deleteNode}
+          nodeHasConnections={nodeHasConnections}
+        />
+      )}
     </div>
   );
 };
