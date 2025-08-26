@@ -244,7 +244,6 @@ function cleanupOrphanedImageReferences() {
     }
   });
 }
-
 // Run cleanup every 5 minutes (300000 ms)
 const CLEANUP_INTERVAL = 60 * 1000 * 5; // 5 minutes
 setInterval(cleanupNullKeys, CLEANUP_INTERVAL);
@@ -253,7 +252,10 @@ setInterval(cleanupNullKeys, CLEANUP_INTERVAL);
 setTimeout(cleanupNullKeys, 5000); // Wait 5 seconds after server start
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static files from the React app build directory (for production)
 if (process.env.NODE_ENV === 'production') {

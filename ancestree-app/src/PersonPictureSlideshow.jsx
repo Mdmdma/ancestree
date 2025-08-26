@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { API_BASE_URL } from './api';
 import { appConfig } from './config';
 import { api } from './api';
 
@@ -51,7 +52,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
     const loadPersonImages = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3001/api/people/${personId}/images`);
+        const response = await fetch(`${API_BASE_URL}/people/${personId}/images`);
         if (!response.ok) {
           throw new Error('Failed to load images');
         }
@@ -95,7 +96,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
 
   const saveDescription = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/images/${images[currentIndex].id}`, {
+      const response = await fetch(`${API_BASE_URL}/images/${images[currentIndex].id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

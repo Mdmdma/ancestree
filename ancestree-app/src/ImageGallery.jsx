@@ -253,28 +253,22 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
 
   const saveDescription = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/images/${selectedImage.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ description: descriptionValue }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update description');
+      const result = await api.updateImageDescription(selectedImage.id, descriptionValue);
+      if (result.success) {
+        // Update the selected image and images array
+        const updatedImage = { ...selectedImage, description: descriptionValue };
+        setSelectedImage(updatedImage);
+        
+        // Update the images array
+        setImages(images.map(img => 
+          img.id === selectedImage.id ? { ...img, description: descriptionValue } : img
+        ));
+        
+        setEditingDescription(false);
+      } else {
+        throw new Error(result.error || 'Failed to update description');
       }
 
-      // Update the selected image and images array
-      const updatedImage = { ...selectedImage, description: descriptionValue };
-      setSelectedImage(updatedImage);
-      
-      // Update the images array
-      setImages(images.map(img => 
-        img.id === selectedImage.id ? { ...img, description: descriptionValue } : img
-      ));
-      
-      setEditingDescription(false);
     } catch (err) {
       console.error('Error updating description:', err);
       alert('Failed to update description: ' + err.message);

@@ -1,6 +1,9 @@
 // Use environment variable for API URL, fallback to localhost for development
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
+// Export the base URL for use in other components
+export { API_BASE_URL };
+
 // Helper function to get the Socket.IO server URL from the API base URL
 export const getSocketServerUrl = () => {
   // Remove '/api' suffix if present to get the base server URL
