@@ -1,0 +1,21 @@
+{
+  "apps": [{
+    "name": "ancestree",
+    "script": "server.js",
+    "env": {
+      "NODE_ENV": "development"
+    },
+    "env_production": {
+      "NODE_ENV": "production",
+      "PORT": 3001
+    },
+    "instances": 1,
+    "exec_mode": "fork",
+    "watch": false,
+    "merge_logs": true,
+    "log_date_format": "YYYY-MM-DD HH:mm Z",
+    "error_file": "./logs/err.log",
+    "out_file": "./logs/out.log",
+    "log_file": "./logs/combined.log"
+  }]
+}

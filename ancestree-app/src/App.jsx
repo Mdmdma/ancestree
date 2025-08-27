@@ -30,7 +30,6 @@ const AddNodeOnEdgeDrop = () => {
   const [user, setUser] = useState(null);
   const [passphrase, setPassphrase] = useState(null); // Store passphrase for encryption
   const [needsPassphrase, setNeedsPassphrase] = useState(false); // Track if we need passphrase entry
-  const [isLoginExpanded, setIsLoginExpanded] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const { fitView } = useReactFlow();
@@ -60,11 +59,9 @@ const AddNodeOnEdgeDrop = () => {
           console.log('Token invalid, please login again');
           api.logout();
           setIsAuthenticated(false);
-          setIsLoginExpanded(true);
           clearPassphraseValidation(); // Clear any stored validation
         }
       } else {
-        setIsLoginExpanded(true);
         clearPassphraseValidation(); // Clear validation when not logged in
       }
       setCheckingAuth(false);
@@ -81,7 +78,6 @@ const AddNodeOnEdgeDrop = () => {
     setNeedsPassphrase(false); // No longer need passphrase
     api.setPassphrase(userPassphrase); // Set passphrase in API for encryption
     storePassphraseValidation(userPassphrase); // Store validation hash for future sessions
-    setIsLoginExpanded(false);
   };
 
   // Handle passphrase entry for returning users
@@ -100,7 +96,6 @@ const AddNodeOnEdgeDrop = () => {
     setPassphrase(null); // Clear passphrase on logout
     setNeedsPassphrase(false);
     api.clearPassphrase(); // Clear passphrase in API
-    setIsLoginExpanded(true);
   };
 
   // Keyboard shortcuts
@@ -329,20 +324,21 @@ const AddNodeOnEdgeDrop = () => {
       boxSizing: 'border-box',
       overflow: 'hidden'
     }}>
-      {/* Login Component */}
-      <Login 
-        onLoginSuccess={handleLoginSuccess}
-        isExpanded={isLoginExpanded}
-        onToggleExpanded={() => setIsLoginExpanded(!isLoginExpanded)}
-      />
+      {/* Login Component - Only show when not authenticated */}
+      {!isAuthenticated && (
+        <Login 
+          onLoginSuccess={handleLoginSuccess}
+        />
+      )}
 
       {/* Main Content */}
       <div style={{ 
         flex: 1, 
         minWidth: 0,
         overflow: 'hidden',
-        marginLeft: isLoginExpanded ? '320px' : '60px',
-        transition: 'margin-left 0.3s ease'
+        marginLeft: '0',
+        width: isAuthenticated ? '100%' : '0',
+        display: isAuthenticated ? 'block' : 'none'
       }}>
         {checkingAuth ? (
           <div style={{ 
@@ -370,15 +366,27 @@ const AddNodeOnEdgeDrop = () => {
             <div>Please login to access your family tree</div>
           </div>
         ) : needsPassphrase ? (
-          <PassphrasePrompt 
-            user={user}
-            onPassphraseEntered={handlePassphraseEntered}
-            onLogout={handleLogout}
-          />
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            width: '100%'
+          }}>
+            <PassphrasePrompt 
+              user={user}
+              onPassphraseEntered={handlePassphraseEntered}
+              onLogout={handleLogout}
+            />
+          </div>
         ) : (
           <>
             <AppHeader user={user} onLogout={handleLogout} />
-            <div style={{ width: '100%', height: 'calc(100vh - 120px)' }}>
+            <div style={{ 
+              width: '100%', 
+              height: 'calc(100vh - 60px)',
+              overflow: 'hidden'
+            }}>
               <FamilyTree 
                 selectedNode={selectedNode}
                 setSelectedNode={setSelectedNode}

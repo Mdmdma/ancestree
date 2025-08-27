@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api.js';
 
-export default function Login({ onLoginSuccess, isExpanded, onToggleExpanded }) {
+export default function Login({ onLoginSuccess }) {
   const [familyName, setFamilyName] = useState('');
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -57,200 +57,195 @@ export default function Login({ onLoginSuccess, isExpanded, onToggleExpanded }) 
       position: 'fixed',
       top: '0',
       left: '0',
-      width: isExpanded ? '320px' : '60px',
+      width: '100vw',
       height: '100vh',
       backgroundColor: '#2c3e50',
       color: 'white',
-      transition: 'width 0.3s ease',
       overflow: 'hidden',
       zIndex: 1000,
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
-      {/* Toggle Button */}
-      <button
-        onClick={onToggleExpanded}
-        style={{
-          backgroundColor: '#34495e',
-          border: 'none',
-          color: 'white',
-          padding: '15px',
-          cursor: 'pointer',
-          fontSize: '16px',
-          fontWeight: 'bold',
-          borderBottom: '1px solid #3e5465',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: isExpanded ? 'flex-start' : 'center',
-          gap: '10px'
-        }}
-      >
-        <span style={{ fontSize: '18px' }}>🔐</span>
-        {isExpanded && (
-          <span>
-            {authStatus?.requiresSetup ? 'Setup Family' : 'Family Login'}
-          </span>
-        )}
-      </button>
-
-      {/* Login Form */}
-      {isExpanded && (
+      {/* Main Login Container */}
+      <div style={{
+        backgroundColor: '#34495e',
+        borderRadius: '12px',
+        padding: '40px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+        maxWidth: '400px',
+        width: '90%',
+        textAlign: 'center'
+      }}>
+        {/* Header */}
         <div style={{
-          padding: '20px',
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column'
+          marginBottom: '30px'
         }}>
-          <div style={{
-            marginBottom: '20px',
-            textAlign: 'center'
+          <div style={{ fontSize: '48px', marginBottom: '10px' }}>🌳</div>
+          <h2 style={{
+            margin: '0 0 10px 0',
+            fontSize: '24px',
+            color: '#ecf0f1'
           }}>
-            <h3 style={{
-              margin: '0 0 10px 0',
-              fontSize: '18px',
+            {isRegistering ? 'Setup Your Family Tree' : 'Welcome to AncesTree'}
+          </h2>
+          <p style={{
+            fontSize: '14px',
+            color: '#bdc3c7',
+            margin: '0',
+            lineHeight: '1.4'
+          }}>
+            {authStatus?.requiresSetup ? 
+              'Create your family\'s secure access credentials' : 
+              (isRegistering ? 'Set up a new family tree' : 'Sign in to access your family tree')
+            }
+          </p>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div style={{
+            backgroundColor: '#e74c3c',
+            padding: '12px',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            fontSize: '14px',
+            color: 'white'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '15px',
+          textAlign: 'left'
+        }}>
+          <div>
+            <label style={{
+              display: 'block',
+              marginBottom: '5px',
+              fontSize: '14px',
+              fontWeight: 'bold',
               color: '#ecf0f1'
             }}>
-              {isRegistering ? 'Setup Your Family Tree' : 'Access Family Tree'}
-            </h3>
-            {authStatus?.requiresSetup && (
+              Family Name:
+            </label>
+            <input
+              type="text"
+              value={familyName}
+              onChange={(e) => setFamilyName(e.target.value)}
+              placeholder="Enter your family name"
+              required
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '6px',
+                border: '2px solid #5a6c7d',
+                backgroundColor: '#ffffff',
+                color: '#2c3e50',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              marginBottom: '5px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#ecf0f1'
+            }}>
+              {isRegistering ? 'Create Passphrase:' : 'Passphrase:'}
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={isRegistering ? "Create a secure passphrase" : "Enter your passphrase"}
+              required
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '6px',
+                border: '2px solid #5a6c7d',
+                backgroundColor: '#ffffff',
+                color: '#2c3e50',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+            {isRegistering && (
               <p style={{
                 fontSize: '12px',
-                color: '#bdc3c7',
-                margin: '0',
-                lineHeight: '1.4'
+                color: '#95a5a6',
+                margin: '5px 0 0 0',
+                lineHeight: '1.3'
               }}>
-                Create your family credentials to secure your family tree
+                This passphrase encrypts all personal data. Choose something memorable but secure.
               </p>
             )}
           </div>
 
-          <form onSubmit={handleSubmit} style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '15px'
-          }}>
-            <div>
-              <label style={{
-                display: 'block',
-                marginBottom: '5px',
-                fontSize: '14px',
-                color: '#ecf0f1'
-              }}>
-                Family Name
-              </label>
-              <input
-                type="text"
-                value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #34495e',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  backgroundColor: '#34495e',
-                  color: 'white',
-                  boxSizing: 'border-box'
-                }}
-                placeholder="Enter your family name"
-              />
-            </div>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              backgroundColor: '#27ae60',
+              color: 'white',
+              border: 'none',
+              padding: '14px',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              marginTop: '10px'
+            }}
+          >
+            {loading ? 'Please wait...' : (isRegistering ? 'Create Family Access' : 'Access Family Tree')}
+          </button>
 
-            <div>
-              <label style={{
-                display: 'block',
-                marginBottom: '5px',
-                fontSize: '14px',
-                color: '#ecf0f1'
-              }}>
-                Passphrase
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={isRegistering ? 6 : 1}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #34495e',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  backgroundColor: '#34495e',
-                  color: 'white',
-                  boxSizing: 'border-box'
-                }}
-                placeholder={isRegistering ? "Choose a secure passphrase (min 6 chars)" : "Enter your passphrase"}
-              />
-            </div>
-
-            {error && (
-              <div style={{
-                backgroundColor: '#e74c3c',
-                color: 'white',
-                padding: '10px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                textAlign: 'center'
-              }}>
-                {error}
-              </div>
-            )}
-
+          {!authStatus?.requiresSetup && (
             <button
-              type="submit"
-              disabled={loading}
+              type="button"
+              onClick={toggleMode}
               style={{
-                backgroundColor: '#27ae60',
-                color: 'white',
-                border: 'none',
-                padding: '12px',
-                borderRadius: '4px',
+                backgroundColor: 'transparent',
+                color: '#3498db',
+                border: '2px solid #3498db',
+                padding: '10px',
+                borderRadius: '6px',
                 fontSize: '14px',
-                fontWeight: 'bold',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1
+                cursor: 'pointer',
+                marginTop: '10px'
               }}
             >
-              {loading ? 'Please wait...' : (isRegistering ? 'Create Family Access' : 'Access Family Tree')}
+              {isRegistering ? 'Already have access? Sign in' : 'First time? Setup family access'}
             </button>
+          )}
+        </form>
 
-            {!authStatus?.requiresSetup && (
-              <button
-                type="button"
-                onClick={toggleMode}
-                style={{
-                  backgroundColor: 'transparent',
-                  color: '#3498db',
-                  border: '1px solid #3498db',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  marginTop: '10px'
-                }}
-              >
-                {isRegistering ? 'Already have access? Sign in' : 'First time? Setup family access'}
-              </button>
-            )}
-          </form>
-
-          <div style={{
-            marginTop: 'auto',
-            paddingTop: '20px',
-            borderTop: '1px solid #34495e',
-            fontSize: '11px',
-            color: '#95a5a6',
-            textAlign: 'center',
-            lineHeight: '1.4'
-          }}>
-            <p style={{ margin: '5px 0' }}>🔒 Your family tree is private and secure</p>
-            <p style={{ margin: '5px 0' }}>Only family members with the passphrase can access</p>
-          </div>
+        {/* Security Notice */}
+        <div style={{
+          marginTop: '30px',
+          paddingTop: '20px',
+          borderTop: '1px solid #5a6c7d',
+          fontSize: '12px',
+          color: '#95a5a6',
+          textAlign: 'center',
+          lineHeight: '1.4'
+        }}>
+          <p style={{ margin: '5px 0' }}>🔒 Your family tree is private and secure</p>
+          <p style={{ margin: '5px 0' }}>Only family members with the passphrase can access</p>
+          <p style={{ margin: '5px 0' }}>All personal data is encrypted on your device</p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
