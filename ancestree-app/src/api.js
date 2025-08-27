@@ -1,11 +1,25 @@
 // Use environment variable for API URL, fallback to localhost for development
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
+// Import encryption utilities
+import { encryptNode, decryptNode, encryptNodes, decryptNodes } from './utils/encryption.js';
+
 // Export the base URL for use in other components
 export { API_BASE_URL };
 
 // Authentication token management
 let authToken = localStorage.getItem('authToken');
+let currentPassphrase = null; // Store current passphrase for encryption
+
+// Set passphrase for encryption
+export const setPassphrase = (passphrase) => {
+  currentPassphrase = passphrase;
+};
+
+// Clear passphrase
+export const clearPassphrase = () => {
+  currentPassphrase = null;
+};
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -103,7 +117,13 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
       headers: getAuthHeaders()
     });
-    return response.json();
+    const nodes = await response.json();
+    
+    // Decrypt nodes if we have a passphrase
+    if (currentPassphrase && nodes) {
+      return decryptNodes(nodes, currentPassphrase);
+    }
+    return nodes;
   },
 
   async loadEdges() {
@@ -115,19 +135,25 @@ export const api = {
 
   // Node operations
   async createNode(node) {
+    // Encrypt node data before sending to backend
+    const nodeToSend = currentPassphrase ? encryptNode(node, currentPassphrase) : node;
+    
     const response = await fetch(`${API_BASE_URL}/nodes`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify(node)
+      body: JSON.stringify(nodeToSend)
     });
     return response.json();
   },
 
   async updateNode(id, updates) {
+    // Encrypt node data before sending to backend
+    const updatesToSend = currentPassphrase ? encryptNode(updates, currentPassphrase) : updates;
+    
     const response = await fetch(`${API_BASE_URL}/nodes/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify(updates)
+      body: JSON.stringify(updatesToSend)
     });
     return response.json();
   },

@@ -4,7 +4,14 @@ import FamilyTree from './FamilyTree';
 import AppHeader from './AppHeader';
 import Sidebar from './Sidebar';
 import Login from './Login';
+import PassphrasePrompt from './PassphrasePrompt';
 import { api, getAuthToken } from './api';
+import { 
+  storePassphraseValidation, 
+  clearPassphraseValidation, 
+  getStoredPassphraseHash,
+  validatePassphrase 
+} from './utils/passphraseValidation';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
 import '@xyflow/react/dist/style.css';
@@ -21,6 +28,8 @@ const AddNodeOnEdgeDrop = () => {
   const [edges, setEdges] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const [passphrase, setPassphrase] = useState(null); // Store passphrase for encryption
+  const [needsPassphrase, setNeedsPassphrase] = useState(false); // Track if we need passphrase entry
   const [isLoginExpanded, setIsLoginExpanded] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
@@ -35,14 +44,28 @@ const AddNodeOnEdgeDrop = () => {
           const result = await api.verifyToken();
           setIsAuthenticated(true);
           setUser(result.user);
+          
+          // Check if we have a stored passphrase validation
+          const storedHash = getStoredPassphraseHash();
+          if (storedHash) {
+            console.log('Found stored passphrase validation, user can continue without re-entry');
+            setNeedsPassphrase(false);
+            // Note: We'll still need the actual passphrase for encryption, but we can try to get it
+            // For now, we'll show a simplified passphrase prompt that can validate against the hash
+          } else {
+            console.log('No stored passphrase validation, user needs to enter passphrase');
+            setNeedsPassphrase(true);
+          }
         } catch (error) {
           console.log('Token invalid, please login again');
           api.logout();
           setIsAuthenticated(false);
           setIsLoginExpanded(true);
+          clearPassphraseValidation(); // Clear any stored validation
         }
       } else {
         setIsLoginExpanded(true);
+        clearPassphraseValidation(); // Clear validation when not logged in
       }
       setCheckingAuth(false);
     };
@@ -51,10 +74,22 @@ const AddNodeOnEdgeDrop = () => {
   }, []);
 
   // Handle successful login
-  const handleLoginSuccess = (userData) => {
+  const handleLoginSuccess = (userData, userPassphrase) => {
     setIsAuthenticated(true);
     setUser(userData);
+    setPassphrase(userPassphrase); // Store passphrase for encryption
+    setNeedsPassphrase(false); // No longer need passphrase
+    api.setPassphrase(userPassphrase); // Set passphrase in API for encryption
+    storePassphraseValidation(userPassphrase); // Store validation hash for future sessions
     setIsLoginExpanded(false);
+  };
+
+  // Handle passphrase entry for returning users
+  const handlePassphraseEntered = (userPassphrase) => {
+    setPassphrase(userPassphrase);
+    setNeedsPassphrase(false);
+    api.setPassphrase(userPassphrase);
+    storePassphraseValidation(userPassphrase); // Update validation hash
   };
 
   // Handle logout
@@ -62,6 +97,9 @@ const AddNodeOnEdgeDrop = () => {
     api.logout();
     setIsAuthenticated(false);
     setUser(null);
+    setPassphrase(null); // Clear passphrase on logout
+    setNeedsPassphrase(false);
+    api.clearPassphrase(); // Clear passphrase in API
     setIsLoginExpanded(true);
   };
 
@@ -331,6 +369,12 @@ const AddNodeOnEdgeDrop = () => {
             <div>🔐</div>
             <div>Please login to access your family tree</div>
           </div>
+        ) : needsPassphrase ? (
+          <PassphrasePrompt 
+            user={user}
+            onPassphraseEntered={handlePassphraseEntered}
+            onLogout={handleLogout}
+          />
         ) : (
           <>
             <AppHeader user={user} onLogout={handleLogout} />
@@ -349,8 +393,8 @@ const AddNodeOnEdgeDrop = () => {
         )}
       </div>
       
-      {/* Sidebar - only show when authenticated */}
-      {isAuthenticated && (
+      {/* Sidebar - only show when authenticated and passphrase entered */}
+      {isAuthenticated && !needsPassphrase && (
         <Sidebar 
           activeTab={activeTab}
           setActiveTab={setActiveTab}

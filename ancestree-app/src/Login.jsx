@@ -37,7 +37,7 @@ export default function Login({ onLoginSuccess, isExpanded, onToggleExpanded }) 
       }
 
       console.log('Authentication successful:', result);
-      onLoginSuccess(result.user);
+      onLoginSuccess(result.user, password); // Pass the passphrase for encryption
     } catch (error) {
       setError(error.message);
     } finally {
