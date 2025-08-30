@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { API_BASE_URL } from './api';
 import { appConfig } from './config';
 import { api } from './api';
 
@@ -52,11 +51,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
     const loadPersonImages = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/people/${personId}/images`);
-        if (!response.ok) {
-          throw new Error('Failed to load images');
-        }
-        const imageData = await response.json();
+        const imageData = await api.loadPersonImages(personId);
         setImages(imageData);
         setError(null);
       } catch (err) {
@@ -71,6 +66,16 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
       loadPersonImages();
     }
   }, [personId]);
+
+  // Navigate to preferred image when images are loaded
+  useEffect(() => {
+    if (images.length > 0 && preferredImageId) {
+      const preferredIndex = images.findIndex(img => img.id === preferredImageId);
+      if (preferredIndex !== -1) {
+        setCurrentIndex(preferredIndex);
+      }
+    }
+  }, [images, preferredImageId]);
 
   const nextImage = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % images.length);
@@ -96,17 +101,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
 
   const saveDescription = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/images/${images[currentIndex].id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ description: descriptionValue }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update description');
-      }
+      await api.updateImageDescription(images[currentIndex].id, descriptionValue);
 
       // Update the current image and images array
       const updatedImages = [...images];

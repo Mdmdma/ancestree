@@ -1,8 +1,7 @@
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   Background,
   ReactFlow,
-  addEdge,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -298,7 +297,7 @@ const FamilyTree = ({
     };
 
     loadData();
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, showDebug]);
 
   // Function to refresh data from database (for ensuring sync)
   const refreshData = useCallback(async () => {
@@ -338,19 +337,12 @@ const FamilyTree = ({
     }
   }, [setNodes, setEdges, showDebug]);
 
-  // Auto layout using ELK with Y-axis constraint based on birth year
+  // Auto layout using ELK
   const autoLayout = useCallback(async () => {
     if (nodes.length === 0) return;
 
     try {
       const elk = new ELK();
-      
-      // Helper function to get birth year from a node
-      const getBirthYear = (node) => {
-        if (!node.data.birthDate) return 1950; // Default fallback
-        const year = parseInt(node.data.birthDate.split('-')[0]);
-        return isNaN(year) ? 1950 : year;
-      };
 
       // Find all bloodline nodes (nodes with bloodline: true)
       const bloodlineNodes = nodes.filter(node => 
@@ -391,7 +383,6 @@ const FamilyTree = ({
 
         // Create ELK cluster
         const clusterNodes = [];
-        const clusterEdges = [];
         
         // Add main bloodline node
         clusterNodes.push({
@@ -529,22 +520,11 @@ const FamilyTree = ({
         elkClusters.push({
           bloodlineNode,
           clusterNodes,
-          bounds: { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY },
-          birthYear: getBirthYear(bloodlineNode)
+          bounds: { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY }
         });
 
         processedNodes.add(bloodlineNode.id);
       }
-
-      // Sort clusters by birth year for Y positioning
-      elkClusters.sort((a, b) => a.birthYear - b.birthYear);
-
-      // Calculate Y positions based on birth years
-      const minBirthYear = Math.min(...elkClusters.map(c => c.birthYear));
-      const maxBirthYear = Math.max(...elkClusters.map(c => c.birthYear));
-      const yearRange = maxBirthYear - minBirthYear || 1;
-      const ySpacing = 70; // Reduced pixels per year for more compact layout
-      const baseY = 0;
 
       // Create ELK graph with clusters as nodes and bloodline connections as edges
       const elkGraph = {
@@ -565,8 +545,6 @@ const FamilyTree = ({
 
       // Add clusters as ELK nodes with ports for family nodes
       elkClusters.forEach((cluster, index) => {
-        const clusterY = ((cluster.birthYear - minBirthYear) / Math.max(yearRange, 1)) * ySpacing;
-        
         // Count bloodline connections to determine priority
         const connectionCount = edges.filter(edge => 
           (edge.type === 'bloodline' || edge.type === 'bloodlinehidden') &&
@@ -605,30 +583,16 @@ const FamilyTree = ({
               c.clusterNodes.some(n => n.id === otherNodeId)
             );
             
-            let primaryTargetCluster = null;
             let primaryTargetType = 'external';
             
             if (targetClusterIndex !== -1) {
-              primaryTargetCluster = elkClusters[targetClusterIndex];
               primaryTargetType = `cluster-${targetClusterIndex}`;
             }
             
-            // Determine port side and position based on family node position and target direction
+            // Determine port side and position - always on bottom (SOUTH side)
             let portSide = 'SOUTH';
             let basePortX = familyNode.x - cluster.bounds.minX + 50;
             let portY = cluster.bounds.height + 100;
-            
-            if (primaryTargetCluster) {
-              if (primaryTargetCluster.birthYear > cluster.birthYear) {
-                // Target is younger - port on bottom edge
-                portSide = 'SOUTH';
-                portY = cluster.bounds.height + 100;
-              } else {
-                // Target is older - port on top edge  
-                portSide = 'NORTH';
-                portY = 0;
-              }
-            }
             
             // Calculate port X position with spacing for multiple ports from the same family node
             const portSpacing = 25; // Distance between ports from the same family node
@@ -668,9 +632,7 @@ const FamilyTree = ({
           height: cluster.bounds.height + 100,
           ports: ports,
           layoutOptions: {
-            'elk.position': `(0,${clusterY})`,
             'elk.priority': `${Math.max(1, connectionCount)}`,
-            'elk.layered.priority': `${cluster.birthYear}`,
             'elk.layered.layerConstraint': 'FIRST_SEPARATE'
           }
         });
@@ -708,17 +670,13 @@ const FamilyTree = ({
           if (sourceClusterIndex !== -1 && targetClusterIndex !== -1 && 
               sourceClusterIndex !== targetClusterIndex) {
             
-            // Determine direction based on birth years (older -> younger)
-            const sourceCluster = elkClusters[sourceClusterIndex];
-            const targetCluster = elkClusters[targetClusterIndex];
-            const isDownward = sourceCluster.birthYear <= targetCluster.birthYear;
+            // Use source and target as they are (no age-based reordering)
+            const finalSourceIndex = sourceClusterIndex;
+            const finalTargetIndex = targetClusterIndex;
             
-            const finalSourceIndex = isDownward ? sourceClusterIndex : targetClusterIndex;
-            const finalTargetIndex = isDownward ? targetClusterIndex : sourceClusterIndex;
-            
-            // Determine which nodes are involved in the correctly oriented edge
-            const effectiveSourceNode = isDownward ? sourceNode : targetNode;
-            const effectiveTargetNode = isDownward ? targetNode : sourceNode;
+            // Use nodes as they are in the edge
+            const effectiveSourceNode = sourceNode;
+            const effectiveTargetNode = targetNode;
             
             // Find appropriate ports for this specific edge by looking through all ports
             let sourcePort = null;
@@ -790,7 +748,7 @@ const FamilyTree = ({
       let standaloneY = 0;
       const maxClusterX = Math.max(0, ...Array.from(finalPositions.values()).map(pos => pos.x));
       
-      remainingNodes.forEach((node, index) => {
+      remainingNodes.forEach((node) => {
         if (node.type === 'family') {
           // Position family nodes near their connected nodes
           const connectedEdges = edges.filter(edge => 
@@ -822,10 +780,8 @@ const FamilyTree = ({
             standaloneX += 200;
           }
         } else {
-          // Position standalone person nodes based on birth year
-          const birthYear = getBirthYear(node);
-          const nodeY = ((birthYear - minBirthYear) / Math.max(yearRange, 1)) * ySpacing;
-          finalPositions.set(node.id, { x: maxClusterX + 200 + standaloneX, y: nodeY });
+          // Position standalone person nodes in a simple grid layout
+          finalPositions.set(node.id, { x: maxClusterX + 200 + standaloneX, y: standaloneY });
           standaloneX += 200;
           if (standaloneX > 600) {
             standaloneX = 0;
@@ -866,7 +822,7 @@ const FamilyTree = ({
     } catch (error) {
       console.error('Auto layout failed:', error);
     }
-  }, [nodes, edges, setNodes, fitView]);
+  }, [nodes, edges, setNodes]);
 
   // Fit tree to view
   const fitTreeToView = useCallback(() => {
@@ -877,7 +833,7 @@ const FamilyTree = ({
   }, [fitView]);
 
   // Simplified validation - allow all connections
-  const isValidConnection = useCallback((connection) => {
+  const isValidConnection = useCallback(() => {
     return true;
   }, []);
 
@@ -1073,7 +1029,7 @@ const FamilyTree = ({
         console.error('Failed to create edge:', error);
       }
     },
-    [setEdges, showDebug, nodes],
+    [setEdges, showDebug, nodes, edges, setNodes],
   );
 
   // Validation function for connection rules
@@ -1112,7 +1068,7 @@ const FamilyTree = ({
         data: { ...n.data, isSelected: false }
       }))
     );
-  }, [setNodes]);
+  }, [setNodes, setSelectedNode]);
 
   const onConnectEnd = useCallback(
     async (event, connectionState) => {
@@ -1512,7 +1468,7 @@ const FamilyTree = ({
         }
       }
     },
-    [screenToFlowPosition, setNodes, setEdges, showDebug, nodes, edges],
+    [screenToFlowPosition, setNodes, showDebug, nodes, edges],
   );
 
   // Function to update node data from parent component (for syncing sidebar changes)

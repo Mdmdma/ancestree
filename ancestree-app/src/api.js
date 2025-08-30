@@ -257,6 +257,18 @@ export const api = {
     return response.json();
   },
 
+  async loadPersonImages(personId) {
+    const response = await fetch(`${API_BASE_URL}/people/${personId}/images`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to load person images');
+    }
+    
+    return response.json();
+  },
+
   // Image-person associations
   async tagPersonInImage(imageId, personId, positionX = null, positionY = null, width = null, height = null) {
     const response = await fetch(`${API_BASE_URL}/images/${imageId}/people`, {
