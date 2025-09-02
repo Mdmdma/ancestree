@@ -37,7 +37,7 @@ export default function Login({ onLoginSuccess }) {
       }
 
       console.log('Authentication successful:', result);
-      onLoginSuccess(result.user, password); // Pass the passphrase for encryption
+      onLoginSuccess(result.user); // Pass the user data
     } catch (error) {
       setError(error.message);
     } finally {
@@ -161,13 +161,13 @@ export default function Login({ onLoginSuccess }) {
               fontWeight: 'bold',
               color: '#ecf0f1'
             }}>
-              {isRegistering ? 'Create Passphrase:' : 'Passphrase:'}
+              {isRegistering ? 'Create Password:' : 'Password:'}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={isRegistering ? "Create a secure passphrase" : "Enter your passphrase"}
+              placeholder={isRegistering ? "Create a secure password" : "Enter your password"}
               required
               style={{
                 width: '100%',
@@ -180,16 +180,6 @@ export default function Login({ onLoginSuccess }) {
                 boxSizing: 'border-box'
               }}
             />
-            {isRegistering && (
-              <p style={{
-                fontSize: '12px',
-                color: '#95a5a6',
-                margin: '5px 0 0 0',
-                lineHeight: '1.3'
-              }}>
-                This passphrase encrypts all personal data. Choose something memorable but secure.
-              </p>
-            )}
           </div>
 
           <button
@@ -242,8 +232,7 @@ export default function Login({ onLoginSuccess }) {
           lineHeight: '1.4'
         }}>
           <p style={{ margin: '5px 0' }}>🔒 Your family tree is private and secure</p>
-          <p style={{ margin: '5px 0' }}>Only family members with the passphrase can access</p>
-          <p style={{ margin: '5px 0' }}>All personal data is encrypted on your device</p>
+          <p style={{ margin: '5px 0' }}>Only authorized family members can access</p>
         </div>
       </div>
     </div>

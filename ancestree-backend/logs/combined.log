@@ -1096,3 +1096,19 @@
 2025-08-27 23:45 +00:00: User exFmyml21fG_btPbAAAX authenticated and joined family room family-5. Total users: 2
 2025-08-27 23:46 +00:00: User disconnected: exFmyml21fG_btPbAAAX
 2025-08-27 23:46 +00:00: User exFmyml21fG_btPbAAAX left family room family-5. Total users: 1
+2025-09-02 14:49 +00:00: Server running on http://localhost:3001
+2025-09-02 14:49 +00:00: Server also available on local network at http://[your-ip]:3001
+2025-09-02 14:49 +00:00: Socket.IO enabled for real-time collaboration
+2025-09-02 14:49 +00:00: Environment: production
+2025-09-02 14:49 +00:00: (node:58669) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+2025-09-02 14:49 +00:00:  SDK releases are limited to address critical bug fixes and security issues only.
+2025-09-02 14:49 +00:00: 
+2025-09-02 14:49 +00:00: Please migrate your code to use AWS SDK for JavaScript (v3).
+2025-09-02 14:49 +00:00: For more information, check the blog post at https://a.co/cUPnyil
+2025-09-02 14:49 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2025-09-02 14:49 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-09-02 14:49 +00:00: Cleaning up orphaned image references...
+2025-09-02 14:49 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-09-02 14:49 +00:00: No duplicate edges found
+2025-09-02 14:49 +00:00: User connected: MccTZx431quqdANrAAAB
+2025-09-02 14:49 +00:00: User MccTZx431quqdANrAAAB authenticated and joined family room family-5. Total users: 1

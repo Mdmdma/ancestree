@@ -81,3 +81,9 @@
 2025-08-27 23:13 +00:00: Please migrate your code to use AWS SDK for JavaScript (v3).
 2025-08-27 23:13 +00:00: For more information, check the blog post at https://a.co/cUPnyil
 2025-08-27 23:13 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2025-09-02 14:49 +00:00: (node:58669) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+2025-09-02 14:49 +00:00:  SDK releases are limited to address critical bug fixes and security issues only.
+2025-09-02 14:49 +00:00: 
+2025-09-02 14:49 +00:00: Please migrate your code to use AWS SDK for JavaScript (v3).
+2025-09-02 14:49 +00:00: For more information, check the blog post at https://a.co/cUPnyil
+2025-09-02 14:49 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
