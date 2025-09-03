@@ -339,6 +339,7 @@ const AddNodeOnEdgeDrop = () => {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           selectedNode={selectedNode}
+          setSelectedNode={setSelectedNode}
           nodes={nodes}
           edges={edges}
           showDebug={showDebug}

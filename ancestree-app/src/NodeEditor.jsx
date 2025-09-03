@@ -3,7 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import PersonPictureSlideshow from './PersonPictureSlideshow';
 import { appConfig } from './config';
 
-function NodeEditor({ node, onUpdate, hasConnections, isDebugMode = false, edges = [] }) {
+function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [] }) {
   const { deleteElements } = useReactFlow();
   
   const [formData, setFormData] = useState({
@@ -121,14 +121,13 @@ function NodeEditor({ node, onUpdate, hasConnections, isDebugMode = false, edges
   };
 
   const handleDelete = () => {
-    if (hasConnections) {
-      alert(appConfig.ui.nodeEditor.messages.deleteWithConnections);
-      return;
-    }
+    // Use React Flow's deleteElements method to trigger the same deletion as Delete key
+    // This will handle all the same logic as the keyboard delete key
+    deleteElements({ nodes: [{ id: node.id }] });
     
-    if (window.confirm(`${appConfig.ui.nodeEditor.messages.confirmDeletePrefix}${formData.name} ${formData.surname}${appConfig.ui.nodeEditor.messages.confirmDeleteSuffix}${appConfig.ui.nodeEditor.messages.confirmDelete}`)) {
-      // Use React Flow's deleteElements method to trigger the same deletion as Delete key
-      deleteElements({ nodes: [{ id: node.id }] });
+    // Close the node editor by clearing the selection
+    if (setSelectedNode) {
+      setSelectedNode(null);
     }
   };
 
@@ -346,27 +345,26 @@ function NodeEditor({ node, onUpdate, hasConnections, isDebugMode = false, edges
         </button>
       </div>
 
-      {!hasConnections && (
-        <div style={{ marginTop: '30px', borderTop: '1px solid #666', paddingTop: '20px' }}>
-          <button
-            onClick={handleDelete}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              fontSize: '16px',
-              cursor: 'pointer'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
-          >
-            {appConfig.ui.nodeEditor.buttons.delete}
-          </button>
-        </div>
-      )}
+      {/* Delete Button - Always visible */}
+      <div style={{ marginTop: '10px' }}>
+        <button
+          onClick={handleDelete}
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            fontSize: '16px',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
+          onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+        >
+          {appConfig.ui.nodeEditor.buttons.delete}
+        </button>
+      </div>
 
       {showSlideshow && (
         <PersonPictureSlideshow

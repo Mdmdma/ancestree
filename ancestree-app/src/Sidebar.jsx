@@ -9,6 +9,7 @@ const Sidebar = ({
   activeTab, 
   setActiveTab,
   selectedNode,
+  setSelectedNode,
   nodes,
   edges,
   showDebug,
@@ -107,6 +108,7 @@ const Sidebar = ({
               <NodeEditor 
                 node={selectedNode} 
                 onUpdate={showDebug ? updateNodeDataAndPosition : updateNodeData}
+                setSelectedNode={setSelectedNode}
                 hasConnections={nodeHasConnections(selectedNode.id)}
                 isDebugMode={showDebug}
                 nodes={nodes}
