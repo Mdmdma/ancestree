@@ -3,6 +3,7 @@ import NodeEditor from './NodeEditor';
 import ImageGallery from './ImageGallery';
 import MapView from './MapView';
 import ElkDebugOverlay from './ElkDebugOverlay';
+import NodeSearch from './NodeSearch';
 import { appConfig } from './config';
 
 const Sidebar = ({ 
@@ -38,6 +39,22 @@ const Sidebar = ({
       boxSizing: 'border-box',
       flexShrink: 0 // Prevent sidebar from shrinking
     }}>
+      {/* Search Section - Always visible at top */}
+      <div style={{ 
+        padding: '16px',
+        borderBottom: '1px solid #0a4b11ff',
+        backgroundColor: '#09380dff'
+      }}>
+        <NodeSearch 
+          nodes={nodes}
+          activeTab={activeTab}
+          onNodeSelect={(node) => {
+            setSelectedNode(node);
+            setActiveTab('editor'); // Switch to editor tab when a node is selected
+          }}
+        />
+      </div>
+
       {/* Tab Navigation */}
       <div style={{ 
         display: 'flex', 

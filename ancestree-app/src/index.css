@@ -11,6 +11,16 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Search component theme variables - dark theme */
+  --search-bg: #2d2d2d;
+  --search-text: #ffffff;
+  --search-text-muted: #cccccc;
+  --search-icon: #cccccc;
+  --search-hover: #404040;
+  --search-dropdown-bg: #2d2d2d;
+  --search-selected-bg: #3d5afe;
+  --search-header-bg: #1a1a1a;
 }
 
 a {
@@ -58,6 +68,16 @@ button:focus-visible {
   :root {
     color: #213547;
     background-color: #ffffff;
+
+    /* Search component theme variables - light theme */
+    --search-bg: #ffffff;
+    --search-text: #333333;
+    --search-text-muted: #666666;
+    --search-icon: #666666;
+    --search-hover: #f0f0f0;
+    --search-dropdown-bg: #ffffff;
+    --search-selected-bg: #f0f8ff;
+    --search-header-bg: #f8f9fa;
   }
   a:hover {
     color: #747bff;
