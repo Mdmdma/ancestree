@@ -932,34 +932,64 @@ const FamilyTree = ({
           // Use a timeout to ensure the partner edge is added to state first
           setTimeout(async () => {
             try {
-              // Set target node bloodline status to false
-              const updatedTargetNode = {
-                ...targetNode,
-                data: { ...targetNode.data, bloodline: false }
+              // Determine which node should remain bloodline and which should become partner
+              // Check if either node has a connection through the parent handle
+              const sourceHasParentConnection = edges.some(edge => 
+                (edge.source === sourceNode.id && edge.sourceHandle === 'parent') ||
+                (edge.target === sourceNode.id && edge.targetHandle === 'parent')
+              );
+              const targetHasParentConnection = edges.some(edge => 
+                (edge.source === targetNode.id && edge.sourceHandle === 'parent') ||
+                (edge.target === targetNode.id && edge.targetHandle === 'parent')
+              );
+              
+              let bloodlineNode, partnerNode;
+              
+              if (sourceHasParentConnection && !targetHasParentConnection) {
+                // Source has parent connection, so source stays bloodline, target becomes partner
+                console.log(`🔗 Partner connection decision: Source (${sourceNode.data.name}) has parent connection, staying bloodline. Target (${targetNode.data.name}) becomes partner.`);
+                bloodlineNode = sourceNode;
+                partnerNode = targetNode;
+              } else if (targetHasParentConnection && !sourceHasParentConnection) {
+                // Target has parent connection, so target stays bloodline, source becomes partner
+                console.log(`🔗 Partner connection decision: Target (${targetNode.data.name}) has parent connection, staying bloodline. Source (${sourceNode.data.name}) becomes partner.`);
+                bloodlineNode = targetNode;
+                partnerNode = sourceNode;
+              } else {
+                // Default behavior: target becomes partner (original logic)
+                console.log(`🔗 Partner connection decision: Using default logic. Source (${sourceNode.data.name}) stays bloodline, Target (${targetNode.data.name}) becomes partner.`);
+                bloodlineNode = sourceNode;
+                partnerNode = targetNode;
+              }
+              
+              // Set partner node bloodline status to false
+              const updatedPartnerNode = {
+                ...partnerNode,
+                data: { ...partnerNode.data, bloodline: false }
               };
               
-              await api.updateNode(targetNode.id, { 
-                position: targetNode.position, 
-                data: updatedTargetNode.data 
+              await api.updateNode(partnerNode.id, { 
+                position: partnerNode.position, 
+                data: updatedPartnerNode.data 
               });
               
               setNodes((nds) => 
-                nds.map(n => n.id === targetNode.id ? updatedTargetNode : n)
+                nds.map(n => n.id === partnerNode.id ? updatedPartnerNode : n)
               );
               
               // Get current edges including the newly created partner edge
               setEdges((currentEdges) => {
-                // Find all family connections from the target node and convert to fake bloodline edges
-                const targetFamilyEdges = currentEdges.filter(edge => 
-                  (edge.source === targetNode.id && (edge.sourceHandle === 'child' || edge.sourceHandle === 'parent')) ||
-                  (edge.target === targetNode.id && (edge.targetHandle === 'child' || edge.targetHandle === 'parent'))
+                // Find all family connections from the partner node and convert to fake bloodline edges
+                const partnerFamilyEdges = currentEdges.filter(edge => 
+                  (edge.source === partnerNode.id && (edge.sourceHandle === 'child' || edge.sourceHandle === 'parent')) ||
+                  (edge.target === partnerNode.id && (edge.targetHandle === 'child' || edge.targetHandle === 'parent'))
                 );
                 
                 // Convert family edges to fake bloodline edges and collect family nodes
                 const affectedFamilyNodes = [];
                 let updatedEdges = [...currentEdges];
                 
-                for (const familyEdge of targetFamilyEdges) {
+                for (const familyEdge of partnerFamilyEdges) {
                   if (familyEdge.type === 'bloodline') {
                     // Delete old edge and create new fake bloodline edge
                     api.deleteEdge(familyEdge.id);
@@ -977,7 +1007,7 @@ const FamilyTree = ({
                     updatedEdges = updatedEdges.filter(e => e.id !== familyEdge.id);
                     
                     // Collect family node for hidden edge creation
-                    const familyNodeId = familyEdge.source === targetNode.id ? familyEdge.target : familyEdge.source;
+                    const familyNodeId = familyEdge.source === partnerNode.id ? familyEdge.target : familyEdge.source;
                     const familyNode = nodes.find(n => n.id === familyNodeId);
                     if (familyNode && familyNode.type === 'family') {
                       affectedFamilyNodes.push({ familyNode, familyEdge: updatedFamilyEdge });
@@ -985,7 +1015,7 @@ const FamilyTree = ({
                   }
                 }
                 
-                // Create hidden bloodline edges from source bloodline node to family nodes
+                // Create hidden bloodline edges from bloodline node to family nodes
                 affectedFamilyNodes.forEach(({ familyNode, familyEdge }) => {
                   // Check if family node already has hidden or true bloodline edges (excluding the one we just converted)
                   const existingBloodlineEdges = updatedEdges.filter(edge => 
@@ -995,27 +1025,27 @@ const FamilyTree = ({
                   );
                   
                   if (existingBloodlineEdges.length === 0) {
-                    // Create hidden bloodline edge from source bloodline node to family
+                    // Create hidden bloodline edge from bloodline node to family
                     const hiddenEdgeId = getId();
                     let hiddenEdge;
                     
-                    if (familyEdge.source === targetNode.id && familyEdge.sourceHandle === 'child') {
-                      // Source node child -> Family parentconnection (hidden)
+                    if (familyEdge.source === partnerNode.id && familyEdge.sourceHandle === 'child') {
+                      // Bloodline node child -> Family parentconnection (hidden)
                       hiddenEdge = {
                         id: hiddenEdgeId,
-                        source: sourceNode.id,
+                        source: bloodlineNode.id,
                         target: familyNode.id,
                         sourceHandle: 'child',
                         targetHandle: 'parentconnection',
                         type: 'bloodlinehidden',
                         data: { isDebugMode: showDebug }
                       };
-                    } else if (familyEdge.target === targetNode.id && familyEdge.targetHandle === 'parent') {
-                      // Family childrenconnection -> Source node parent (hidden)
+                    } else if (familyEdge.target === partnerNode.id && familyEdge.targetHandle === 'parent') {
+                      // Family childrenconnection -> Bloodline node parent (hidden)
                       hiddenEdge = {
                         id: hiddenEdgeId,
                         source: familyNode.id,
-                        target: sourceNode.id,
+                        target: bloodlineNode.id,
                         sourceHandle: 'childrenconnection',
                         targetHandle: 'parent',
                         type: 'bloodlinehidden',
@@ -1150,6 +1180,8 @@ const FamilyTree = ({
           
           // Determine what type of node to create and how to connect
           let newNode, newEdge;
+          let isPartnerNode = false;
+          let existingBloodlineNode = null;
           
           if (sourceNode.type === 'person') {
             if (sourceHandle === 'parent' || sourceHandle === 'child') {
@@ -1347,6 +1379,21 @@ const FamilyTree = ({
               personBirthYear = familyBirthYear - ageOffset;
             }
             
+            // Check if family already has a bloodline edge through parentconnection
+            if (sourceHandle === 'parentconnection') {
+              const existingParentEdge = edges.find(edge => 
+                edge.target === sourceNode.id && 
+                edge.targetHandle === 'parentconnection' && 
+                (edge.type === 'bloodline' || edge.type === 'bloodlinehidden')
+              );
+              
+              if (existingParentEdge) {
+                isPartnerNode = true;
+                existingBloodlineNode = nodes.find(n => n.id === existingParentEdge.source);
+                console.log(`🔗 Family parentconnection already has bloodline edge. Creating partner node for existing bloodline node: ${existingBloodlineNode?.data?.name}`);
+              }
+            }
+            
             const personNodeData = {
               name: personName,
               surname: sourceNode.data.surname || '',
@@ -1360,8 +1407,8 @@ const FamilyTree = ({
               gender: 'male',
               numberOfPartners: 0,
               isSelected: false,
-              bloodline: true,
-              disabledHandles: []
+              bloodline: !isPartnerNode, // Partner nodes have bloodline: false
+              disabledHandles: isPartnerNode ? ['partner-left'] : [] // Disable left partner handle for partner nodes
             };
             
             // Calculate position so the connecting handle is at the drop point
@@ -1394,15 +1441,29 @@ const FamilyTree = ({
               };
             } else {
               // Family parentconnection -> Person child
-              newEdge = {
-                id: `edge-${newId}`,
-                source: newId,
-                target: sourceNode.id,
-                sourceHandle: 'child',
-                targetHandle: 'parentconnection',
-                type: 'bloodline',
-                data: { isDebugMode: showDebug }
-              };
+              if (isPartnerNode) {
+                // Create fake bloodline edge for partner node
+                newEdge = {
+                  id: `edge-${newId}`,
+                  source: newId,
+                  target: sourceNode.id,
+                  sourceHandle: 'child',
+                  targetHandle: 'parentconnection',
+                  type: 'bloodlinefake',
+                  data: { isDebugMode: showDebug }
+                };
+              } else {
+                // Create regular bloodline edge for bloodline node
+                newEdge = {
+                  id: `edge-${newId}`,
+                  source: newId,
+                  target: sourceNode.id,
+                  sourceHandle: 'child',
+                  targetHandle: 'parentconnection',
+                  type: 'bloodline',
+                  data: { isDebugMode: showDebug }
+                };
+              }
             }
           }
           
@@ -1416,6 +1477,56 @@ const FamilyTree = ({
               try {
                 await api.createEdge(newEdge);
                 // Note: Edge will be added to state via socket listener when backend confirms creation
+                
+                // Special case: If we created a partner node through family parentconnection, create partner edge to existing bloodline node
+                if (newNode.type === 'person' && sourceNode.type === 'family' && sourceHandle === 'parentconnection' && isPartnerNode && existingBloodlineNode) {
+                  console.log(`🔗 Creating partner edge between bloodline node ${existingBloodlineNode.data.name} and new partner node ${newNode.data.name}`);
+                  
+                  // Create partner edge from bloodline node (right handle) to new partner node (left handle)
+                  const partnerEdgeId = getId();
+
+                  // Determine source and target based on relative positions
+                  const bloodlineNodePosition = existingBloodlineNode.position;
+                  const newNodePosition = newNode.position;
+                  
+                  // If new node is to the right of bloodline node, bloodline is source, new node is target
+                  // If new node is to the left of bloodline node, new node is source, bloodline is target
+                  let source, target;
+                  
+                  if (newNodePosition.x > bloodlineNodePosition.x) {
+                    // New node is to the right: bloodline -> new node (right->left)
+                    source = newNode.id;
+                    target = existingBloodlineNode.id;
+                    
+                    console.log(`🔗 New node is to the right, using bloodline -> newNode`);
+                  } else {
+                    // New node is to the left: new node -> bloodline (left->right)
+                    source = existingBloodlineNode.id;
+                    target = newNode.id;  
+                    console.log(`🔗 New node is to the left, using newNode -> bloodline`);
+                  }
+                  
+                  // Create partner edge with position-based source/target
+                  const partnerEdge = {
+                    id: partnerEdgeId,
+                    source: source,
+                    target: target,
+                    sourceHandle: 'partner-left',
+                    targetHandle: 'partner-right',
+                    type: 'partner',
+                    data: { isDebugMode: showDebug }
+                  };
+                  
+                  // Create partner edge after a short delay to ensure the first edge is processed
+                  setTimeout(async () => {
+                    try {
+                      await api.createEdge(partnerEdge);
+                      console.log(`🔗 Successfully created partner edge between ${existingBloodlineNode.data.name} and ${newNode.data.name}`);
+                    } catch (error) {
+                      console.error('Failed to create partner edge:', error);
+                    }
+                  }, 100);
+                }
                 
                 // Special case: If creating family from partner node, also create hidden bloodline edge from connected bloodline node
                 if (newNode.type === 'family' && sourceNode.type === 'person' && !isBloodlineNode(sourceNode)) {
