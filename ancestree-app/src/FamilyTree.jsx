@@ -50,6 +50,107 @@ const isBloodlineNode = (node) => {
   return node.type === 'family' || node.data.bloodline;
 };
 
+// Validation function for connection rules
+const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, edges) => {
+  // Helper function to count parent handle connections for a node
+  const countParentConnections = (node) => {
+    return edges.filter(edge => 
+      (edge.source === node.id && edge.sourceHandle === 'parent') ||
+      (edge.target === node.id && edge.targetHandle === 'parent')
+    ).length;
+  };
+  
+  // Prohibit direct Family-to-Family connections
+  if (sourceNode.type === 'family' && targetNode.type === 'family') {
+    return { 
+      isValid: false, 
+      message: appConfig.ui.editor.validationMessages.familyToFamily
+    };
+  }
+  
+  // Prohibit direct Person parent-to-child connections
+  if (sourceNode.type === 'person' && targetNode.type === 'person') {
+    if ((sourceHandle === 'parent' && targetHandle === 'child') ||
+        (sourceHandle === 'child' && targetHandle === 'parent')) {
+      return { 
+        isValid: false, 
+        message: appConfig.ui.editor.validationMessages.directParentChild
+      };
+    }
+  }
+  
+  // Check partner handle restrictions for partner nodes
+  if (sourceNode.type === 'person' && targetNode.type === 'person' && 
+      (sourceHandle?.includes('partner') || targetHandle?.includes('partner'))) {
+    
+    // Check if source is a partner node trying to use partner handles
+    if (!isBloodlineNode(sourceNode) && sourceHandle?.includes('partner')) {
+      return { 
+        isValid: false, 
+        message: appConfig.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', sourceNode.data.name)
+      };
+    }
+    
+    // Check if target is a partner node trying to use partner handles
+    if (!isBloodlineNode(targetNode) && targetHandle?.includes('partner')) {
+      return { 
+        isValid: false, 
+        message: appConfig.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', targetNode.data.name)
+      };
+    }
+    
+    // Prohibit partner connections between two bloodline nodes
+    if (isBloodlineNode(sourceNode) && isBloodlineNode(targetNode)) {
+      return { 
+        isValid: false, 
+        message: appConfig.ui.editor.validationMessages.bloodlineToBloodlinePartner
+      };
+    }
+  }
+  
+  // Check parent handle restrictions for partner nodes
+  if (sourceNode.type === 'person' && !isBloodlineNode(sourceNode) && sourceHandle === 'parent') {
+    return { 
+      isValid: false, 
+      message: appConfig.ui.editor.validationMessages.partnerNodeParentHandle.replace('{name}', sourceNode.data.name)
+    };
+  }
+  
+  if (targetNode.type === 'person' && !isBloodlineNode(targetNode) && targetHandle === 'parent') {
+    return { 
+      isValid: false, 
+      message: appConfig.ui.editor.validationMessages.partnerNodeParentHandle.replace('{name}', targetNode.data.name)
+    };
+  }
+  
+  // Check parent handle restrictions for bloodline nodes with multiple connections
+  if (sourceNode.type === 'person' && isBloodlineNode(sourceNode) && sourceHandle === 'parent') {
+    const parentConnectionCount = countParentConnections(sourceNode);
+    if (parentConnectionCount >= 1) {
+      return { 
+        isValid: false, 
+        message: appConfig.ui.editor.validationMessages.bloodlineMultipleParents
+          .replace('{name}', sourceNode.data.name)
+          .replace('{count}', parentConnectionCount.toString())
+      };
+    }
+  }
+  
+  if (targetNode.type === 'person' && isBloodlineNode(targetNode) && targetHandle === 'parent') {
+    const parentConnectionCount = countParentConnections(targetNode);
+    if (parentConnectionCount >= 1) {
+      return { 
+        isValid: false, 
+        message: appConfig.ui.editor.validationMessages.bloodlineMultipleParents
+          .replace('{name}', targetNode.data.name)
+          .replace('{count}', parentConnectionCount.toString())
+      };
+    }
+  }
+  
+  return { isValid: true, message: null };
+};
+
 const FamilyTree = ({ 
   setSelectedNode, 
   showDebug, 
@@ -858,15 +959,21 @@ const FamilyTree = ({
       if (!sourceNode || !targetNode) return;
       
       // Validate connection rules
-      const isValidConnection = validateConnection(
+      const validationResult = validateConnection(
         sourceNode, 
         targetNode, 
         params.sourceHandle, 
-        params.targetHandle
+        params.targetHandle,
+        edges
       );
       
-      if (!isValidConnection) {
-        console.log('Connection prohibited by family tree rules');
+      if (!validationResult.isValid) {
+        // Show user-friendly message
+        console.warn('Connection prohibited:', validationResult.message);
+        // Use setTimeout to ensure the message appears after React has processed the connection attempt
+        setTimeout(() => {
+          alert(`Connection not allowed:\n\n${validationResult.message}`);
+        }, 100);
         return;
       }
       
@@ -1074,24 +1181,6 @@ const FamilyTree = ({
     [setEdges, showDebug, nodes, edges, setNodes],
   );
 
-  // Validation function for connection rules
-  const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle) => {
-    // Prohibit direct Family-to-Family connections
-    if (sourceNode.type === 'family' && targetNode.type === 'family') {
-      return false;
-    }
-    
-    // Prohibit direct Person parent-to-child connections
-    if (sourceNode.type === 'person' && targetNode.type === 'person') {
-      if ((sourceHandle === 'parent' && targetHandle === 'child') ||
-          (sourceHandle === 'child' && targetHandle === 'parent')) {
-        return false;
-      }
-    }
-    
-    return true;
-  };
-
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
     setNodes((nds) =>
@@ -1118,6 +1207,74 @@ const FamilyTree = ({
         try {
           const sourceHandle = connectionState.fromHandle.id;
           const sourceNode = connectionState.fromNode;
+          
+          // Validate connection before creating new node
+          // Create a virtual target node based on what would be created
+          let virtualTargetNode, virtualTargetHandle;
+          
+          if (sourceNode.type === 'person') {
+            if (sourceHandle === 'parent' || sourceHandle === 'child') {
+              // Would create a Family node
+              virtualTargetNode = {
+                id: 'virtual-family',
+                type: 'family',
+                data: { bloodline: true }
+              };
+              virtualTargetHandle = sourceHandle === 'parent' ? 'childrenconnection' : 'parentconnection';
+            } else if (sourceHandle === 'partner-left' || sourceHandle === 'partner-right') {
+              // Would create a Partner Person node
+              virtualTargetNode = {
+                id: 'virtual-partner',
+                type: 'person',
+                data: { name: 'Virtual Partner', bloodline: false }
+              };
+              virtualTargetHandle = sourceHandle === 'partner-left' ? 'partner-right' : 'partner-left';
+            }
+          } else if (sourceNode.type === 'family') {
+            // Would create a Person node
+            if (sourceHandle === 'childrenconnection') {
+              virtualTargetNode = {
+                id: 'virtual-person',
+                type: 'person',
+                data: { name: 'Virtual Parent', bloodline: true }
+              };
+              virtualTargetHandle = 'parent';
+            } else if (sourceHandle === 'parentconnection') {
+              // Check if family already has a bloodline edge through parentconnection
+              const hasExistingBloodlineConnection = edges.some(edge => 
+                edge.target === sourceNode.id && 
+                edge.targetHandle === 'parentconnection' && 
+                (edge.type === 'bloodline' || edge.type === 'bloodlinehidden')
+              );
+              
+              virtualTargetNode = {
+                id: 'virtual-person',
+                type: 'person',
+                data: { name: 'Virtual Child', bloodline: !hasExistingBloodlineConnection }
+              };
+              virtualTargetHandle = 'child';
+            }
+          }
+          
+          // Validate the virtual connection
+          if (virtualTargetNode && virtualTargetHandle) {
+            const validationResult = validateConnection(
+              sourceNode,
+              virtualTargetNode,
+              sourceHandle,
+              virtualTargetHandle,
+              edges
+            );
+            
+            if (!validationResult.isValid) {
+              // Show validation message and stop node creation
+              console.warn('Node creation prohibited:', validationResult.message);
+              setTimeout(() => {
+                alert(`Node creation not allowed:\n\n${validationResult.message}`);
+              }, 100);
+              return;
+            }
+          }
           
           const newId = getId();
           const { clientX, clientY } =

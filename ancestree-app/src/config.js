@@ -54,6 +54,16 @@ export const appConfig = {
         partner: "🔵 Blau (links/rechts): Partner hinzufügen"
       },
 
+      // Validation messages
+      validationMessages: {
+        familyToFamily: "Direkte Verbindungen zwischen Familien-Knoten sind nicht erlaubt. Verbinde stattdessen Personen mit Familien.",
+        directParentChild: "Direkte Eltern-Kind-Verbindungen zwischen Personen sind nicht erlaubt. Verwende Familien-Knoten, um Generationen zu repräsentieren.",
+        partnerNodePartnerHandle: "{name} ist ein Partner-Knoten und kann keine weiteren Partner-Verbindungen eingehen. Nur Blutlinien-Knoten können mehrere Partner haben.",
+        bloodlineToBloodlinePartner: "Zwei Blutlinien-Knoten können nicht als Partner verbunden werden. Einer muss zuerst ein Partner-Knoten werden, indem er mit einem anderen Blutlinien-Knoten verbunden wird.",
+        partnerNodeParentHandle: "{name} ist ein Partner-Knoten und kann den Eltern-Anschluss nicht verwenden. Partner-Knoten können nur über Kind-Anschlüsse Familien bilden.",
+        bloodlineMultipleParents: "{name} hat bereits {count} Eltern-Verbindung(en). Blutlinien-Knoten können nur eine Eltern-Familie haben."
+      },
+
       // Debug information
       debug: {
         title: "🔧 ELK Debug Information",
