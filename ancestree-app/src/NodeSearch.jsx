@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import { appConfig } from './config';
 
 const NodeSearch = ({ nodes, onNodeSelect }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,7 +14,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
   const dropdownRef = useRef(null);
   const searchTimeoutRef = useRef(null);
 
-  // Search function that filters nodes by name and sorts by relevance
+  // Suchfunktion, die Knoten nach Namen filtert und nach Relevanz sortiert
   const searchNodes = (term) => {
     if (!term.trim() || !nodes || nodes.length === 0) {
       setSearchResults([]);
@@ -31,13 +32,13 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
         const surname = (node.data.surname || '').toLowerCase();
         const fullName = `${name} ${surname}`.trim();
         
-        // Check if all search terms are found in the name
+        // Überprüfe, ob alle Suchbegriffe im Namen gefunden werden
         return termWords.every(word => 
           name.includes(word) || surname.includes(word) || fullName.includes(word)
         );
       })
       .sort((a, b) => {
-        // Calculate relevance scores for better sorting
+        // Berechne Relevanz-Scores für bessere Sortierung
         const aName = (a.data.name || '').toLowerCase();
         const aSurname = (a.data.surname || '').toLowerCase();
         const aFullName = `${aName} ${aSurname}`.trim();
@@ -46,21 +47,21 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
         const bSurname = (b.data.surname || '').toLowerCase();
         const bFullName = `${bName} ${bSurname}`.trim();
         
-        // Exact match gets highest priority
+        // Exakte Übereinstimmung hat höchste Priorität
         const aExactMatch = aFullName === termLower;
         const bExactMatch = bFullName === termLower;
         
         if (aExactMatch && !bExactMatch) return -1;
         if (bExactMatch && !aExactMatch) return 1;
         
-        // Starts with search term gets second priority
+        // Beginnt mit Suchbegriff bekommt zweite Priorität
         const aStartsWith = aFullName.startsWith(termLower) || aName.startsWith(termLower) || aSurname.startsWith(termLower);
         const bStartsWith = bFullName.startsWith(termLower) || bName.startsWith(termLower) || bSurname.startsWith(termLower);
         
         if (aStartsWith && !bStartsWith) return -1;
         if (bStartsWith && !aStartsWith) return 1;
         
-        // Then sort by birth date (older first)
+        // Dann nach Geburtsdatum sortieren (ältere zuerst)
         const aDate = a.data.birthDate || a.data.birth_date;
         const bDate = b.data.birthDate || b.data.birth_date;
         
@@ -75,11 +76,11 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
         }
       });
 
-    // Store total count and limit results to avoid overwhelming the user
+    // Speichere Gesamtanzahl und begrenze Ergebnisse, um Benutzer nicht zu überlasten
     const totalResults = filtered.length;
     const limitedResults = filtered.slice(0, 8);
     
-    // Store both limited results and total count for display
+    // Speichere sowohl begrenzte Ergebnisse als auch Gesamtanzahl für die Anzeige
     setSearchResults({ 
       results: limitedResults, 
       total: totalResults, 
@@ -89,7 +90,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     setSelectedIndex(-1);
   };
 
-  // Handle search input changes with debounce
+  // Behandle Sucheingabe-Änderungen mit Debounce
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
@@ -108,14 +109,14 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     
     setIsSearching(true);
     
-    // Debounce search with shorter delay for better responsiveness
+    // Debounce-Suche mit kürzerer Verzögerung für bessere Reaktionsfähigkeit
     searchTimeoutRef.current = setTimeout(() => {
       searchNodes(value);
       setIsSearching(false);
     }, 100);
   };
 
-  // Clear search
+  // Suche löschen
   const clearSearch = () => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -128,7 +129,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     searchInputRef.current?.focus();
   };
 
-  // Handle node selection
+  // Behandle Knoten-Auswahl
   const handleNodeSelect = (node) => {
     setIsSelectingNode(true);
     setSearchTerm('');
@@ -136,11 +137,11 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     setIsDropdownVisible(false);
     setSelectedIndex(-1);
     
-    // Always select the node regardless of active tab
-    // This ensures the node is properly selected in the tree
+    // Wähle immer den Knoten aus, unabhängig vom aktiven Tab
+    // Dies stellt sicher, dass der Knoten im Baum richtig ausgewählt wird
     onNodeSelect(node);
     
-    // Center the view on the selected node with a slight delay for better UX
+    // Zentriere die Ansicht auf den ausgewählten Knoten mit einer kleinen Verzögerung für bessere UX
     setTimeout(() => {
       fitView({
         nodes: [node],
@@ -149,14 +150,14 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
         maxZoom: 1.5
       });
       
-      // Reset selecting state after animation
+      // Setze Auswahl-Status nach Animation zurück
       setTimeout(() => {
         setIsSelectingNode(false);
       }, 800);
     }, 100);
   };
 
-  // Helper function to highlight search terms in text
+  // Hilfsfunktion zum Hervorheben von Suchbegriffen im Text
   const highlightSearchTerm = (text, searchTerm) => {
     if (!searchTerm.trim() || !text) return text;
     
@@ -164,7 +165,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     let highlightedText = text;
     
     termWords.forEach(word => {
-      if (word.length > 1) { // Only highlight words longer than 1 character
+      if (word.length > 1) { // Nur Wörter länger als 1 Zeichen hervorheben
         const regex = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         highlightedText = highlightedText.replace(regex, '<mark>$1</mark>');
       }
@@ -172,6 +173,8 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     
     return highlightedText;
   };
+
+  // Behandle Tastatur-Navigation
   const handleKeyDown = (e) => {
     if (!isDropdownVisible || !searchResults.results || searchResults.results.length === 0) return;
 
@@ -202,16 +205,16 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     }
   };
 
-  // Format birth date for display
+  // Formatiere Geburtsdatum für die Anzeige
   const formatBirthDate = (birthDate) => {
-    // Handle both birthDate and birth_date field names
+    // Behandle sowohl birthDate als auch birth_date Feldnamen
     const date = birthDate || '';
     if (!date) return '';
     
     try {
       const dateObj = new Date(date);
-      if (isNaN(dateObj.getTime())) return date; // Return original if invalid
-      return dateObj.toLocaleDateString('en-US', {
+      if (isNaN(dateObj.getTime())) return date; // Ursprüngliches zurückgeben wenn ungültig
+      return dateObj.toLocaleDateString('de-DE', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -221,7 +224,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     }
   };
 
-  // Close dropdown when clicking outside
+  // Dropdown schließen beim Klicken außerhalb
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -237,7 +240,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      // Clean up timeout on unmount
+      // Timeout beim Unmounting aufräumen
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
@@ -261,7 +264,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
         <input
           ref={searchInputRef}
           type="text"
-          placeholder={isSelectingNode ? "Navigating to person..." : "Search people..."}
+          placeholder={isSelectingNode ? appConfig.ui.nodeSearch.navigatingPlaceholder : appConfig.ui.nodeSearch.placeholder}
           value={searchTerm}
           onChange={handleSearchChange}
           onKeyDown={handleKeyDown}
@@ -349,7 +352,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
               fontSize: '14px',
               textAlign: 'center'
             }}>
-              Searching...
+              {appConfig.ui.nodeSearch.searchingMessage}
             </div>
           ) : (!searchResults.results || searchResults.results.length === 0) && searchTerm.trim() ? (
             <div style={{
@@ -358,7 +361,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
               fontSize: '14px',
               textAlign: 'center'
             }}>
-              No people found matching "{searchTerm}"
+              {appConfig.ui.nodeSearch.noResultsMessage.replace('{searchTerm}', searchTerm)}
             </div>
           ) : (
             <>
@@ -371,8 +374,10 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
                   borderBottom: '1px solid #eee'
                 }}>
                   {searchResults.hasMore 
-                    ? `Showing 8 of ${searchResults.total} people found`
-                    : `${searchResults.total} people found`
+                    ? appConfig.ui.nodeSearch.resultCountLimited.replace('{total}', searchResults.total)
+                    : searchResults.total === 1 
+                      ? appConfig.ui.nodeSearch.resultCountSingle.replace('{count}', searchResults.total)
+                      : appConfig.ui.nodeSearch.resultCountMultiple.replace('{count}', searchResults.total)
                   }
                 </div>
               )}
@@ -404,7 +409,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
                         marginBottom: birthDate ? '4px' : '0'
                       }}
                       dangerouslySetInnerHTML={{
-                        __html: highlightSearchTerm(fullName || 'Unnamed Person', searchTerm)
+                        __html: highlightSearchTerm(fullName || appConfig.ui.nodeSearch.unnamedPerson, searchTerm)
                       }}
                     />
                     {birthDate && (
@@ -412,7 +417,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
                         fontSize: '12px',
                         color: 'var(--search-text-muted, #666666)'
                       }}>
-                        Born: {birthDate}
+                        {appConfig.ui.nodeSearch.bornLabel} {birthDate}
                       </div>
                     )}
                   </div>

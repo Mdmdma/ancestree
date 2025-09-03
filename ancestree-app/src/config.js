@@ -291,6 +291,19 @@ export const appConfig = {
       child: "Kind", 
       parent: "Eltern",
       family: "Familie" // Template for family nodes (year will be appended)
+    },
+
+    // Node Search component
+    nodeSearch: {
+      placeholder: "Personen suchen...",
+      navigatingPlaceholder: "Navigiere zu Person...",
+      searchingMessage: "Suche läuft...",
+      noResultsMessage: "Keine Personen gefunden für \"{searchTerm}\"",
+      resultCountSingle: "{count} Person gefunden",
+      resultCountMultiple: "{count} Personen gefunden",
+      resultCountLimited: "Zeige 8 von {total} gefundenen Personen",
+      unnamedPerson: "Unbenannte Person",
+      bornLabel: "Geboren:"
     }
   }
 };
