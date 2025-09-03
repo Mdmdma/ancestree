@@ -73,13 +73,21 @@ export default function PersonNode({ data }) {
           backgroundColor: "#e2e8f0",
           border: "2px solid #bbbdbf",
           padding: "8px 12px",
-          minWidth: "120px",
+          width: "120px",
+          height: "40px",
           cursor: "pointer"
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ fontWeight: "bold", fontSize: "1.2rem", color : "#374151" }}>
-            {name} {surname}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
+          <div style={{ 
+            fontWeight: "bold", 
+            fontSize: "1.2rem", 
+            color: "#374151",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }}>
+            {name}
           </div>
         </div>
         <HandleComponent />

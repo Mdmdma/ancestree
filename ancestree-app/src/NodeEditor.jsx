@@ -39,7 +39,7 @@ function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = fa
       } else {
         onUpdate(nodeId, data);
       }
-    }, 300); // 300ms debounce
+    }, 2000); // 300ms debounce
   }, [onUpdate]);
 
   // Cleanup timeout on unmount
