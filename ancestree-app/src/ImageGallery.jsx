@@ -2,14 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
 
-const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange }) => {
+const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => {
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [viewMode, setViewMode] = useState('gallery'); // 'gallery', 'upload', 'view', 'confirm'
   const [description, setDescription] = useState('');
   const [taggingMode, setTaggingMode] = useState(false);
-  const [showTaggingInstructions, setShowTaggingInstructions] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [dragOver, setDragOver] = useState(false);

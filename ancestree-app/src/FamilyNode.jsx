@@ -3,7 +3,7 @@ import { Position } from "@xyflow/react";
 import CustomHandle from "./CustomHandle";
 
 export default function FamilyNode({ data }) {
-  const { name, isSelected, childrenPorts = [] } = data;
+  const { childrenPorts = [] } = data;
 
   // Handle styles for family node
   const handleStyles = {

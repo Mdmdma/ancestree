@@ -156,7 +156,7 @@ const AddNodeOnEdgeDrop = () => {
         treeOperations.refreshData();
       }
     }
-  }, [nodes, treeOperations]);
+  }, [nodes, treeOperations, selectedNode, showDebug]);
 
   const updateNodeDataAndPosition = useCallback(async (nodeId, newData, newPosition) => {
     try {
@@ -221,20 +221,7 @@ const AddNodeOnEdgeDrop = () => {
       }
       throw error;
     }
-  }, [nodes, treeOperations]);
-
-  const deleteNode = useCallback(async (nodeId) => {
-    try {
-      await api.deleteNode(nodeId);
-      
-      setNodes((nds) => nds.filter(node => node.id !== nodeId));
-      setEdges((eds) => eds.filter(edge => edge.source !== nodeId && edge.target !== nodeId));
-      
-      setSelectedNode(null);
-    } catch (error) {
-      console.error('Failed to delete node:', error);
-    }
-  }, []);
+  }, [nodes, treeOperations, selectedNode, showDebug]);
 
   const nodeHasConnections = useCallback((nodeId) => {
     return edges.some(edge => edge.source === nodeId || edge.target === nodeId);
@@ -363,7 +350,6 @@ const AddNodeOnEdgeDrop = () => {
           onMapModeChange={handleMapModeChange}
           updateNodeData={updateNodeData}
           updateNodeDataAndPosition={updateNodeDataAndPosition}
-          deleteNode={deleteNode}
           nodeHasConnections={nodeHasConnections}
         />
       )}

@@ -134,11 +134,22 @@ export const api = {
   },
 
   async deleteNode(id) {
+    console.log('API: Calling deleteNode for ID:', id);
     const response = await fetch(`${API_BASE_URL}/nodes/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    return response.json();
+    console.log('API: deleteNode response status:', response.status);
+    const result = await response.json();
+    console.log('API: deleteNode response body:', result);
+    
+    // Don't treat 404 as an error since it might mean the node was already deleted
+    if (response.status === 404) {
+      console.log('API: Node already deleted, treating as success');
+      return { success: true, message: 'Node already deleted' };
+    }
+    
+    return result;
   },
 
   // Edge operations

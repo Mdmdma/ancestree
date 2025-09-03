@@ -20,7 +20,6 @@ const Sidebar = ({
   onMapModeChange,
   updateNodeData,
   updateNodeDataAndPosition,
-  deleteNode,
   nodeHasConnections
 }) => {
   const { autoLayout, fitTreeToView } = treeOperations || {};
@@ -108,7 +107,6 @@ const Sidebar = ({
               <NodeEditor 
                 node={selectedNode} 
                 onUpdate={showDebug ? updateNodeDataAndPosition : updateNodeData}
-                onDelete={deleteNode}
                 hasConnections={nodeHasConnections(selectedNode.id)}
                 isDebugMode={showDebug}
                 nodes={nodes}

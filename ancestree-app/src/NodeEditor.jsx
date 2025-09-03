@@ -3,7 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import PersonPictureSlideshow from './PersonPictureSlideshow';
 import { appConfig } from './config';
 
-function NodeEditor({ node, onUpdate, onDelete, hasConnections, isDebugMode = false, edges = [] }) {
+function NodeEditor({ node, onUpdate, hasConnections, isDebugMode = false, edges = [] }) {
   const { deleteElements } = useReactFlow();
   
   const [formData, setFormData] = useState({

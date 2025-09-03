@@ -1,11 +1,10 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   Background,
   ReactFlow,
   useNodesState,
   useEdgesState,
   useReactFlow,
-  useUpdateNodeInternals,
 } from '@xyflow/react';
 import { appConfig } from './config';
 import ELK from 'elkjs/lib/elk.bundled.js';
@@ -52,12 +51,8 @@ const isBloodlineNode = (node) => {
 };
 
 const FamilyTree = ({ 
-  selectedNode, 
   setSelectedNode, 
   showDebug, 
-  setDebugInfo, 
-  isTaggingMode, 
-  isMapMode,
   onNodeUpdate 
 }) => {
   const [loading, setLoading] = useState(true);
@@ -66,11 +61,13 @@ const FamilyTree = ({
   const [elkDebugData, setElkDebugData] = useState(null);
   const [showElkDebug, setShowElkDebug] = useState(false);
   const { screenToFlowPosition, fitView } = useReactFlow();
-  const updateNodeInternals = useUpdateNodeInternals();
 
   // Real-time collaboration setup
-  const { socket, isConnected, userCount, isCollaborating, isSocketAuthenticated } = useSocket(getSocketServerUrl(), true);
-  const [recentChanges, setRecentChanges] = useState(new Set());
+  const { socket, isConnected, userCount, isCollaborating } = useSocket(getSocketServerUrl(), true);
+  const [, setRecentChanges] = useState(new Set());
+  
+  // Track deletion attempts to prevent duplicates
+  const deletionAttemptsRef = useRef(new Set());
 
   // Debounced position update for real-time collaboration
   const [debouncedPositionUpdate] = useDebounce((nodeId, position) => {
@@ -226,10 +223,27 @@ const FamilyTree = ({
       } else if (change.type === 'remove') {
         // Handle node deletions - only delete from database
         // React Flow will only allow deletion if no edges are connected
+        console.log('FamilyTree: Handling node deletion for node:', change.id);
+        
+        // Check if we're already processing this deletion
+        if (deletionAttemptsRef.current.has(change.id)) {
+          console.log('FamilyTree: Deletion already in progress for node:', change.id);
+          continue;
+        }
+        
+        // Mark this deletion as in progress
+        deletionAttemptsRef.current.add(change.id);
+        
         try {
           await api.deleteNode(change.id);
+          console.log('FamilyTree: Successfully deleted node:', change.id);
         } catch (error) {
           console.error('Failed to delete node:', error);
+        } finally {
+          // Remove from tracking set after completion (success or failure)
+          setTimeout(() => {
+            deletionAttemptsRef.current.delete(change.id);
+          }, 1000); // 1 second delay to handle potential race conditions
         }
       }
     }

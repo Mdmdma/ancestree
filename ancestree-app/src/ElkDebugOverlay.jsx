@@ -65,7 +65,7 @@ const ElkDebugOverlay = ({ elkDebugData, showDebug }) => {
 };
 
 const renderDebugContent = (popup, elkDebugData) => {
-  const { elkGraph, elkClusters, layoutedGraph, edgeToPortMap } = elkDebugData;
+  const { elkGraph, elkClusters, layoutedGraph } = elkDebugData;
   
   // Calculate total bounds for proper canvas sizing
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -390,7 +390,6 @@ const renderEdges = (elkGraph, layoutedGraph, offsetX, offsetY) => {
 
     const dx = targetX - sourceX;
     const dy = targetY - sourceY;
-    const length = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
     // Extract original edge ID from the ELK edge ID for better labeling

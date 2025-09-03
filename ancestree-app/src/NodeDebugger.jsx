@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
 
-export default function NodeDebugger({ nodes, edges, onUpdateNode, onDeleteNode }) {
+export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
   const { deleteElements } = useReactFlow();
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [editingNode, setEditingNode] = useState(null);

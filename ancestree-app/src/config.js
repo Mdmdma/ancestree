@@ -169,47 +169,6 @@ export const appConfig = {
       }
     },
     
-    // Node Editor component
-    nodeEditor: {
-      // Form labels
-      labels: {
-        name: "Name",
-        surname: "Nachname",
-        birthDate: "Geburtsdatum",
-        deathDate: "Todesdatum",
-        street: "Straße",
-        city: "Stadt",
-        zip: "PLZ",
-        country: "Land",
-        phone: "Telefon",
-        bloodline: "Blutlinie",
-        position: "Position",
-        positionX: "X:",
-        positionY: "Y:"
-      },
-      
-      // Buttons
-      buttons: {
-        delete: "🗑 Person löschen",
-        pictures: "📸 Bilder"
-      },
-      
-      // Messages
-      messages: {
-        deleteWithConnections: "Diese Person kann nicht gelöscht werden, da sie noch Verbindungen zu anderen Personen hat. Entferne zuerst alle Verbindungen.",
-        confirmDelete: "wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
-      },
-      
-      // Debug section
-      debug: {
-        title: "🔧 Debug Informationen",
-        bloodlineTrue: "JA",
-        bloodlineFalse: "NEIN",
-        connectedEdges: "Verbundene Kanten:",
-        noConnections: "Keine Verbindungen"
-      }
-    },
-    
     // Person Picture Slideshow component
     slideshow: {
       loadingTitle: "Bilder werden geladen...",
