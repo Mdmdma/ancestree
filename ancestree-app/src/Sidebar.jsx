@@ -47,10 +47,15 @@ const Sidebar = ({
       }}>
         <NodeSearch 
           nodes={nodes}
-          activeTab={activeTab}
           onNodeSelect={(node) => {
-            setSelectedNode(node);
-            setActiveTab('editor'); // Switch to editor tab when a node is selected
+            // Use tree operations to properly select the node in the tree
+            if (treeOperations?.selectNode) {
+              treeOperations.selectNode(node.id);
+            } else {
+              // Fallback to direct selection if selectNode is not available
+              setSelectedNode(node);
+            }
+            // Don't change the active tab - preserve current sidebar view
           }}
         />
       </div>

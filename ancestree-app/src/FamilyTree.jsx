@@ -1771,6 +1771,21 @@ const FamilyTree = ({
     );
   }, [setNodes, showDebug]);
 
+  // Select a node programmatically (for search functionality)
+  const selectNode = useCallback((nodeId) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      // Use the same logic as onNodeClick
+      setSelectedNode(node);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          data: { ...n.data, isSelected: n.id === nodeId }
+        }))
+      );
+    }
+  }, [nodes, setSelectedNode, setNodes]);
+
   // Expose tree operations to parent component
   useEffect(() => {
     if (onNodeUpdate) {
@@ -1780,10 +1795,11 @@ const FamilyTree = ({
         autoLayout,
         fitTreeToView,
         updateNode,
-        refreshData
+        refreshData,
+        selectNode
       });
     }
-  }, [nodes, edges, autoLayout, fitTreeToView, updateNode, refreshData, onNodeUpdate]);
+  }, [nodes, edges, autoLayout, fitTreeToView, updateNode, refreshData, selectNode, onNodeUpdate]);
 
   if (loading) {
     return <div>{appConfig.ui.loading.familyTree}</div>;

@@ -93,7 +93,8 @@ const AddNodeOnEdgeDrop = () => {
       autoLayout: data.autoLayout,
       fitTreeToView: data.fitTreeToView,
       updateNode: data.updateNode,
-      refreshData: data.refreshData
+      refreshData: data.refreshData,
+      selectNode: data.selectNode
     });
   }, []);
 

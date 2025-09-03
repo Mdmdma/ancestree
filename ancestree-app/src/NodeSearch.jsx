@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 
-const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
+const NodeSearch = ({ nodes, onNodeSelect }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSelectingNode, setIsSelectingNode] = useState(false);
   const { fitView } = useReactFlow();
   const searchInputRef = useRef(null);
   const dropdownRef = useRef(null);
   const searchTimeoutRef = useRef(null);
 
-  // Search function that filters nodes by name and sorts by birth date
+  // Search function that filters nodes by name and sorts by relevance
   const searchNodes = (term) => {
     if (!term.trim() || !nodes || nodes.length === 0) {
       setSearchResults([]);
@@ -20,31 +21,44 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
       return;
     }
 
+    const termLower = term.toLowerCase().trim();
+    const termWords = termLower.split(/\s+/);
+
     const filtered = nodes
       .filter(node => {
         if (!node || !node.data) return false;
-        const name = node.data.name || '';
-        const surname = node.data.surname || '';
-        const fullName = `${name} ${surname}`.toLowerCase().trim();
-        return fullName.includes(term.toLowerCase().trim());
+        const name = (node.data.name || '').toLowerCase();
+        const surname = (node.data.surname || '').toLowerCase();
+        const fullName = `${name} ${surname}`.trim();
+        
+        // Check if all search terms are found in the name
+        return termWords.every(word => 
+          name.includes(word) || surname.includes(word) || fullName.includes(word)
+        );
       })
       .sort((a, b) => {
-        // First sort by name similarity (exact match first)
-        const aName = a.data.name || '';
-        const aSurname = a.data.surname || '';
-        const aFullName = `${aName} ${aSurname}`.toLowerCase().trim();
+        // Calculate relevance scores for better sorting
+        const aName = (a.data.name || '').toLowerCase();
+        const aSurname = (a.data.surname || '').toLowerCase();
+        const aFullName = `${aName} ${aSurname}`.trim();
         
-        const bName = b.data.name || '';
-        const bSurname = b.data.surname || '';
-        const bFullName = `${bName} ${bSurname}`.toLowerCase().trim();
+        const bName = (b.data.name || '').toLowerCase();
+        const bSurname = (b.data.surname || '').toLowerCase();
+        const bFullName = `${bName} ${bSurname}`.trim();
         
-        const termLower = term.toLowerCase().trim();
-        
+        // Exact match gets highest priority
         const aExactMatch = aFullName === termLower;
         const bExactMatch = bFullName === termLower;
         
         if (aExactMatch && !bExactMatch) return -1;
         if (bExactMatch && !aExactMatch) return 1;
+        
+        // Starts with search term gets second priority
+        const aStartsWith = aFullName.startsWith(termLower) || aName.startsWith(termLower) || aSurname.startsWith(termLower);
+        const bStartsWith = bFullName.startsWith(termLower) || bName.startsWith(termLower) || bSurname.startsWith(termLower);
+        
+        if (aStartsWith && !bStartsWith) return -1;
+        if (bStartsWith && !aStartsWith) return 1;
         
         // Then sort by birth date (older first)
         const aDate = a.data.birthDate || a.data.birth_date;
@@ -61,8 +75,17 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
         }
       });
 
-    setSearchResults(filtered);
-    setIsDropdownVisible(filtered.length > 0);
+    // Store total count and limit results to avoid overwhelming the user
+    const totalResults = filtered.length;
+    const limitedResults = filtered.slice(0, 8);
+    
+    // Store both limited results and total count for display
+    setSearchResults({ 
+      results: limitedResults, 
+      total: totalResults, 
+      hasMore: totalResults > 8 
+    });
+    setIsDropdownVisible(limitedResults.length > 0);
     setSelectedIndex(-1);
   };
 
@@ -77,7 +100,7 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
     }
     
     if (!value.trim()) {
-      setSearchResults([]);
+      setSearchResults({ results: [], total: 0, hasMore: false });
       setIsDropdownVisible(false);
       setIsSearching(false);
       return;
@@ -85,11 +108,11 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
     
     setIsSearching(true);
     
-    // Debounce search
+    // Debounce search with shorter delay for better responsiveness
     searchTimeoutRef.current = setTimeout(() => {
       searchNodes(value);
       setIsSearching(false);
-    }, 150);
+    }, 100);
   };
 
   // Clear search
@@ -98,7 +121,7 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
       clearTimeout(searchTimeoutRef.current);
     }
     setSearchTerm('');
-    setSearchResults([]);
+    setSearchResults({ results: [], total: 0, hasMore: false });
     setIsDropdownVisible(false);
     setSelectedIndex(-1);
     setIsSearching(false);
@@ -107,18 +130,17 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
 
   // Handle node selection
   const handleNodeSelect = (node) => {
+    setIsSelectingNode(true);
     setSearchTerm('');
     setSearchResults([]);
     setIsDropdownVisible(false);
     setSelectedIndex(-1);
     
-    // Only select the node if the editor tab is already active
-    // Otherwise, just fit the view to the node
-    if (activeTab === 'editor') {
-      onNodeSelect(node);
-    }
+    // Always select the node regardless of active tab
+    // This ensures the node is properly selected in the tree
+    onNodeSelect(node);
     
-    // Center the view on the selected node
+    // Center the view on the selected node with a slight delay for better UX
     setTimeout(() => {
       fitView({
         nodes: [node],
@@ -126,30 +148,50 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
         duration: 800,
         maxZoom: 1.5
       });
+      
+      // Reset selecting state after animation
+      setTimeout(() => {
+        setIsSelectingNode(false);
+      }, 800);
     }, 100);
   };
 
-  // Handle keyboard navigation
+  // Helper function to highlight search terms in text
+  const highlightSearchTerm = (text, searchTerm) => {
+    if (!searchTerm.trim() || !text) return text;
+    
+    const termWords = searchTerm.toLowerCase().trim().split(/\s+/);
+    let highlightedText = text;
+    
+    termWords.forEach(word => {
+      if (word.length > 1) { // Only highlight words longer than 1 character
+        const regex = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        highlightedText = highlightedText.replace(regex, '<mark>$1</mark>');
+      }
+    });
+    
+    return highlightedText;
+  };
   const handleKeyDown = (e) => {
-    if (!isDropdownVisible || searchResults.length === 0) return;
+    if (!isDropdownVisible || !searchResults.results || searchResults.results.length === 0) return;
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
         setSelectedIndex(prev => 
-          prev < searchResults.length - 1 ? prev + 1 : 0
+          prev < searchResults.results.length - 1 ? prev + 1 : 0
         );
         break;
       case 'ArrowUp':
         e.preventDefault();
         setSelectedIndex(prev => 
-          prev > 0 ? prev - 1 : searchResults.length - 1
+          prev > 0 ? prev - 1 : searchResults.results.length - 1
         );
         break;
       case 'Enter':
         e.preventDefault();
-        if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
-          handleNodeSelect(searchResults[selectedIndex]);
+        if (selectedIndex >= 0 && selectedIndex < searchResults.results.length) {
+          handleNodeSelect(searchResults.results[selectedIndex]);
         }
         break;
       case 'Escape':
@@ -204,30 +246,43 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
+      <style>
+        {`
+          .search-highlight mark {
+            background-color: #ffeb3b;
+            color: #333;
+            padding: 1px 2px;
+            border-radius: 2px;
+            font-weight: bold;
+          }
+        `}
+      </style>
       <div style={{ position: 'relative' }}>
         <input
           ref={searchInputRef}
           type="text"
-          placeholder="Search people..."
+          placeholder={isSelectingNode ? "Navigating to person..." : "Search people..."}
           value={searchTerm}
           onChange={handleSearchChange}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (searchResults.length > 0) {
+            if (searchResults.results && searchResults.results.length > 0) {
               setIsDropdownVisible(true);
             }
           }}
+          disabled={isSelectingNode}
           style={{
             width: '100%',
             padding: '12px 40px 12px 40px',
             fontSize: '14px',
             border: '1px solid #ccc',
             borderRadius: '6px',
-            backgroundColor: 'var(--search-bg, #ffffff)',
-            color: 'var(--search-text, #333333)',
+            backgroundColor: isSelectingNode ? 'var(--search-selecting-bg, #f0f8ff)' : 'var(--search-bg, #ffffff)',
+            color: isSelectingNode ? 'var(--search-selecting-text, #666666)' : 'var(--search-text, #333333)',
             boxSizing: 'border-box',
             outline: 'none',
-            transition: 'border-color 0.2s ease, background-color 0.2s ease'
+            transition: 'border-color 0.2s ease, background-color 0.2s ease',
+            cursor: isSelectingNode ? 'wait' : 'text'
           }}
         />
         <div style={{
@@ -239,7 +294,7 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
           pointerEvents: 'none',
           fontSize: '16px'
         }}>
-          🔍
+          {isSelectingNode ? '⏳' : '🔍'}
         </div>
         {searchTerm && (
           <button
@@ -269,7 +324,7 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
         )}
       </div>
 
-      {(isDropdownVisible && (searchResults.length > 0 || (searchTerm.trim() && !isSearching))) || isSearching ? (
+      {(isDropdownVisible && ((searchResults.results && searchResults.results.length > 0) || (searchTerm.trim() && !isSearching))) || isSearching ? (
         <div
           ref={dropdownRef}
           style={{
@@ -296,7 +351,7 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
             }}>
               Searching...
             </div>
-          ) : searchResults.length === 0 && searchTerm.trim() ? (
+          ) : (!searchResults.results || searchResults.results.length === 0) && searchTerm.trim() ? (
             <div style={{
               padding: '12px',
               color: 'var(--search-text-muted, #666666)',
@@ -307,7 +362,7 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
             </div>
           ) : (
             <>
-              {searchResults.length > 1 && (
+              {searchResults.total > 1 && (
                 <div style={{
                   padding: '8px 12px',
                   fontSize: '12px',
@@ -315,10 +370,13 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
                   backgroundColor: 'var(--search-header-bg, #f8f9fa)',
                   borderBottom: '1px solid #eee'
                 }}>
-                  {searchResults.length} people found
+                  {searchResults.hasMore 
+                    ? `Showing 8 of ${searchResults.total} people found`
+                    : `${searchResults.total} people found`
+                  }
                 </div>
               )}
-              {searchResults.map((node, index) => {
+              {searchResults.results && searchResults.results.map((node, index) => {
                 const name = node.data?.name || '';
                 const surname = node.data?.surname || '';
                 const fullName = `${name} ${surname}`.trim();
@@ -332,19 +390,23 @@ const NodeSearch = ({ nodes, onNodeSelect, activeTab }) => {
                       padding: '12px',
                       cursor: 'pointer',
                       backgroundColor: index === selectedIndex ? 'var(--search-selected-bg, #f0f8ff)' : 'var(--search-dropdown-bg, #ffffff)',
-                      borderBottom: index < searchResults.length - 1 ? '1px solid #eee' : 'none',
+                      borderBottom: index < searchResults.results.length - 1 ? '1px solid #eee' : 'none',
                       transition: 'background-color 0.15s ease'
                     }}
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
-                    <div style={{
-                      fontWeight: '500',
-                      fontSize: '14px',
-                      color: 'var(--search-text, #333333)',
-                      marginBottom: birthDate ? '4px' : '0'
-                    }}>
-                      {fullName || 'Unnamed Person'}
-                    </div>
+                    <div 
+                      className="search-highlight"
+                      style={{
+                        fontWeight: '500',
+                        fontSize: '14px',
+                        color: 'var(--search-text, #333333)',
+                        marginBottom: birthDate ? '4px' : '0'
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: highlightSearchTerm(fullName || 'Unnamed Person', searchTerm)
+                      }}
+                    />
                     {birthDate && (
                       <div style={{
                         fontSize: '12px',
