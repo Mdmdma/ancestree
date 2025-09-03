@@ -284,7 +284,6 @@ const FamilyTree = ({
             // Provide defaults for new fields if they don't exist
             // Family nodes are always on the bloodline
             bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-            disabledHandles: node.data.disabledHandles || [],
             isRecentChange: false, // Initialize recent change indicator
             isDebugMode: showDebug // Add debug mode to node data
           }
@@ -329,7 +328,6 @@ const FamilyTree = ({
         data: {
           ...node.data,
           bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-          disabledHandles: node.data.disabledHandles || [],
           isRecentChange: false, // Initialize recent change indicator
           isDebugMode: showDebug // Add debug mode to node data
         }
@@ -1310,8 +1308,7 @@ const FamilyTree = ({
                 phone: '',
                 numberOfPartners: 0,
                 isSelected: false,
-                bloodline: false,
-                disabledHandles: sourceHandle === 'partner-left' ? ['partner-left'] : ['partner-right']
+                bloodline: false
               };
 
               // Calculate position so the connecting handle is at the drop point
@@ -1407,8 +1404,7 @@ const FamilyTree = ({
               gender: 'male',
               numberOfPartners: 0,
               isSelected: false,
-              bloodline: !isPartnerNode, // Partner nodes have bloodline: false
-              disabledHandles: isPartnerNode ? ['partner-left'] : [] // Disable left partner handle for partner nodes
+              bloodline: !isPartnerNode // Partner nodes have bloodline: false
             };
             
             // Calculate position so the connecting handle is at the drop point

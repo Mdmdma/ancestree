@@ -25,7 +25,6 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           country: node.data.country || '',
           phone: node.data.phone || '',
           bloodline: node.data.bloodline || false,
-          disabledHandles: node.data.disabledHandles || [],
         });
       }
     } else {
