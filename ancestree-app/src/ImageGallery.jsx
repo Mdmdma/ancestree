@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
+import FamilyGallerySlideshow from './FamilyGallerySlideshow';
 
 const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => {
   const [images, setImages] = useState([]);
@@ -14,6 +15,12 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
   const [dragOver, setDragOver] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState('');
+  const [showFamilyGallery, setShowFamilyGallery] = useState(false);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('ImageGallery: showFamilyGallery state changed to:', showFamilyGallery);
+  }, [showFamilyGallery]);
 
   // Load images from database
   const loadImages = useCallback(async () => {
@@ -281,6 +288,30 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
   // Render gallery view
   const renderGallery = () => (
     <div>
+      {/* Family Gallery Button on top */}
+      <div style={{ marginBottom: '10px' }}>
+        <button
+          onClick={() => {
+            console.log('Family Gallery button clicked! Current showFamilyGallery state:', showFamilyGallery);
+            setShowFamilyGallery(true);
+            console.log('Set showFamilyGallery to true');
+          }}
+          style={{
+            padding: '12px 20px',
+            backgroundColor: '#9C27B0',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            width: '100%'
+          }}
+        >
+          {appConfig.ui.familyGallery.galleryButton}
+        </button>
+      </div>
+
+      {/* Upload and Refresh buttons below */}
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
         <button
           onClick={() => setViewMode('upload')}
@@ -943,6 +974,20 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
         {viewMode === 'confirm' && renderConfirm()}
         {viewMode === 'view' && selectedImage && renderImageView()}
       </div>
+
+      {/* Family Gallery Slideshow */}
+      {showFamilyGallery && (
+        <>
+          {console.log('Rendering FamilyGallerySlideshow, showFamilyGallery:', showFamilyGallery)}
+          <FamilyGallerySlideshow
+            onClose={() => {
+              console.log('Closing family gallery');
+              setShowFamilyGallery(false);
+            }}
+            onPersonSelect={onPersonSelect}
+          />
+        </>
+      )}
     </div>
   );
 };
