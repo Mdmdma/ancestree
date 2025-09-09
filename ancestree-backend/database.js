@@ -122,6 +122,18 @@ db.serialize(() => {
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // Chat messages table for image discussions
+  db.run(`CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_id TEXT NOT NULL,
+    family_id INTEGER NOT NULL,
+    user_name TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
+    FOREIGN KEY (family_id) REFERENCES users (id) ON DELETE CASCADE
+  )`);
+
   // Add preferred_image_id column to nodes table if it doesn't exist
   db.run(`PRAGMA table_info(nodes)`, (err, result) => {
     if (err) {

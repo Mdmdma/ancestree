@@ -1561,6 +1561,133 @@ app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
   });
 });
 
+// === CHAT ENDPOINTS ===
+
+// Get chat messages for a specific image
+app.get('/api/images/:imageId/chat', authenticateToken, (req, res) => {
+  const { imageId } = req.params;
+  const familyId = req.user.id;
+
+  const query = `
+    SELECT id, user_name, message, created_at
+    FROM chat_messages 
+    WHERE image_id = ? AND family_id = ?
+    ORDER BY created_at ASC
+  `;
+
+  db.all(query, [imageId, familyId], (err, rows) => {
+    if (err) {
+      console.error('Database error in /api/images/:imageId/chat:', err.message);
+      res.status(500).json({ error: err.message });
+      return;
+    }
+
+    const messages = rows.map(row => ({
+      id: row.id,
+      userName: row.user_name,
+      message: row.message,
+      createdAt: row.created_at
+    }));
+
+    res.json(messages);
+  });
+});
+
+// Post a new chat message for an image
+app.post('/api/images/:imageId/chat', authenticateToken, (req, res) => {
+  const { imageId } = req.params;
+  const { userName, message } = req.body;
+  const familyId = req.user.id;
+
+  if (!userName || !message) {
+    return res.status(400).json({ error: 'User name and message are required' });
+  }
+
+  if (message.trim().length === 0) {
+    return res.status(400).json({ error: 'Message cannot be empty' });
+  }
+
+  if (userName.trim().length === 0) {
+    return res.status(400).json({ error: 'User name cannot be empty' });
+  }
+
+  // Verify the image exists and belongs to this family
+  db.get('SELECT id FROM images WHERE id = ? AND family_id = ?', [imageId, familyId], (err, row) => {
+    if (err) {
+      console.error('Database error checking image:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (!row) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    // Insert the new chat message
+    const query = `
+      INSERT INTO chat_messages (image_id, family_id, user_name, message, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `;
+
+    db.run(query, [imageId, familyId, userName.trim(), message.trim()], function(err) {
+      if (err) {
+        console.error('Database error in /api/images/:imageId/chat POST:', err.message);
+        res.status(500).json({ error: err.message });
+        return;
+      }
+
+      const newMessage = {
+        id: this.lastID,
+        userName: userName.trim(),
+        message: message.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      // Emit the new message to all clients in this family room for real-time updates
+      req.app.get('io').to(`family-${familyId}`).emit('chat:message', {
+        imageId: imageId,
+        message: newMessage
+      });
+
+      res.json({
+        success: true,
+        message: newMessage
+      });
+    });
+  });
+});
+
+// Delete a chat message (optional - allows users to delete their own messages)
+app.delete('/api/images/:imageId/chat/:messageId', authenticateToken, (req, res) => {
+  const { imageId, messageId } = req.params;
+  const familyId = req.user.id;
+
+  // Verify the message exists and belongs to this family and image
+  const query = `
+    DELETE FROM chat_messages 
+    WHERE id = ? AND image_id = ? AND family_id = ?
+  `;
+
+  db.run(query, [messageId, imageId, familyId], function(err) {
+    if (err) {
+      console.error('Database error in /api/images/:imageId/chat/:messageId DELETE:', err.message);
+      res.status(500).json({ error: err.message });
+      return;
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Emit the message deletion to all clients in this family room
+    req.app.get('io').to(`family-${familyId}`).emit('chat:messageDeleted', {
+      imageId: imageId,
+      messageId: messageId
+    });
+
+    res.json({ success: true, message: 'Chat message deleted successfully' });
+  });
+});
+
 // Catch-all handler: send back React's index.html file for production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {

@@ -323,5 +323,48 @@ export const api = {
     }
     
     return response.json();
+  },
+
+  // Chat operations
+  async getChatMessages(imageId) {
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/chat`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to load chat messages');
+    }
+    
+    return response.json();
+  },
+
+  async postChatMessage(imageId, userName, message) {
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/chat`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ userName, message })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to post chat message');
+    }
+    
+    return response.json();
+  },
+
+  async deleteChatMessage(imageId, messageId) {
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/chat/${messageId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete chat message');
+    }
+    
+    return response.json();
   }
 };

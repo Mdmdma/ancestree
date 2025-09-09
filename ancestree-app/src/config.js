@@ -304,6 +304,50 @@ export const appConfig = {
       resultCountLimited: "Zeige 8 von {total} gefundenen Personen",
       unnamedPerson: "Unbenannte Person",
       bornLabel: "Geboren:"
+    },
+
+    // Family Gallery Slideshow component
+    familyGallery: {
+      title: "👨‍👩‍👧‍👦 Familien-Fotoalbum",
+      loadingTitle: "Lade Familienbilder...",
+      loadingMessage: "Familienbilder werden geladen...",
+      errorTitle: "Fehler",
+      errorMessage: "Fehler beim Laden der Familienbilder: ",
+      noPicturesIcon: "📷",
+      noPicturesTitle: "Keine Familienbilder gefunden",
+      noPicturesMessage: "Es wurden noch keine Bilder zur Familiengalerie hinzugefügt.",
+      descriptionTitle: "Beschreibung",
+      taggedPeopleTitle: "Markierte Personen",
+      noTaggedPeople: "Keine Personen in diesem Bild markiert.",
+      editButton: "✏️ Bearbeiten",
+      saveButton: "💾 Speichern",
+      cancelButton: "✖ Abbrechen",
+      descriptionPlaceholder: "Beschreibung eingeben...",
+      noDescription: "Keine Beschreibung vorhanden",
+      galleryButton: "🖼️ Familien-Album"
+    },
+
+    // Chat component for image discussions
+    chat: {
+      title: "💬 Diskussion",
+      noMessages: "Noch keine Nachrichten. Starte die Diskussion über dieses Bild!",
+      namePlaceholder: "Dein Name...",
+      messagePlaceholder: "Schreibe einen Kommentar zu diesem Bild...",
+      sendButton: "Senden",
+      nameRequired: "Bitte gib deinen Namen ein",
+      messageRequired: "Bitte schreibe eine Nachricht",
+      loadingMessages: "Lade Nachrichten...",
+      errorLoading: "Fehler beim Laden der Nachrichten",
+      errorSending: "Fehler beim Senden der Nachricht",
+      deleteConfirm: "Möchtest du diese Nachricht wirklich löschen?",
+      deleteButton: "🗑️",
+      timeFormat: {
+        justNow: "gerade eben",
+        minutesAgo: "vor {minutes} Min.",
+        hoursAgo: "vor {hours} Std.", 
+        daysAgo: "vor {days} Tagen",
+        dateFormat: "DD.MM.YYYY HH:mm"
+      }
     }
   }
 };

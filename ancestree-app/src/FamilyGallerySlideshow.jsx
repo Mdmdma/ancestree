@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { appConfig } from './config';
 import { api } from './api';
+import ChatComponent from './ChatComponent';
 
 // Optimized PersonTag component to prevent re-renders
 const PersonTag = React.memo(({ person, index, onPersonSelect }) => {
@@ -454,6 +455,14 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
                   {appConfig.ui.familyGallery.noTaggedPeople}
                 </p>
               )}
+            </div>
+
+            {/* Chat Section */}
+            <div>
+              <ChatComponent 
+                imageId={currentImage?.id} 
+                onError={(error) => console.error('Chat error:', error)}
+              />
             </div>
 
             {/* Navigation hints */}
