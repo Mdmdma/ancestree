@@ -195,7 +195,9 @@ export const appConfig = {
       saveButton: "💾 Speichern",
       cancelButton: "✖ Abbrechen",
       descriptionPlaceholder: "Beschreibung eingeben...",
-      noDescription: "Keine Beschreibung vorhanden"
+      noDescription: "Keine Beschreibung vorhanden",
+      fullscreenButton: "⛶ Vollbild",
+      exitFullscreenButton: "⛶ Vollbild verlassen"
     },
     
     // Node Editor configuration
@@ -204,11 +206,11 @@ export const appConfig = {
       labels: {
         name: 'Name:',
         surname: 'Nachname:',
+        maidenName: 'Geburtsname:',
         birthDate: 'Geburtsdatum:',
         deathDate: 'Todestag:',
         phone: 'Telefon:',
         email: 'E-Mail:',
-        street: 'Straße:',
         city: 'Stadt:',
         zip: 'PLZ:',
         country: 'Land (Code):'
@@ -216,7 +218,7 @@ export const appConfig = {
       placeholders: {
         phone: 'z.B. +43 5287 87123',
         email: 'z.B. name@beispiel.com',
-        street: 'z.B. Hauptstraße 123',
+        maidenName: 'z.B. Müller (falls abweichend)',
         city: 'z.B. Innsbruck',
         zip: '6020',
         country: 'z.B. AT, DE, CH'
@@ -268,7 +270,7 @@ export const appConfig = {
       selectedPersonAddress: "📍",
       noAddressAvailable: "Keine Adresse verfügbar",
       noLocationsTitle: "Keine Standorte gefunden",
-      noLocationsMessage: "Füge Straßen- und Stadtinformationen zu Personen im Editor hinzu, um sie auf der Karte zu sehen.",
+      noLocationsMessage: "Füge Stadt- und Länderinformationen zu Personen im Editor hinzu, um sie auf der Karte zu sehen.",
       mapIcon: "🗺️",
       errors: {
         failedToLoad: "Fehler beim Laden der Standorte",
@@ -324,7 +326,9 @@ export const appConfig = {
       cancelButton: "✖ Abbrechen",
       descriptionPlaceholder: "Beschreibung eingeben...",
       noDescription: "Keine Beschreibung vorhanden",
-      galleryButton: "🖼️ Familien-Album"
+      galleryButton: "🖼️ Familien-Album",
+      fullscreenButton: "⛶ Vollbild",
+      exitFullscreenButton: "⛶ Vollbild verlassen"
     },
 
     // Chat component for image discussions

@@ -17,9 +17,9 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           id: node.id,
           name: node.data.name || '',
           surname: node.data.surname || '',
+          maidenName: node.data.maidenName || '',
           birthDate: node.data.birthDate || '',
           deathDate: node.data.deathDate || '',
-          street: node.data.street || '',
           city: node.data.city || '',
           zip: node.data.zip || '',
           country: node.data.country || '',
@@ -46,9 +46,9 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
     const updatedData = {
       name: formData.name,
       surname: formData.surname,
+      maidenName: formData.maidenName,
       birthDate: formData.birthDate,
       deathDate: formData.deathDate,
-      street: formData.street,
       city: formData.city,
       zip: formData.zip,
       country: formData.country,
@@ -193,6 +193,14 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
               type="text"
               value={formData.surname}
               onChange={(e) => handleInputChange('surname', e.target.value)}
+              style={inputStyle}
+            />
+
+            <label style={labelStyle}>Maiden Name:</label>
+            <input
+              type="text"
+              value={formData.maidenName}
+              onChange={(e) => handleInputChange('maidenName', e.target.value)}
               style={inputStyle}
             />
 

@@ -54,6 +54,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
   const [error, setError] = useState(null);
   const [descriptionValue, setDescriptionValue] = useState('');
   const [editingDescription, setEditingDescription] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const loadImages = useCallback(async () => {
     try {
@@ -148,6 +149,53 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [nextImage, prevImage, onClose]);
+
+  // Fullscreen functionality
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        // Enter fullscreen
+        const element = document.documentElement;
+        if (element.requestFullscreen) {
+          await element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+          await element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) {
+          await element.msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          await document.msExitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    } catch (err) {
+      console.error('Error toggling fullscreen:', err);
+    }
+  }, []);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   // Styles (reused from PersonPictureSlideshow)
   const overlayStyle = {
@@ -300,13 +348,26 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
   }
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
+    <div style={isFullscreen ? fullscreenOverlayStyle : overlayStyle}>
+      <div style={isFullscreen ? fullscreenModalStyle : modalStyle}>
         <div style={headerStyle}>
           <h3 style={{ margin: 0, color: '#ffffff' }}>
             {appConfig.ui.familyGallery.title} ({currentIndex + 1}/{images.length})
           </h3>
-          <button onClick={onClose} style={closeButtonStyle}>✖</button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {isFullscreen ? (
+              <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
+                {appConfig.ui.familyGallery.exitFullscreenButton}
+              </button>
+            ) : (
+              <>
+                <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
+                  {appConfig.ui.familyGallery.fullscreenButton}
+                </button>
+                <button onClick={onClose} style={closeButtonStyle}>✖</button>
+              </>
+            )}
+          </div>
         </div>
 
         <div style={contentStyle}>
@@ -327,7 +388,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
               <img
                 src={currentImage.s3Url || currentImage.url}
                 alt={currentImage.description || `Familie Bild ${currentIndex + 1}`}
-                style={imageStyle}
+                style={isFullscreen ? fullscreenImageStyle : imageStyle}
                 onError={(e) => {
                   console.error('Error loading image:', currentImage);
                   e.target.style.display = 'none';
@@ -348,6 +409,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
           </div>
 
           {/* Sidebar with Image Info */}
+          {!isFullscreen && (
           <div style={sidebarStyle}>
             {/* Description Section */}
             <div>
@@ -481,10 +543,54 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>
   );
+};
+
+// Fullscreen styles
+const fullscreenButtonStyle = {
+  padding: '6px 12px',
+  backgroundColor: '#4CAF50',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '12px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '5px'
+};
+
+const fullscreenOverlayStyle = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 1)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 2000
+};
+
+const fullscreenModalStyle = {
+  backgroundColor: '#1a1a1a',
+  width: '100vw',
+  height: '100vh',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  boxShadow: 'none'
+};
+
+const fullscreenImageStyle = {
+  maxWidth: '100%',
+  maxHeight: 'calc(100vh - 80px)', // Full screen height minus header
+  objectFit: 'contain'
 };
 
 export default FamilyGallerySlideshow;

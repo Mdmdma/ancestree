@@ -1362,8 +1362,8 @@ const FamilyTree = ({
               const familyNodeData = {
                 name: `${appConfig.ui.defaultNames.family} ${familyEstablishmentYear}`,
                 surname: sourceNode.data.surname || '',
+                maidenName: '',
                 birthDate: `${familyEstablishmentYear}-01-01`,
-                street: sourceNode.data.street || '',
                 city: sourceNode.data.city || '',
                 zip: sourceNode.data.zip || '',
                 country: sourceNode.data.country || '',
@@ -1456,9 +1456,9 @@ const FamilyTree = ({
               const newNodeData = {
                 name: appConfig.ui.defaultNames.partner,
                 surname: sourceNode.data.surname || '',
+                maidenName: '',
                 birthDate: `${partnerBirthYear}-01-01`,
                 deathDate: '',
-                street: sourceNode.data.street || '',
                 city: sourceNode.data.city || '',
                 zip: sourceNode.data.zip || '',
                 country: sourceNode.data.country || '',
@@ -1551,9 +1551,9 @@ const FamilyTree = ({
             const personNodeData = {
               name: personName,
               surname: sourceNode.data.surname || '',
+              maidenName: '',
               birthDate: `${personBirthYear}-01-01`,
               deathDate: '',
-              street: sourceNode.data.street || '',
               city: sourceNode.data.city || '',
               zip: sourceNode.data.zip || '',
               country: sourceNode.data.country || '',

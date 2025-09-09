@@ -7,11 +7,11 @@ const db = new sqlite3.Database(dbPath);
 // Helper function to insert a default node for a family
 const insertDefaultNodeForFamily = (familyId, callback) => {
   db.run(`INSERT INTO nodes (
-    id, family_id, type, position_x, position_y, name, surname, birth_date, death_date,
-    street, city, zip, country, phone, bloodline
+    id, family_id, type, position_x, position_y, name, surname, maiden_name, birth_date, death_date,
+    city, zip, country, phone, bloodline
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    `default-${familyId}-${Date.now()}`, familyId, 'person', 0, 50, 'Family', 'Ancestor', '1900-01-01', null,
-    null, null, null, null, null, 1
+    `default-${familyId}-${Date.now()}`, familyId, 'person', 0, 50, 'Family', 'Ancestor', null, '1900-01-01', null,
+    null, null, null, null, 1
   ], function(insertErr) {
     if (insertErr) {
       console.error('Error inserting default node for family', familyId, ':', insertErr);
@@ -48,9 +48,9 @@ db.serialize(() => {
     position_y REAL NOT NULL,
     name TEXT,
     surname TEXT,
+    maiden_name TEXT,
     birth_date TEXT,
     death_date TEXT,
-    street TEXT,
     city TEXT,
     zip TEXT,
     country TEXT,
@@ -157,6 +157,8 @@ db.serialize(() => {
     const hasLongitude = columnNames.includes('longitude');
     const hasAddressHash = columnNames.includes('address_hash');
     const hasFamilyId = columnNames.includes('family_id');
+    const hasMaidenName = columnNames.includes('maiden_name');
+    const hasStreet = columnNames.includes('street');
     
     if (!hasPreferredImageId) {
       db.run(`ALTER TABLE nodes ADD COLUMN preferred_image_id TEXT REFERENCES images(id) ON DELETE SET NULL`, (alterErr) => {
@@ -225,6 +227,23 @@ db.serialize(() => {
           });
         }
       });
+    }
+    
+    // Add maiden_name column if it doesn't exist
+    if (!hasMaidenName) {
+      db.run(`ALTER TABLE nodes ADD COLUMN maiden_name TEXT`, (alterErr) => {
+        if (alterErr) {
+          console.error('Error adding maiden_name column:', alterErr);
+        } else {
+          console.log('Successfully added maiden_name column to nodes table');
+        }
+      });
+    }
+    
+    // Note: SQLite doesn't support DROP COLUMN easily, so we'll ignore the street column in code
+    // The street column will remain in the database but won't be used
+    if (hasStreet) {
+      console.log('Street column exists but will be ignored in application logic');
     }
   });
 

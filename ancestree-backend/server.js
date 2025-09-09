@@ -57,8 +57,8 @@ const optionalAuth = (req, res, next) => {
 };
 
 // Helper function to generate address hash for geocoding optimization
-const generateAddressHash = (street, city, zip, country) => {
-  const addressString = [street, city, zip, country]
+const generateAddressHash = (city, zip, country) => {
+  const addressString = [city, zip, country]
     .filter(Boolean)
     .map(part => part.toString().trim().toLowerCase())
     .join('|');
@@ -67,10 +67,10 @@ const generateAddressHash = (street, city, zip, country) => {
 
 // Helper function to perform smart geocoding (only when address changes)
 const performSmartGeocoding = async (nodeData, currentNode = null) => {
-  const { street, city, zip, country } = nodeData;
+  const { city, zip, country } = nodeData;
   
   // Generate new address hash
-  const newAddressHash = generateAddressHash(street, city, zip, country);
+  const newAddressHash = generateAddressHash(city, zip, country);
   
   // If we have a current node and the address hash hasn't changed, keep existing coordinates
   if (currentNode && currentNode.address_hash === newAddressHash && 
@@ -83,7 +83,7 @@ const performSmartGeocoding = async (nodeData, currentNode = null) => {
   }
   
   // If no valid address components, return null coordinates
-  if (!street && !city && !zip && !country) {
+  if (!city && !zip && !country) {
     return {
       latitude: null,
       longitude: null,
@@ -93,7 +93,7 @@ const performSmartGeocoding = async (nodeData, currentNode = null) => {
   
   // Perform geocoding for new/changed address
   try {
-    const address = [street, city, zip, country].filter(Boolean).join(', ');
+    const address = [city, zip, country].filter(Boolean).join(', ');
     const geocodeResponse = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
       params: {
         address: address,
@@ -631,9 +631,9 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
       data: {
         name: row.name,
         surname: row.surname,
+        maidenName: row.maiden_name,
         birthDate: row.birth_date,
         deathDate: row.death_date,
-        street: row.street,
         city: row.city,
         zip: row.zip,
         country: row.country,
@@ -684,12 +684,12 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
     const geocodingResult = await performSmartGeocoding(data);
     
     db.run(`INSERT INTO nodes (
-      id, type, position_x, position_y, name, surname, birth_date, death_date,
-      street, city, zip, country, phone, email, latitude, longitude, address_hash,
+      id, type, position_x, position_y, name, surname, maiden_name, birth_date, death_date,
+      city, zip, country, phone, email, latitude, longitude, address_hash,
       bloodline, preferred_image_id, family_id
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-      id, type, position.x, position.y, data.name, data.surname, data.birthDate,
-      data.deathDate, data.street, data.city, data.zip, data.country, data.phone,
+      id, type, position.x, position.y, data.name, data.surname, data.maidenName,
+      data.birthDate, data.deathDate, data.city, data.zip, data.country, data.phone,
       data.email, geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
       data.bloodline ? 1 : 0, data.preferredImageId || null, familyId
     ], function(err) {
@@ -749,13 +749,13 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
     const geocodingResult = await performSmartGeocoding(data, currentNode);
     
     db.run(`UPDATE nodes SET 
-      position_x = ?, position_y = ?, name = ?, surname = ?, birth_date = ?,
-      death_date = ?, street = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
+      position_x = ?, position_y = ?, name = ?, surname = ?, maiden_name = ?, birth_date = ?,
+      death_date = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
       latitude = ?, longitude = ?, address_hash = ?,
       bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND family_id = ?`, [
-      position?.x, position?.y, data.name, data.surname, data.birthDate,
-      data.deathDate, data.street, data.city, data.zip, data.country, data.phone, data.email,
+      position?.x, position?.y, data.name, data.surname, data.maidenName, data.birthDate,
+      data.deathDate, data.city, data.zip, data.country, data.phone, data.email,
       geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
       data.bloodline ? 1 : 0, data.preferredImageId || null, id, familyId
     ], function(err) {

@@ -9,9 +9,9 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
   const [formData, setFormData] = useState({
     name: '',
     surname: '',
+    maidenName: '',
     birthDate: '',
     deathDate: '',
-    street: '',
     city: '',
     zip: '',
     country: '',
@@ -65,9 +65,9 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       setFormData({
         name: node.data.name || '',
         surname: node.data.surname || '',
+        maidenName: node.data.maidenName || '',
         birthDate: node.data.birthDate || '',
         deathDate: node.data.deathDate || '',
-        street: node.data.street || '',
         city: node.data.city || '',
         zip: node.data.zip || '',
         country: node.data.country || '',
@@ -174,6 +174,15 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         style={inputStyle}
       />
 
+      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.maidenName}</label>
+      <input
+        type="text"
+        value={formData.maidenName}
+        onChange={(e) => handleInputChange('maidenName', e.target.value)}
+        style={inputStyle}
+        placeholder={appConfig.ui.nodeEditor.placeholders.maidenName}
+      />
+
       <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.birthDate}</label>
       <input
         type="date"
@@ -206,15 +215,6 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         onChange={(e) => handleInputChange('email', e.target.value)}
         style={inputStyle}
         placeholder={appConfig.ui.nodeEditor.placeholders.email}
-      />
-
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.street}</label>
-      <input
-        type="text"
-        value={formData.street}
-        onChange={(e) => handleInputChange('street', e.target.value)}
-        style={inputStyle}
-        placeholder={appConfig.ui.nodeEditor.placeholders.street}
       />
 
       <div style={addressRowStyle}>

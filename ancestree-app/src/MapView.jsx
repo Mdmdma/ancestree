@@ -28,10 +28,9 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
     setError(null);
     
     try {
-      // Filter nodes that have complete addresses
+      // Filter nodes that have at least city information
       const nodesWithAddresses = nodes.filter(node => 
-        node.data.street && node.data.city && 
-        (node.data.street.trim() !== '' || node.data.city.trim() !== '')
+        node.data.city && node.data.city.trim() !== ''
       );
 
       if (nodesWithAddresses.length === 0) {
@@ -43,7 +42,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
       // Geocode addresses
       const locationPromises = nodesWithAddresses.map(async (node) => {
         try {
-          const address = `${node.data.street || ''} ${node.data.city || ''} ${node.data.zip || ''} ${node.data.country || ''}`.trim();
+          const address = `${node.data.city || ''} ${node.data.zip || ''} ${node.data.country || ''}`.trim();
           const coordinates = await api.geocodeAddress(address);
           
           return {
@@ -475,9 +474,8 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
             <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
               {appConfig.ui.mapView.selectedPersonAddress} {selectedNode.data.name} {selectedNode.data.surname}
             </div>
-            {(selectedNode.data.street || selectedNode.data.city) ? (
+            {selectedNode.data.city ? (
               <div style={{ fontSize: '14px', opacity: 0.9 }}>
-                {selectedNode.data.street && <div>{selectedNode.data.street}</div>}
                 <div>
                   {selectedNode.data.city}
                   {selectedNode.data.zip && ` ${selectedNode.data.zip}`}

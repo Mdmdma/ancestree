@@ -47,6 +47,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState('');
   const [settingPreferred, setSettingPreferred] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const loadPersonImages = async () => {
@@ -164,6 +165,53 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
     }
   }, [personId, personName, onPreferredImageChange]);
 
+  // Fullscreen functionality
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        // Enter fullscreen
+        const element = document.documentElement;
+        if (element.requestFullscreen) {
+          await element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+          await element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) {
+          await element.msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          await document.msExitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    } catch (err) {
+      console.error('Error toggling fullscreen:', err);
+    }
+  }, []);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   // Memoize styles to prevent object recreation
   const navButtonLeftStyle = useMemo(() => ({
     ...navButtonStyle,
@@ -235,13 +283,26 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
   }
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
+    <div style={isFullscreen ? fullscreenOverlayStyle : overlayStyle}>
+      <div style={isFullscreen ? fullscreenModalStyle : modalStyle}>
         <div style={headerStyle}>
           <h3 style={{ margin: 0, color: '#ffffff' }}>
             {appConfig.ui.slideshow.picturesTitle}{personName} ({currentIndex + 1}/{images.length})
           </h3>
-          <button onClick={onClose} style={closeButtonStyle}>✖</button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {isFullscreen ? (
+              <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
+                {appConfig.ui.slideshow.exitFullscreenButton}
+              </button>
+            ) : (
+              <>
+                <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
+                  {appConfig.ui.slideshow.fullscreenButton}
+                </button>
+                <button onClick={onClose} style={closeButtonStyle}>✖</button>
+              </>
+            )}
+          </div>
         </div>
 
         <div style={contentStyle}>
@@ -260,7 +321,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
             <img
               src={currentImage.s3Url}
               alt={currentImage.description || currentImage.originalFilename}
-              style={mainImageStyle}
+              style={isFullscreen ? fullscreenImageStyle : mainImageStyle}
             />
             
             {images.length > 1 && (
@@ -275,6 +336,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
           </div>
 
           {/* Image Info */}
+          {!isFullscreen && (
           <div style={imageInfoStyle}>
             <div style={{ 
               display: 'flex', 
@@ -401,9 +463,10 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
               </div>
             </div>
           </div>
+          )}
 
           {/* Tagged People Info */}
-          {currentImage.people && currentImage.people.length > 0 && (
+          {!isFullscreen && currentImage.people && currentImage.people.length > 0 && (
             <div style={imageInfoStyle}>
               <div style={{ fontWeight: 'bold', marginBottom: '10px', color: '#ffffff' }}>
                 {appConfig.ui.slideshow.taggedPeopleTitle} ({currentImage.people.length})
@@ -417,7 +480,7 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
           )}
 
           {/* Thumbnail Navigation */}
-          {images.length > 1 && (
+          {!isFullscreen && images.length > 1 && (
             <div style={thumbnailContainerStyle}>
               {images.map((image, index) => (
                 <img
@@ -436,12 +499,14 @@ const PersonPictureSlideshow = ({ personId, personName, preferredImageId, onPref
           )}
 
           {/* Chat Section */}
-          <div style={imageInfoStyle}>
-            <ChatComponent 
-              imageId={currentImage?.id} 
-              onError={(error) => console.error('Chat error:', error)}
-            />
-          </div>
+          {!isFullscreen && (
+            <div style={imageInfoStyle}>
+              <ChatComponent 
+                imageId={currentImage?.id} 
+                onError={(error) => console.error('Chat error:', error)}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -599,6 +664,49 @@ const thumbnailStyle = {
   borderRadius: '4px',
   cursor: 'pointer',
   transition: 'opacity 0.2s ease'
+};
+
+// Fullscreen styles
+const fullscreenButtonStyle = {
+  padding: '6px 12px',
+  backgroundColor: '#4CAF50',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '12px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '5px'
+};
+
+const fullscreenOverlayStyle = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 1)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000
+};
+
+const fullscreenModalStyle = {
+  backgroundColor: '#1a1a1a',
+  width: '100vw',
+  height: '100vh',
+  display: 'flex',
+  flexDirection: 'column',
+  border: 'none'
+};
+
+const fullscreenImageStyle = {
+  width: '100%',
+  height: 'calc(100vh - 80px)', // Full screen height minus header
+  objectFit: 'contain',
+  borderRadius: '0px',
 };
 
 export default PersonPictureSlideshow;
