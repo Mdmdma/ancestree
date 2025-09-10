@@ -59,7 +59,8 @@ export const appConfig = {
         familyToFamily: "Direkte Verbindungen zwischen Familien-Knoten sind nicht erlaubt. Verbinde stattdessen Personen mit Familien.",
         directParentChild: "Direkte Eltern-Kind-Verbindungen zwischen Personen sind nicht erlaubt. Verwende Familien-Knoten, um Generationen zu repräsentieren.",
         partnerNodePartnerHandle: "{name} ist ein Partner-Knoten und kann keine weiteren Partner-Verbindungen eingehen. Nur Blutlinien-Knoten können mehrere Partner haben.",
-        bloodlineToBloodlinePartner: "Zwei Blutlinien-Knoten können nicht als Partner verbunden werden. Einer muss zuerst ein Partner-Knoten werden, indem er mit einem anderen Blutlinien-Knoten verbunden wird.",
+        partnerNodeMultiplePartners: "{name} ist bereits mit einem Blutlinien-Partner verbunden. Partner-Knoten können nur einen Partner haben.",
+        bloodlineToBloodlinePartner: "Damit das automatische Layout funktioniert, könne Blutlinien Knoten nicht miteinander verbunden werden. Sollte dies erforderlich sein, füge die Entsprechende Person erneut als Partner hinzu",
         partnerNodeParentHandle: "{name} ist ein Partner-Knoten und kann den Eltern-Anschluss nicht verwenden. Partner-Knoten können nur über Kind-Anschlüsse Familien bilden.",
         bloodlineMultipleParents: "{name} hat bereits {count} Eltern-Verbindung(en). Blutlinien-Knoten können nur eine Eltern-Familie haben."
       },

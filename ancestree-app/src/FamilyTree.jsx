@@ -84,7 +84,8 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
       (sourceHandle?.includes('partner') || targetHandle?.includes('partner'))) {
     
     // Check if source is a partner node trying to use partner handles
-    if (!isBloodlineNode(sourceNode) && sourceHandle?.includes('partner')) {
+    // Allow if target is bloodline (bloodline nodes can connect to partners)
+    if (!isBloodlineNode(sourceNode) && sourceHandle?.includes('partner') && !isBloodlineNode(targetNode)) {
       return { 
         isValid: false, 
         message: appConfig.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', sourceNode.data.name)
@@ -92,11 +93,40 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     }
     
     // Check if target is a partner node trying to use partner handles
-    if (!isBloodlineNode(targetNode) && targetHandle?.includes('partner')) {
+    // Allow if source is bloodline (bloodline nodes can connect to partners)
+    if (!isBloodlineNode(targetNode) && targetHandle?.includes('partner') && !isBloodlineNode(sourceNode)) {
       return { 
         isValid: false, 
         message: appConfig.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', targetNode.data.name)
       };
+    }
+    
+    // Check if source partner node already has a partner connection
+    if (!isBloodlineNode(sourceNode) && sourceHandle?.includes('partner')) {
+      const existingPartnerConnections = edges.filter(edge => 
+        edge.type === 'partner' && 
+        (edge.source === sourceNode.id || edge.target === sourceNode.id)
+      );
+      if (existingPartnerConnections.length >= 1) {
+        return { 
+          isValid: false, 
+          message: appConfig.ui.editor.validationMessages.partnerNodeMultiplePartners.replace('{name}', sourceNode.data.name)
+        };
+      }
+    }
+    
+    // Check if target partner node already has a partner connection
+    if (!isBloodlineNode(targetNode) && targetHandle?.includes('partner')) {
+      const existingPartnerConnections = edges.filter(edge => 
+        edge.type === 'partner' && 
+        (edge.source === targetNode.id || edge.target === targetNode.id)
+      );
+      if (existingPartnerConnections.length >= 1) {
+        return { 
+          isValid: false, 
+          message: appConfig.ui.editor.validationMessages.partnerNodeMultiplePartners.replace('{name}', targetNode.data.name)
+        };
+      }
     }
     
     // Prohibit partner connections between two bloodline nodes
@@ -1362,7 +1392,6 @@ const FamilyTree = ({
               const familyNodeData = {
                 name: `${appConfig.ui.defaultNames.family} ${familyEstablishmentYear}`,
                 surname: sourceNode.data.surname || '',
-                maidenName: '',
                 birthDate: `${familyEstablishmentYear}-01-01`,
                 city: sourceNode.data.city || '',
                 zip: sourceNode.data.zip || '',
@@ -1456,7 +1485,6 @@ const FamilyTree = ({
               const newNodeData = {
                 name: appConfig.ui.defaultNames.partner,
                 surname: sourceNode.data.surname || '',
-                maidenName: '',
                 birthDate: `${partnerBirthYear}-01-01`,
                 deathDate: '',
                 city: sourceNode.data.city || '',
@@ -1551,7 +1579,6 @@ const FamilyTree = ({
             const personNodeData = {
               name: personName,
               surname: sourceNode.data.surname || '',
-              maidenName: '',
               birthDate: `${personBirthYear}-01-01`,
               deathDate: '',
               city: sourceNode.data.city || '',
@@ -1771,21 +1798,6 @@ const FamilyTree = ({
     );
   }, [setNodes, showDebug]);
 
-  // Select a node programmatically (for search functionality)
-  const selectNode = useCallback((nodeId) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (node) {
-      // Use the same logic as onNodeClick
-      setSelectedNode(node);
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          data: { ...n.data, isSelected: n.id === nodeId }
-        }))
-      );
-    }
-  }, [nodes, setSelectedNode, setNodes]);
-
   // Expose tree operations to parent component
   useEffect(() => {
     if (onNodeUpdate) {
@@ -1795,11 +1807,10 @@ const FamilyTree = ({
         autoLayout,
         fitTreeToView,
         updateNode,
-        refreshData,
-        selectNode
+        refreshData
       });
     }
-  }, [nodes, edges, autoLayout, fitTreeToView, updateNode, refreshData, selectNode, onNodeUpdate]);
+  }, [nodes, edges, autoLayout, fitTreeToView, updateNode, refreshData, onNodeUpdate]);
 
   if (loading) {
     return <div>{appConfig.ui.loading.familyTree}</div>;
