@@ -557,7 +557,8 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
         )}
         
         <div 
-          id="google-map" 
+          id="google-map"
+          className="map-container" 
           style={{ 
             width: '100%', 
             height: '100%',

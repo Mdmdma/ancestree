@@ -477,8 +477,8 @@ const PictureSlideshow = ({
 
   return (
     <div style={isFullscreen ? fullscreenOverlayStyle : overlayStyle}>
-      <div style={isFullscreen ? fullscreenModalStyle : modalStyle}>
-        <div style={headerStyle}>
+      <div className="slideshow-modal" style={isFullscreen ? fullscreenModalStyle : modalStyle}>
+        <div className="slideshow-header" style={headerStyle}>
           <h3 style={{ margin: 0, color: '#ffffff' }}>
             {title}
           </h3>
@@ -498,9 +498,9 @@ const PictureSlideshow = ({
           </div>
         </div>
 
-        <div style={contentStyle}>
+        <div className="slideshow-content" style={contentStyle}>
           {/* Main Image Display */}
-          <div style={imageContainerStyle}>
+          <div className="slideshow-image-container" style={imageContainerStyle}>
             {images.length > 1 && (
               <button 
                 onClick={prevImage} 
@@ -538,7 +538,7 @@ const PictureSlideshow = ({
 
           {/* Sidebar with Image Info */}
           {!isFullscreen && (
-          <div style={sidebarStyle}>
+          <div className="slideshow-sidebar" style={sidebarStyle}>
             {/* Description Section */}
             <div>
               <h4 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>

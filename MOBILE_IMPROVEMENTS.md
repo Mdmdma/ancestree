@@ -3,6 +3,19 @@
 ## Overview
 This document describes the CSS-based mobile improvements implemented to make the Ancestree app more user-friendly on mobile devices without affecting desktop users.
 
+## Major Layout Changes on Mobile
+
+### Desktop Layout (> 768px):
+- **Horizontal layout**: Sidebar on the right (20% width)
+- **Tree area**: Takes remaining space on the left
+- **Header**: Full header with title, subtitle, and description
+
+### Mobile Layout (≤ 768px):
+- **Vertical layout**: Sidebar moves to the bottom
+- **Tree area**: Top 60% of screen (minus header)
+- **Sidebar**: Bottom 40% of screen
+- **Header**: Minimal - only family name and logout button visible
+
 ## Changes Made
 
 ### 1. Added Mobile-Specific CSS Rules (`App.css`)

@@ -316,6 +316,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
         <button
           onClick={() => setViewMode('upload')}
           style={{
+            flex: 1,
             padding: '12px 20px',
             backgroundColor: '#4CAF50',
             color: 'white',
@@ -330,6 +331,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
         <button
           onClick={loadImages}
           style={{
+            flex: 1,
             padding: '12px 20px',
             backgroundColor: '#2196F3',
             color: 'white',

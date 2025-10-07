@@ -264,7 +264,7 @@ const AddNodeOnEdgeDrop = () => {
   }, []);
 
   return (
-    <div style={{ 
+    <div className="app-container" style={{ 
       display: 'flex', 
       height: '100vh', 
       width: '100vw',
@@ -279,7 +279,7 @@ const AddNodeOnEdgeDrop = () => {
       )}
 
       {/* Main Content */}
-      <div style={{ 
+      <div className="main-content" style={{ 
         flex: 1, 
         minWidth: 0,
         overflow: 'hidden',
@@ -315,7 +315,7 @@ const AddNodeOnEdgeDrop = () => {
         ) : (
           <>
             <AppHeader user={user} onLogout={handleLogout} />
-            <div style={{ 
+            <div className="tree-container" style={{ 
               width: '100%', 
               height: 'calc(100vh - 60px)',
               overflow: 'hidden'

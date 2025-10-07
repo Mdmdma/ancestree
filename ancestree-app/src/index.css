@@ -105,6 +105,71 @@ button:focus-visible {
 
 /* Mobile-specific styles */
 @media screen and (max-width: 768px) {
+  /* Change layout to column on mobile - sidebar at bottom */
+  .app-container {
+    flex-direction: column !important;
+  }
+  
+  /* Main content takes remaining space */
+  .main-content {
+    flex: 1 !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+  
+  /* Tree container adjusts for mobile layout */
+  .tree-container {
+    height: calc(60vh - 60px) !important;
+  }
+  
+  /* Sidebar moves to bottom */
+  .sidebar-container {
+    width: 100% !important;
+    height: 40vh !important;
+    min-height: 40vh !important;
+    max-height: 40vh !important;
+    border-left: none !important;
+    border-top: 2px solid #4CAF50 !important;
+    order: 2;
+  }
+  
+  /* Map container - reduce minimum height for mobile */
+  .map-container {
+    min-height: 200px !important;
+  }
+  
+  /* Slideshow adjustments for mobile */
+  .slideshow-modal {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    max-width: 100vw !important;
+  }
+  
+  .slideshow-header {
+    padding: 12px !important;
+  }
+  
+  .slideshow-header h3 {
+    font-size: 14px !important;
+  }
+  
+  .slideshow-content {
+    flex-direction: column !important;
+  }
+  
+  .slideshow-image-container {
+    height: 50% !important;
+    flex: none !important;
+  }
+  
+  .slideshow-sidebar {
+    width: 100% !important;
+    height: 50% !important;
+    padding: 12px !important;
+    max-height: 50vh !important;
+  }
+  
   /* Hide online users indicator */
   div.mobile-hide-online-users {
     display: none !important;

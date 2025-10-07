@@ -27,7 +27,7 @@ const Sidebar = ({
   const { autoLayout, fitTreeToView } = treeOperations || {};
 
   return (
-    <div style={{ 
+    <div className="sidebar-container" style={{ 
       width: '20vw', 
       borderLeft: '1px solid #ccc', 
       backgroundColor: '#09380dff',
