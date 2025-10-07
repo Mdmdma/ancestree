@@ -112,7 +112,9 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
     border: '1px solid #555',
     backgroundColor: '#2a2a2a',
     color: 'white',
-    fontSize: '0.8rem'
+    fontSize: '0.8rem',
+    height: '30px',
+    boxSizing: 'border-box'
   };
 
   const labelStyle = {
@@ -229,12 +231,36 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
             />
 
             <label style={labelStyle}>Death Date:</label>
-            <input
-              type="date"
-              value={formData.deathDate}
-              onChange={(e) => handleInputChange('deathDate', e.target.value)}
-              style={inputStyle}
-            />
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <input
+                type="date"
+                value={formData.deathDate}
+                onChange={(e) => handleInputChange('deathDate', e.target.value)}
+                style={{ ...inputStyle, flex: 1, margin: 0 }}
+              />
+              {formData.deathDate && (
+                <button
+                  onClick={() => handleInputChange('deathDate', '')}
+                  style={{
+                    padding: '6px 8px',
+                    border: '1px solid #555',
+                    borderRadius: '3px',
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    margin: 0,
+                    height: '30px',
+                    minWidth: '30px'
+                  }}
+                  onMouseOver={(e) => e.target.style.backgroundColor = '#da190b'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = '#f44336'}
+                  title="Clear death date"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Address */}

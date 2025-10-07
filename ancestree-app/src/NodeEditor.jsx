@@ -137,7 +137,9 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
     marginBottom: '10px',
     border: '1px solid #ccc',
     borderRadius: '4px',
-    fontSize: '14px'
+    fontSize: '14px',
+    height: '34px',
+    boxSizing: 'border-box'
   };
 
   const labelStyle = {
@@ -192,12 +194,36 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       />
 
       <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.deathDate}</label>
-      <input
-        type="date"
-        value={formData.deathDate}
-        onChange={(e) => handleInputChange('deathDate', e.target.value || null)}
-        style={inputStyle}
-      />
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <input
+          type="date"
+          value={formData.deathDate}
+          onChange={(e) => handleInputChange('deathDate', e.target.value || null)}
+          style={{ ...inputStyle, flex: 1, marginBottom: 0 }}
+        />
+        {formData.deathDate && (
+          <button
+            onClick={() => handleInputChange('deathDate', '')}
+            style={{
+              padding: '8px 10px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              backgroundColor: '#f44336',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginBottom: 0,
+              height: '34px',
+              minWidth: '34px'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#da190b'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#f44336'}
+            title="Clear death date"
+          >
+            ✕
+          </button>
+        )}
+      </div>
 
       <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.phone}</label>
       <input
