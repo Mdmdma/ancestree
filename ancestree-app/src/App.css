@@ -172,3 +172,27 @@ html, body {
   margin: 0;
   color: #0c5460;
 }
+
+/* Mobile-specific styles */
+@media screen and (max-width: 768px) {
+  /* Hide user info (family name) in header */
+  div.mobile-hide-user-info {
+    display: none !important;
+  }
+  
+  /* Hide description in header */
+  p.mobile-hide-description {
+    display: none !important;
+  }
+  
+  /* Hide search bar in sidebar */
+  div.mobile-hide-search {
+    display: none !important;
+  }
+  
+  /* Hide instructions in sidebar when no node is selected */
+  p.mobile-hide-instructions,
+  div.mobile-hide-instructions {
+    display: none !important;
+  }
+}

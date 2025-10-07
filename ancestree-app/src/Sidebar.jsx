@@ -40,7 +40,7 @@ const Sidebar = ({
       flexShrink: 0 // Prevent sidebar from shrinking
     }}>
       {/* Search Section - Always visible at top */}
-      <div style={{ 
+      <div className="mobile-hide-search" style={{ 
         padding: '16px',
         borderBottom: '1px solid #0a4b11ff',
         backgroundColor: '#09380dff'
@@ -139,8 +139,8 @@ const Sidebar = ({
             ) : (
               <div style={{ color: 'white' }}>
                 <h3>{appConfig.ui.editor.selectPersonTitle}</h3>
-                <p>{appConfig.ui.editor.selectPersonDescription}</p>
-                <p>{appConfig.ui.editor.addPersonDescription}</p>
+                <p className="mobile-hide-instructions">{appConfig.ui.editor.selectPersonDescription}</p>
+                <p className="mobile-hide-instructions">{appConfig.ui.editor.addPersonDescription}</p>
                 
                 <div style={{ marginTop: '30px' }}>
                   <button 
@@ -181,7 +181,7 @@ const Sidebar = ({
                     {appConfig.ui.editor.buttons.fitToView}
                   </button>
                   
-                  <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
+                  <p className="mobile-hide-instructions" style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
                     {appConfig.ui.editor.shortcutsHelp.autoLayout}<br/>
                     {appConfig.ui.editor.shortcutsHelp.fitToView}
                   </p>
@@ -194,7 +194,7 @@ const Sidebar = ({
                   )}
                 </div>
                 
-                <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
+                <div className="mobile-hide-instructions" style={{ marginTop: '20px', fontSize: '0.9rem' }}>
                   <h4>{appConfig.ui.editor.connectionRules.title}</h4>
                   <p>{appConfig.ui.editor.connectionRules.parent}</p>
                   <p>{appConfig.ui.editor.connectionRules.child}</p>

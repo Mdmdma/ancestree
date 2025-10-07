@@ -1842,6 +1842,7 @@ const FamilyTree = ({
       {/* Real-time Collaboration Indicator */}
       {isConnected && (
         <div
+          className="mobile-hide-online-users"
           style={{
             position: 'absolute',
             top: '10px',
