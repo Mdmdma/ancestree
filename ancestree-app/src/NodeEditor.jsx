@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import PersonPictureSlideshow from './PersonPictureSlideshow';
+import PictureSlideshow from './PictureSlideshow';
 import { appConfig } from './config';
 
 function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [] }) {
@@ -393,7 +393,8 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       </div>
 
       {showSlideshow && (
-        <PersonPictureSlideshow
+        <PictureSlideshow
+          mode="person"
           personId={node.id}
           personName={`${formData.name} ${formData.surname}`}
           preferredImageId={formData.preferredImageId}

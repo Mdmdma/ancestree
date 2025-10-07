@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
-import FamilyGallerySlideshow from './FamilyGallerySlideshow';
+import PictureSlideshow from './PictureSlideshow';
 
 const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => {
   const [images, setImages] = useState([]);
@@ -978,8 +978,9 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
       {/* Family Gallery Slideshow */}
       {showFamilyGallery && (
         <>
-          {console.log('Rendering FamilyGallerySlideshow, showFamilyGallery:', showFamilyGallery)}
-          <FamilyGallerySlideshow
+          {console.log('Rendering PictureSlideshow in family mode, showFamilyGallery:', showFamilyGallery)}
+          <PictureSlideshow
+            mode="family"
             onClose={() => {
               console.log('Closing family gallery');
               setShowFamilyGallery(false);

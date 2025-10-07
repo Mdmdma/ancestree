@@ -46,8 +46,16 @@ const PersonTag = React.memo(({ person, index, onPersonSelect }) => {
 
 PersonTag.displayName = 'PersonTag';
 
-const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
-  console.log('FamilyGallerySlideshow: Component called with onClose:', typeof onClose, 'onPersonSelect:', typeof onPersonSelect);
+const PictureSlideshow = ({ 
+  mode = 'family', // 'family' or 'person'
+  personId, 
+  personName, 
+  preferredImageId, 
+  onPreferredImageChange,
+  onClose, 
+  onPersonSelect 
+}) => {
+  console.log('PictureSlideshow: Component called with mode:', mode, 'personId:', personId);
   const [images, setImages] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -55,16 +63,25 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
   const [descriptionValue, setDescriptionValue] = useState('');
   const [editingDescription, setEditingDescription] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [settingPreferred, setSettingPreferred] = useState(false);
 
   const loadImages = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Load all family images
-      console.log('Family Gallery: Starting to load images...');
-      const imagesData = await api.loadImages();
-      console.log('Family Gallery: Loaded images data:', imagesData);
+      let imagesData;
+      if (mode === 'person') {
+        // Load images for specific person
+        console.log('PictureSlideshow: Loading images for person:', personId);
+        imagesData = await api.loadPersonImages(personId);
+      } else {
+        // Load all family images
+        console.log('PictureSlideshow: Loading all family images...');
+        imagesData = await api.loadImages();
+      }
+      
+      console.log('PictureSlideshow: Loaded images data:', imagesData);
       
       if (!Array.isArray(imagesData)) {
         throw new Error('Invalid response: expected array of images');
@@ -74,22 +91,35 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
       
       // If we have images, load details for the first one
       if (imagesData.length > 0) {
-        setCurrentIndex(0);
-        setDescriptionValue(imagesData[0].description || '');
-        console.log('Family Gallery: First image:', imagesData[0]);
+        // For person mode, navigate to preferred image if available
+        if (mode === 'person' && preferredImageId) {
+          const preferredIndex = imagesData.findIndex(img => img.id === preferredImageId);
+          if (preferredIndex !== -1) {
+            setCurrentIndex(preferredIndex);
+            setDescriptionValue(imagesData[preferredIndex].description || '');
+            console.log('PictureSlideshow: Navigated to preferred image at index:', preferredIndex);
+          } else {
+            setCurrentIndex(0);
+            setDescriptionValue(imagesData[0].description || '');
+          }
+        } else {
+          setCurrentIndex(0);
+          setDescriptionValue(imagesData[0].description || '');
+        }
+        console.log('PictureSlideshow: First image:', imagesData[0]);
       } else {
-        console.log('Family Gallery: No images found');
+        console.log('PictureSlideshow: No images found');
       }
     } catch (err) {
-      console.error('Error loading family images:', err);
+      console.error('Error loading images:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mode, personId, preferredImageId]);
 
   useEffect(() => {
-    console.log('FamilyGallerySlideshow: Component mounted, starting to load images...');
+    console.log('PictureSlideshow: Component mounted, starting to load images...');
     loadImages();
   }, [loadImages]);
 
@@ -119,6 +149,48 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
   const handleDescriptionChange = useCallback((e) => {
     setDescriptionValue(e.target.value);
   }, []);
+
+  const setAsPreferredImage = useCallback(async () => {
+    if (!currentImage || mode !== 'person') return;
+    
+    try {
+      setSettingPreferred(true);
+      await api.setPreferredImage(personId, currentImage.id);
+      
+      // Call the callback to update the parent component
+      if (onPreferredImageChange) {
+        onPreferredImageChange(currentImage.id);
+      }
+      
+      alert(`Bild wurde als Profilbild für ${personName} gesetzt.`);
+    } catch (err) {
+      console.error('Error setting preferred image:', err);
+      alert('Fehler beim Setzen des Profilbildes: ' + err.message);
+    } finally {
+      setSettingPreferred(false);
+    }
+  }, [mode, personId, personName, onPreferredImageChange]);
+
+  const removeAsPreferredImage = useCallback(async () => {
+    if (mode !== 'person') return;
+    
+    try {
+      setSettingPreferred(true);
+      await api.setPreferredImage(personId, null);
+      
+      // Call the callback to update the parent component
+      if (onPreferredImageChange) {
+        onPreferredImageChange(null);
+      }
+      
+      alert(`Profilbild für ${personName} wurde entfernt.`);
+    } catch (err) {
+      console.error('Error removing preferred image:', err);
+      alert('Fehler beim Entfernen des Profilbildes: ' + err.message);
+    } finally {
+      setSettingPreferred(false);
+    }
+  }, [mode, personId, personName, onPreferredImageChange]);
 
   // Memoize current image to prevent unnecessary recalculations
   const currentImage = useMemo(() => {
@@ -197,7 +269,10 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
     };
   }, []);
 
-  // Styles (reused from PersonPictureSlideshow)
+  // Get appropriate config based on mode
+  const config = mode === 'person' ? appConfig.ui.slideshow : appConfig.ui.familyGallery;
+
+  // Styles
   const overlayStyle = {
     position: 'fixed',
     top: 0,
@@ -294,17 +369,59 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
     transition: 'background-color 0.2s ease'
   });
 
+  const fullscreenButtonStyle = {
+    padding: '6px 12px',
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px'
+  };
+
+  const fullscreenOverlayStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 1)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000
+  };
+
+  const fullscreenModalStyle = {
+    backgroundColor: '#1a1a1a',
+    width: '100vw',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    boxShadow: 'none'
+  };
+
+  const fullscreenImageStyle = {
+    maxWidth: '100%',
+    maxHeight: 'calc(100vh - 80px)', // Full screen height minus header
+    objectFit: 'contain'
+  };
+
   if (loading) {
-    console.log('FamilyGallerySlideshow: Rendering loading state');
+    console.log('PictureSlideshow: Rendering loading state');
     return (
       <div style={overlayStyle}>
         <div style={modalStyle}>
           <div style={headerStyle}>
-            <h3 style={{ margin: 0, color: '#ffffff' }}>{appConfig.ui.familyGallery.loadingTitle}</h3>
+            <h3 style={{ margin: 0, color: '#ffffff' }}>{config.loadingTitle}</h3>
             <button onClick={onClose} style={closeButtonStyle}>✖</button>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-            <div style={{ color: '#cccccc' }}>{appConfig.ui.familyGallery.loadingMessage}</div>
+            <div style={{ color: '#cccccc' }}>{config.loadingMessage}</div>
           </div>
         </div>
       </div>
@@ -316,11 +433,11 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
       <div style={overlayStyle}>
         <div style={modalStyle}>
           <div style={headerStyle}>
-            <h3 style={{ margin: 0, color: '#ffffff' }}>{appConfig.ui.familyGallery.errorTitle}</h3>
+            <h3 style={{ margin: 0, color: '#ffffff' }}>{config.errorTitle}</h3>
             <button onClick={onClose} style={closeButtonStyle}>✖</button>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-            <div style={{ color: '#ff6b6b' }}>{appConfig.ui.familyGallery.errorMessage}{error}</div>
+            <div style={{ color: '#ff6b6b' }}>{config.errorMessage}{error}</div>
           </div>
         </div>
       </div>
@@ -328,18 +445,25 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
   }
 
   if (images.length === 0) {
+    const emptyMessage = mode === 'person' 
+      ? `${config.noPicturesMessage}${personName}`
+      : config.noPicturesMessage;
+    const emptyTitle = mode === 'person'
+      ? `${config.picturesTitle}${personName}`
+      : config.title;
+
     return (
       <div style={overlayStyle}>
         <div style={modalStyle}>
           <div style={headerStyle}>
-            <h3 style={{ margin: 0, color: '#ffffff' }}>{appConfig.ui.familyGallery.title}</h3>
+            <h3 style={{ margin: 0, color: '#ffffff' }}>{emptyTitle}</h3>
             <button onClick={onClose} style={closeButtonStyle}>✖</button>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
             <div style={{ color: '#cccccc', textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '20px' }}>{appConfig.ui.familyGallery.noPicturesIcon}</div>
-              <h3>{appConfig.ui.familyGallery.noPicturesTitle}</h3>
-              <div>{appConfig.ui.familyGallery.noPicturesMessage}</div>
+              <div style={{ fontSize: '48px', marginBottom: '20px' }}>{config.noPicturesIcon}</div>
+              <h3>{config.noPicturesTitle || ''}</h3>
+              <div>{emptyMessage}</div>
             </div>
           </div>
         </div>
@@ -347,22 +471,26 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
     );
   }
 
+  const title = mode === 'person'
+    ? `${config.picturesTitle}${personName} (${currentIndex + 1}/${images.length})`
+    : `${config.title} (${currentIndex + 1}/${images.length})`;
+
   return (
     <div style={isFullscreen ? fullscreenOverlayStyle : overlayStyle}>
       <div style={isFullscreen ? fullscreenModalStyle : modalStyle}>
         <div style={headerStyle}>
           <h3 style={{ margin: 0, color: '#ffffff' }}>
-            {appConfig.ui.familyGallery.title} ({currentIndex + 1}/{images.length})
+            {title}
           </h3>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {isFullscreen ? (
               <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
-                {appConfig.ui.familyGallery.exitFullscreenButton}
+                {config.exitFullscreenButton}
               </button>
             ) : (
               <>
                 <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
-                  {appConfig.ui.familyGallery.fullscreenButton}
+                  {config.fullscreenButton}
                 </button>
                 <button onClick={onClose} style={closeButtonStyle}>✖</button>
               </>
@@ -387,7 +515,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
             {currentImage && (
               <img
                 src={currentImage.s3Url || currentImage.url}
-                alt={currentImage.description || `Familie Bild ${currentIndex + 1}`}
+                alt={currentImage.description || `Bild ${currentIndex + 1}`}
                 style={isFullscreen ? fullscreenImageStyle : imageStyle}
                 onError={(e) => {
                   console.error('Error loading image:', currentImage);
@@ -414,14 +542,14 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
             {/* Description Section */}
             <div>
               <h4 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>
-                {appConfig.ui.familyGallery.descriptionTitle}
+                {config.descriptionTitle}
               </h4>
               {editingDescription ? (
                 <div>
                   <textarea
                     value={descriptionValue}
                     onChange={handleDescriptionChange}
-                    placeholder={appConfig.ui.familyGallery.descriptionPlaceholder}
+                    placeholder={config.descriptionPlaceholder}
                     style={{
                       width: '100%',
                       minHeight: '100px',
@@ -448,7 +576,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
                         fontSize: '14px'
                       }}
                     >
-                      {appConfig.ui.familyGallery.saveButton}
+                      {config.saveButton}
                     </button>
                     <button
                       onClick={() => {
@@ -465,7 +593,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
                         fontSize: '14px'
                       }}
                     >
-                      {appConfig.ui.familyGallery.cancelButton}
+                      {config.cancelButton}
                     </button>
                   </div>
                 </div>
@@ -476,7 +604,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
                     color: '#cccccc',
                     fontStyle: currentImage?.description ? 'normal' : 'italic'
                   }}>
-                    {currentImage?.description || appConfig.ui.familyGallery.noDescription}
+                    {currentImage?.description || config.noDescription}
                   </p>
                   <button
                     onClick={() => setEditingDescription(true)}
@@ -490,16 +618,89 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
                       fontSize: '14px'
                     }}
                   >
-                    {appConfig.ui.familyGallery.editButton}
+                    {config.editButton}
                   </button>
                 </div>
               )}
             </div>
 
+            {/* Preferred Image Controls - Only in person mode */}
+            {mode === 'person' && (
+              <div style={{ 
+                padding: '15px',
+                backgroundColor: '#333333',
+                borderRadius: '6px',
+                border: '1px solid #444'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    {currentImage?.id === preferredImageId ? (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        color: '#4CAF50',
+                        fontSize: '14px'
+                      }}>
+                        <span style={{ marginRight: '8px' }}>⭐</span>
+                        <strong>Aktuelles Profilbild</strong>
+                      </div>
+                    ) : (
+                      <div style={{ 
+                        color: '#cccccc',
+                        fontSize: '14px'
+                      }}>
+                        Als Profilbild verwenden
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {currentImage?.id === preferredImageId ? (
+                      <button
+                        onClick={removeAsPreferredImage}
+                        disabled={settingPreferred}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: settingPreferred ? '#666' : '#ff6b6b',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: settingPreferred ? 'not-allowed' : 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        {settingPreferred ? 'Wird entfernt...' : 'Entfernen'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={setAsPreferredImage}
+                        disabled={settingPreferred}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: settingPreferred ? '#666' : '#4CAF50',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: settingPreferred ? 'not-allowed' : 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        {settingPreferred ? 'Wird gesetzt...' : 'Als Profilbild setzen'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Tagged People Section */}
             <div>
               <h4 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>
-                {appConfig.ui.familyGallery.taggedPeopleTitle}
+                {config.taggedPeopleTitle}
               </h4>
               {currentImage?.people && currentImage.people.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
@@ -514,7 +715,7 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
                 </div>
               ) : (
                 <p style={{ margin: 0, color: '#999999', fontStyle: 'italic' }}>
-                  {appConfig.ui.familyGallery.noTaggedPeople}
+                  {config.noTaggedPeople}
                 </p>
               )}
             </div>
@@ -550,47 +751,4 @@ const FamilyGallerySlideshow = ({ onClose, onPersonSelect }) => {
   );
 };
 
-// Fullscreen styles
-const fullscreenButtonStyle = {
-  padding: '6px 12px',
-  backgroundColor: '#4CAF50',
-  color: 'white',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '12px',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '5px'
-};
-
-const fullscreenOverlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 1)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 2000
-};
-
-const fullscreenModalStyle = {
-  backgroundColor: '#1a1a1a',
-  width: '100vw',
-  height: '100vh',
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden',
-  boxShadow: 'none'
-};
-
-const fullscreenImageStyle = {
-  maxWidth: '100%',
-  maxHeight: 'calc(100vh - 80px)', // Full screen height minus header
-  objectFit: 'contain'
-};
-
-export default FamilyGallerySlideshow;
+export default PictureSlideshow;
