@@ -146,13 +146,22 @@ button:focus-visible {
   /* Sidebar moves to bottom with fixed height */
   .sidebar-container {
     width: 100% !important;
-    height: 40vh !important;
-    min-height: 40vh !important;
-    max-height: 40vh !important;
+    height: 45vh !important;
+    min-height: 45vh !important;
+    max-height: 45vh !important;
     border-left: none !important;
     border-top: 2px solid #4CAF50 !important;
     order: 2;
     flex-shrink: 0 !important;
+    transition: height 0.3s ease, min-height 0.3s ease, max-height 0.3s ease;
+  }
+
+  /* Expand sidebar to 70vh when confirming upload OR editing a person */
+  .sidebar-container[data-gallery-mode="confirm"],
+  .sidebar-container[data-expanded="true"] {
+    height: 70vh !important;
+    min-height: 70vh !important;
+    max-height: 70vh !important;
   }
   
   /* Map container - reduce minimum height for mobile */
@@ -219,7 +228,112 @@ button:focus-visible {
     display: none !important;
   }
   
+  /* Upload view improvements for mobile */
+  .upload-container {
+    min-height: auto !important;
+  }
+  
+  .upload-dropzone {
+    min-height: 120px !important;
+    padding: 10px 0 !important;
+    margin-bottom: 0 !important;
+  }
+  
+  .upload-box {
+    padding: 15px !important;
+    max-width: 100% !important;
+  }
+
+  .upload-icon {
+    font-size: 32px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .upload-title {
+    font-size: 14px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .upload-formats {
+    font-size: 11px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .upload-button-text {
+    padding: 10px 20px !important;
+    font-size: 13px !important;
+  }
+
+  /* Hide upload instructions on mobile */
+  .upload-instructions {
+    display: none !important;
+  }
+  
+  .drag-overlay div:first-child {
+    font-size: 48px !important;
+  }
+  
+  .drag-overlay div:last-child {
+    font-size: 18px !important;
+  }
+
+  /* Confirm view mobile styles */
+  .confirm-container {
+    padding: 10px;
+  }
+
+  .confirm-title {
+    font-size: 16px;
+    margin: 0 0 15px 0 !important;
+  }
+
+  .confirm-preview {
+    margin-bottom: 15px !important;
+  }
+
+  .confirm-preview img {
+    max-height: 150px !important;
+  }
+
+  .confirm-file-info {
+    padding: 10px !important;
+    margin-bottom: 15px !important;
+  }
+
+  .confirm-file-info h5 {
+    font-size: 14px;
+  }
+
+  .confirm-file-info div {
+    font-size: 12px !important;
+  }
+
+  .confirm-description-section {
+    margin-bottom: 15px !important;
+  }
+
+  .confirm-description-section > div {
+    padding: 10px !important;
+  }
+
+  .confirm-description-section label {
+    font-size: 14px !important;
+    margin: 0 0 8px 0 !important;
+  }
+
+  .confirm-description {
+    height: 60px !important;
+    font-size: 13px !important;
+    padding: 8px !important;
+  }
+
+  .confirm-hint {
+    font-size: 11px !important;
+    margin-top: 5px !important;
+  }
+  
   /* Hide online users indicator */
+
   
   /* Hide online users indicator */
   div.mobile-hide-online-users {

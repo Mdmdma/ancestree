@@ -22,6 +22,7 @@ const AddNodeOnEdgeDrop = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [galleryViewMode, setGalleryViewMode] = useState('gallery'); // Track gallery view mode for mobile sidebar height
 
   // Check authentication on app load
   useEffect(() => {
@@ -353,6 +354,8 @@ const AddNodeOnEdgeDrop = () => {
           updateNodeData={updateNodeData}
           updateNodeDataAndPosition={updateNodeDataAndPosition}
           nodeHasConnections={nodeHasConnections}
+          galleryViewMode={galleryViewMode}
+          onGalleryViewModeChange={setGalleryViewMode}
         />
       )}
     </div>

@@ -22,12 +22,23 @@ const Sidebar = ({
   onMapModeChange,
   updateNodeData,
   updateNodeDataAndPosition,
-  nodeHasConnections
+  nodeHasConnections,
+  galleryViewMode,
+  onGalleryViewModeChange
 }) => {
   const { autoLayout, fitTreeToView } = treeOperations || {};
 
+  // Determine if sidebar should be expanded on mobile
+  const shouldExpandSidebar = 
+    (activeTab === 'images' && galleryViewMode === 'confirm') ||
+    (activeTab === 'editor' && selectedNode !== null);
+
   return (
-    <div className="sidebar-container" style={{ 
+    <div 
+      className="sidebar-container" 
+      data-gallery-mode={galleryViewMode}
+      data-expanded={shouldExpandSidebar ? 'true' : 'false'}
+      style={{ 
       width: '20vw', 
       borderLeft: '1px solid #ccc', 
       backgroundColor: '#09380dff',
@@ -211,6 +222,7 @@ const Sidebar = ({
             selectedNode={selectedNode}
             onPersonSelect={onPersonSelectFromGallery}
             onTaggingModeChange={onTaggingModeChange}
+            onViewModeChange={onGalleryViewModeChange}
           />
         )}
         

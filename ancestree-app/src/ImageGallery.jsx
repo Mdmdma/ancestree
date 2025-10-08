@@ -3,7 +3,7 @@ import { api } from './api';
 import { appConfig } from './config';
 import PictureSlideshow from './PictureSlideshow';
 
-const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => {
+const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange }) => {
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -16,6 +16,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState('');
   const [showFamilyGallery, setShowFamilyGallery] = useState(false);
+
+  // Notify parent of viewMode changes for mobile sidebar height adjustment
+  useEffect(() => {
+    if (onViewModeChange) {
+      onViewModeChange(viewMode);
+    }
+  }, [viewMode, onViewModeChange]);
 
   // Debug state changes
   useEffect(() => {
@@ -410,6 +417,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
   // Render upload view
   const renderUpload = () => (
     <div
+      className="upload-container"
       style={{
         position: 'relative',
         minHeight: '400px'
@@ -417,7 +425,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
     >
       {/* Drag overlay */}
       {dragOver && (
-        <div style={{
+        <div className="drag-overlay" style={{
           position: 'absolute',
           top: 0,
           left: 0,
@@ -464,6 +472,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
 
       {/* Main Upload Area - Large invisible drop zone */}
       <div
+        className="upload-dropzone"
         style={{
           padding: '20px 0',
           marginBottom: '20px',
@@ -483,6 +492,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
       >
         {/* Visual upload box - smaller and centered */}
         <div
+          className="upload-box"
           style={{
             border: `2px dashed ${dragOver ? '#4CAF50' : '#666'}`,
             borderRadius: '15px',
@@ -495,16 +505,16 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
             pointerEvents: 'none' // Prevent this from interfering with drag events
           }}
         >
-          <div style={{ fontSize: '48px', marginBottom: '10px' }}>
+          <div className="upload-icon" style={{ fontSize: '48px', marginBottom: '10px' }}>
             📤
           </div>
-          <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', color: '#ffffff' }}>
+          <div className="upload-title" style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', color: '#ffffff' }}>
             {appConfig.ui.imageGallery.upload.dragDropTitle}
           </div>
-          <div style={{ fontSize: '14px', color: '#cccccc', marginBottom: '15px' }}>
+          <div className="upload-formats" style={{ fontSize: '14px', color: '#cccccc', marginBottom: '15px' }}>
             {appConfig.ui.imageGallery.upload.supportedFormats}
           </div>
-          <div style={{
+          <div className="upload-button-text" style={{
             display: 'inline-block',
             padding: '12px 24px',
             backgroundColor: '#4CAF50',
@@ -523,12 +533,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
         id="file-input"
         type="file"
         accept="image/*"
+        capture="environment"
         onChange={handleImageUpload}
         style={{ display: 'none' }}
       />
 
       {/* Instructions */}
-      <div style={{ 
+      <div className="upload-instructions" style={{ 
         display: 'flex',
         justifyContent: 'center',
         width: '100%'
@@ -557,7 +568,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
 
   // Render confirmation view
   const renderConfirm = () => (
-    <div>
+    <div className="confirm-container">
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
         <button
           onClick={() => {
@@ -592,12 +603,12 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
         </button>
       </div>
 
-      <h4 style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
+      <h4 className="confirm-title" style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
         {appConfig.ui.imageGallery.confirm.title}
       </h4>
 
       {/* Image Preview */}
-      <div style={{ marginBottom: '20px' }}>
+      <div className="confirm-preview" style={{ marginBottom: '20px' }}>
         <img
           src={previewUrl}
           alt={appConfig.ui.imageGallery.confirm.previewAlt}
@@ -613,7 +624,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
       </div>
 
       {/* File Information */}
-      <div style={{ 
+      <div className="confirm-file-info" style={{ 
         marginBottom: '20px', 
         padding: '15px', 
         backgroundColor: '#2a2a2a', 
@@ -629,29 +640,38 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
       </div>
 
       {/* Description Input */}
-      <div style={{ marginBottom: '30px' }}>
-        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: '#ffffff' }}>
-          {appConfig.ui.imageGallery.confirm.descriptionLabel}
-        </label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={appConfig.ui.imageGallery.confirm.descriptionPlaceholder}
-          style={{
-            width: '100%',
-            height: '100px',
-            padding: '10px',
-            border: '1px solid #444',
-            borderRadius: '8px',
-            fontSize: '14px',
-            resize: 'vertical',
-            fontFamily: 'inherit',
-            backgroundColor: '#2a2a2a',
-            color: '#ffffff'
-          }}
-        />
-        <div style={{ fontSize: '12px', color: '#cccccc', marginTop: '5px' }}>
-          {appConfig.ui.imageGallery.confirm.descriptionHint}
+      <div className="confirm-description-section" style={{ marginBottom: '20px' }}>
+        <div style={{
+          padding: '15px',
+          backgroundColor: '#2a2a2a',
+          borderRadius: '8px',
+          border: '1px solid #444'
+        }}>
+          <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: '#ffffff', margin: '0 0 10px 0' }}>
+            {appConfig.ui.imageGallery.confirm.descriptionLabel}
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={appConfig.ui.imageGallery.confirm.descriptionPlaceholder}
+            className="confirm-description"
+            style={{
+              width: '100%',
+              height: '100px',
+              padding: '10px',
+              border: '1px solid #444',
+              borderRadius: '8px',
+              fontSize: '14px',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              backgroundColor: '#1a1a1a',
+              color: '#ffffff',
+              boxSizing: 'border-box'
+            }}
+          />
+          <div className="confirm-hint" style={{ fontSize: '12px', color: '#cccccc', marginTop: '8px' }}>
+            {appConfig.ui.imageGallery.confirm.descriptionHint}
+          </div>
         </div>
       </div>
 

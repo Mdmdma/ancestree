@@ -204,12 +204,31 @@ export const api = {
     const authHeaders = getAuthHeaders();
     delete authHeaders['Content-Type']; // Remove Content-Type for FormData
 
-    const response = await fetch(`${API_BASE_URL}/images/upload`, {
-      method: 'POST',
-      headers: authHeaders,
-      body: formData
-    });
-    return response.json();
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+      const response = await fetch(`${API_BASE_URL}/images/upload`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Upload timed out. Please check your connection and try again.');
+      }
+      throw error;
+    }
   },
 
   async loadImages() {
