@@ -3,7 +3,7 @@ import { appConfig } from './config';
 
 const AppHeader = ({ user, onLogout }) => {
   return (
-    <article className="container" style={{ 
+    <article className="container app-header" style={{ 
       display: 'flex', 
       flexDirection: 'column', 
       alignItems: 'center', 

@@ -138,7 +138,7 @@ const Sidebar = ({
               />
             ) : (
               <div style={{ color: 'white' }}>
-                <h3>{appConfig.ui.editor.selectPersonTitle}</h3>
+                <h3 className="mobile-hide-tab-title">{appConfig.ui.editor.selectPersonTitle}</h3>
                 <p className="mobile-hide-instructions">{appConfig.ui.editor.selectPersonDescription}</p>
                 <p className="mobile-hide-instructions">{appConfig.ui.editor.addPersonDescription}</p>
                 

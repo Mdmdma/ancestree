@@ -438,7 +438,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
       color: 'white'
     }}>
       {/* Header */}
-      <div style={{ 
+      <div className="mobile-hide-map-header" style={{ 
         padding: '20px', 
         borderBottom: '1px solid #0a4b11ff',
         backgroundColor: '#0a4b11ff'

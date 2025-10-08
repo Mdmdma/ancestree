@@ -288,8 +288,8 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
   // Render gallery view
   const renderGallery = () => (
     <div>
-      {/* Family Gallery Button on top */}
-      <div style={{ marginBottom: '10px' }}>
+      {/* Gallery buttons - Album and Upload side by side on mobile */}
+      <div className="gallery-buttons-container" style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexDirection: 'column' }}>
         <button
           onClick={() => {
             console.log('Family Gallery button clicked! Current showFamilyGallery state:', showFamilyGallery);
@@ -309,10 +309,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
         >
           {appConfig.ui.familyGallery.galleryButton}
         </button>
-      </div>
-
-      {/* Upload and Refresh buttons below */}
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+        
         <button
           onClick={() => setViewMode('upload')}
           style={{
@@ -330,6 +327,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
         </button>
         <button
           onClick={loadImages}
+          className="mobile-hide-refresh-button"
           style={{
             flex: 1,
             padding: '12px 20px',
@@ -958,13 +956,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange }) => 
       flexDirection: 'column',
       minHeight: 0 // Allows flex shrinking
     }}>
-      <div style={{ padding: '20px', flexShrink: 0 }}>
+      <div className="mobile-hide-gallery-header" style={{ padding: '20px', flexShrink: 0 }}>
         <h3 style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
           {appConfig.ui.imageGallery.title}
         </h3>
       </div>
 
-      <div style={{ 
+      <div className="gallery-content" style={{ 
         flex: 1, 
         padding: '0 20px 20px 20px', 
         overflowY: 'auto', 
