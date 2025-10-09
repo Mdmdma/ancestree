@@ -533,7 +533,6 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         id="file-input"
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={handleImageUpload}
         style={{ display: 'none' }}
       />

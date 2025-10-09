@@ -211,7 +211,7 @@ const MapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
 
     if (!window.google) {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=geometry`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=geometry&language=de&region=DE`;
       script.async = true;
       script.defer = true;
       script.onload = () => {

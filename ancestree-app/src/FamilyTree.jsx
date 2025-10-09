@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   Background,
   ReactFlow,
+  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -1835,8 +1836,24 @@ const FamilyTree = ({
         fitView
         fitViewOptions={{ padding: 2 }}
         nodeOrigin={nodeOrigin}
+        minZoom={0.05}
+        maxZoom={2}
       >
         <Background />
+        <MiniMap 
+          className="minimap-desktop-only"
+          nodeColor={(node) => {
+            if (node.type === 'family') return '#09380dff';
+            if (node.data.bloodline) return '#4CAF50';
+            return '#666666';
+          }}
+          maskColor="rgba(0, 0, 0, 0.6)"
+          style={{
+            backgroundColor: '#1a1a1a',
+            border: '2px solid #4CAF50',
+            borderRadius: '8px'
+          }}
+        />
       </ReactFlow>
       
       {/* Real-time Collaboration Indicator */}
