@@ -1176,49 +1176,98 @@ app.post('/api/geocode', async (req, res) => {
 // ============= IMAGE ENDPOINTS =============
 
 // Upload image
-app.post('/api/images/upload', authenticateToken, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No image file provided' });
-  }
-
-  const imageId = uuidv4();
-  const familyId = req.user.id;
-  const imageData = {
-    id: imageId,
-    filename: req.file.key.split('/').pop(), // Extract filename from S3 key
-    original_filename: req.file.originalname,
-    s3_key: req.file.key,
-    s3_url: req.file.location,
-    description: req.body.description || '',
-    file_size: req.file.size,
-    mime_type: req.file.mimetype,
-    uploaded_by: req.body.uploaded_by || 'anonymous',
-    family_id: familyId
-  };
-
-  db.run(`INSERT INTO images (
-    id, filename, original_filename, s3_key, s3_url, description, 
-    file_size, mime_type, uploaded_by, family_id
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    imageData.id,
-    imageData.filename,
-    imageData.original_filename,
-    imageData.s3_key,
-    imageData.s3_url,
-    imageData.description,
-    imageData.file_size,
-    imageData.mime_type,
-    imageData.uploaded_by,
-    imageData.family_id
-  ], function(err) {
+app.post('/api/images/upload', authenticateToken, (req, res) => {
+  // Use multer upload middleware with error handling
+  upload.single('image')(req, res, function(err) {
+    // Handle multer errors
     if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: err.message });
+      console.error('Multer error:', err);
+      
+      if (err instanceof multer.MulterError) {
+        // Multer-specific errors
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ 
+            error: 'File too large. Maximum file size is 10MB.',
+            code: 'FILE_TOO_LARGE'
+          });
+        }
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          return res.status(400).json({ 
+            error: 'Unexpected file field.',
+            code: 'INVALID_FIELD'
+          });
+        }
+        return res.status(400).json({ 
+          error: `Upload error: ${err.message}`,
+          code: 'UPLOAD_ERROR'
+        });
+      }
+      
+      // File filter errors
+      if (err.message.includes('Only image files')) {
+        return res.status(400).json({ 
+          error: 'Only image files are allowed (JPEG, PNG, GIF, WebP).',
+          code: 'INVALID_FILE_TYPE'
+        });
+      }
+      
+      // S3 or other errors
+      return res.status(500).json({ 
+        error: `Upload failed: ${err.message}`,
+        code: 'UPLOAD_FAILED'
+      });
+    }
+    
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No image file provided.',
+        code: 'NO_FILE'
+      });
     }
 
-    res.json({
-      success: true,
-      image: imageData
+    const imageId = uuidv4();
+    const familyId = req.user.id;
+    const imageData = {
+      id: imageId,
+      filename: req.file.key.split('/').pop(), // Extract filename from S3 key
+      original_filename: req.file.originalname,
+      s3_key: req.file.key,
+      s3_url: req.file.location,
+      description: req.body.description || '',
+      file_size: req.file.size,
+      mime_type: req.file.mimetype,
+      uploaded_by: req.body.uploaded_by || 'anonymous',
+      family_id: familyId
+    };
+
+    db.run(`INSERT INTO images (
+      id, filename, original_filename, s3_key, s3_url, description, 
+      file_size, mime_type, uploaded_by, family_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      imageData.id,
+      imageData.filename,
+      imageData.original_filename,
+      imageData.s3_key,
+      imageData.s3_url,
+      imageData.description,
+      imageData.file_size,
+      imageData.mime_type,
+      imageData.uploaded_by,
+      imageData.family_id
+    ], function(err) {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ 
+          error: `Database error: ${err.message}`,
+          code: 'DATABASE_ERROR'
+        });
+      }
+
+      res.json({
+        success: true,
+        image: imageData
+      });
     });
   });
 });

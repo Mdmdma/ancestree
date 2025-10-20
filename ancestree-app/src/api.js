@@ -194,41 +194,152 @@ export const api = {
     return response.json();
   },
 
-  // Image operations
-  async uploadImage(file, description = '', uploadedBy = 'anonymous') {
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('description', description);
-    formData.append('uploaded_by', uploadedBy);
-
-    const authHeaders = getAuthHeaders();
-    delete authHeaders['Content-Type']; // Remove Content-Type for FormData
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-      const response = await fetch(`${API_BASE_URL}/images/upload`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: formData,
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
-        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+  // Helper function for exponential backoff retry
+  async retryWithBackoff(fn, maxRetries = 3, initialDelay = 1000) {
+    let lastError;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn(attempt);
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry for certain error types
+        if (error.message.includes('Invalid file type') || 
+            error.message.includes('File too large') ||
+            error.message.includes('401') ||
+            error.message.includes('403')) {
+          throw error;
+        }
+        
+        // If this was the last attempt, throw the error
+        if (attempt === maxRetries - 1) {
+          throw error;
+        }
+        
+        // Calculate delay with exponential backoff and jitter
+        const delay = initialDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        console.log(`Upload attempt ${attempt + 1} failed, retrying in ${Math.round(delay)}ms...`);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-
-      return response.json();
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Upload timed out. Please check your connection and try again.');
-      }
-      throw error;
     }
+    
+    throw lastError;
+  },
+
+  // Image operations with robust upload
+  async uploadImage(file, description, uploadedBy = 'user', onProgress = null) {
+    // Validate file on client side before attempting upload
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
+    }
+    
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new Error(`File too large. Maximum size is ${maxSize / 1024 / 1024}MB.`);
+    }
+
+    // Use retry logic for the upload
+    return this.retryWithBackoff(async (attempt) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('description', description);
+      formData.append('uploaded_by', uploadedBy);
+
+      const authHeaders = getAuthHeaders();
+      delete authHeaders['Content-Type']; // Remove Content-Type for FormData
+
+      // Increase timeout for larger files and retry attempts
+      const baseTimeout = 60000; // 60 seconds
+      const timeoutMultiplier = 1 + (attempt * 0.5); // Increase timeout on retries
+      const timeout = baseTimeout * timeoutMultiplier;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        // Use XMLHttpRequest for better progress tracking and mobile compatibility
+        const uploadPromise = new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          
+          // Progress tracking
+          if (onProgress) {
+            xhr.upload.addEventListener('progress', (e) => {
+              if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                onProgress(percentComplete, e.loaded, e.total);
+              }
+            });
+          }
+          
+          // Load event - successful response
+          xhr.addEventListener('load', () => {
+            clearTimeout(timeoutId);
+            
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const response = JSON.parse(xhr.responseText);
+                resolve(response);
+              } catch (e) {
+                reject(new Error('Invalid response from server'));
+              }
+            } else {
+              try {
+                const errorData = JSON.parse(xhr.responseText);
+                reject(new Error(errorData.error || `Upload failed with status ${xhr.status}`));
+              } catch (e) {
+                reject(new Error(`Upload failed with status ${xhr.status}`));
+              }
+            }
+          });
+          
+          // Error event - network errors
+          xhr.addEventListener('error', () => {
+            clearTimeout(timeoutId);
+            reject(new Error('Network error. Please check your connection and try again.'));
+          });
+          
+          // Abort event
+          xhr.addEventListener('abort', () => {
+            clearTimeout(timeoutId);
+            reject(new Error('Upload timed out. Please try again.'));
+          });
+          
+          // Timeout event
+          xhr.addEventListener('timeout', () => {
+            clearTimeout(timeoutId);
+            reject(new Error('Upload timed out. Please try again.'));
+          });
+          
+          // Open and send request
+          xhr.open('POST', `${API_BASE_URL}/images/upload`);
+          
+          // Set auth header
+          if (authToken) {
+            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+          }
+          
+          // Set timeout
+          xhr.timeout = timeout;
+          
+          // Send the form data
+          xhr.send(formData);
+          
+          // Wire up abort controller
+          controller.signal.addEventListener('abort', () => {
+            xhr.abort();
+          });
+        });
+
+        return await uploadPromise;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
+    }, 3, 1000); // 3 retries, starting with 1 second delay
   },
 
   async loadImages() {

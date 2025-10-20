@@ -16,6 +16,9 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState('');
   const [showFamilyGallery, setShowFamilyGallery] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Notify parent of viewMode changes for mobile sidebar height adjustment
   useEffect(() => {
@@ -94,19 +97,49 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     if (!selectedFile) return;
 
     setUploadingImage(true);
+    setUploadProgress(0);
+    setUploadError(null);
+    setRetryCount(0);
+    
     try {
-      const result = await api.uploadImage(selectedFile, description, 'user');
+      const result = await api.uploadImage(
+        selectedFile, 
+        description, 
+        'user',
+        // Progress callback
+        (percentComplete, loaded, total) => {
+          setUploadProgress(Math.round(percentComplete));
+        }
+      );
+      
       if (result.success) {
         await loadImages(); // Refresh the gallery
         resetUploadState();
         setViewMode('gallery');
         alert(appConfig.ui.imageGallery.success.uploadSuccess);
       } else {
-        alert(appConfig.ui.imageGallery.errors.uploadFailed + (result.error || appConfig.ui.imageGallery.errors.unknownError));
+        const errorMessage = result.error || appConfig.ui.imageGallery.errors.unknownError;
+        setUploadError(errorMessage);
+        alert(appConfig.ui.imageGallery.errors.uploadFailed + errorMessage);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert(appConfig.ui.imageGallery.errors.uploadFailed + error.message);
+      const errorMessage = error.message || appConfig.ui.imageGallery.errors.unknownError;
+      setUploadError(errorMessage);
+      
+      // Provide more user-friendly error messages
+      let displayMessage = errorMessage;
+      if (errorMessage.includes('Network error') || errorMessage.includes('network')) {
+        displayMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (errorMessage.includes('timed out') || errorMessage.includes('timeout')) {
+        displayMessage = 'Upload timed out. This may be due to a slow connection or large file size. Please try again.';
+      } else if (errorMessage.includes('Invalid file type')) {
+        displayMessage = 'Invalid file type. Please select a JPEG, PNG, GIF, or WebP image.';
+      } else if (errorMessage.includes('File too large')) {
+        displayMessage = 'File is too large. Maximum file size is 10MB.';
+      }
+      
+      alert(appConfig.ui.imageGallery.errors.uploadFailed + displayMessage);
     } finally {
       setUploadingImage(false);
     }
@@ -120,6 +153,9 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     }
     setPreviewUrl(null);
     setDescription('');
+    setUploadProgress(0);
+    setUploadError(null);
+    setRetryCount(0);
   };
 
   // Handle drag and drop events
@@ -710,15 +746,87 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       {uploadingImage && (
         <div style={{ 
           marginTop: '20px', 
-          textAlign: 'center', 
           padding: '15px',
           backgroundColor: '#2a2a2a',
           borderRadius: '5px',
           border: '1px solid #444'
         }}>
-          <div style={{ fontSize: '14px', color: '#cccccc' }}>
+          <div style={{ fontSize: '14px', color: '#cccccc', marginBottom: '10px' }}>
             {appConfig.ui.imageGallery.confirm.uploadingMessage}
           </div>
+          
+          {/* Progress bar */}
+          <div style={{
+            width: '100%',
+            height: '24px',
+            backgroundColor: '#1a1a1a',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            border: '1px solid #444',
+            position: 'relative'
+          }}>
+            <div style={{
+              width: `${uploadProgress}%`,
+              height: '100%',
+              backgroundColor: uploadProgress < 100 ? '#4CAF50' : '#2196F3',
+              transition: 'width 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <span style={{
+                color: 'white',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                position: 'absolute',
+                width: '100%',
+                textAlign: 'center',
+                zIndex: 1
+              }}>
+                {uploadProgress}%
+              </span>
+            </div>
+          </div>
+          
+          {uploadProgress === 100 && (
+            <div style={{ 
+              fontSize: '12px', 
+              color: '#4CAF50', 
+              marginTop: '8px',
+              textAlign: 'center'
+            }}>
+              Processing upload...
+            </div>
+          )}
+        </div>
+      )}
+
+      {uploadError && !uploadingImage && (
+        <div style={{ 
+          marginTop: '20px', 
+          padding: '15px',
+          backgroundColor: '#2a2a2a',
+          borderRadius: '5px',
+          border: '1px solid #f44336'
+        }}>
+          <div style={{ fontSize: '14px', color: '#f44336', marginBottom: '10px' }}>
+            <strong>Upload Failed:</strong> {uploadError}
+          </div>
+          <button
+            onClick={confirmUpload}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Retry Upload
+          </button>
         </div>
       )}
     </div>
