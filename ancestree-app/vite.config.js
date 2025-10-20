@@ -7,5 +7,8 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Allow external network access
     port: 5173,      // Default Vite port
+  },
+  define: {
+    '__BUILD_TIME__': JSON.stringify(new Date().toISOString()),
   }
 })

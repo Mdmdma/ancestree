@@ -372,7 +372,10 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static files from the React app build directory (for production)
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../ancestree-app/dist')));
+  // In production, dist folder is in the same directory as server.js
+  const distPath = path.join(__dirname, 'dist');
+  console.log(`Serving static files from: ${distPath}`);
+  app.use(express.static(distPath));
 }
 
 // Make io instance available to routes
@@ -678,6 +681,7 @@ app.get('/api/edges', authenticateToken, (req, res) => {
 app.post('/api/nodes', authenticateToken, async (req, res) => {
   const { id, type, position, data } = req.body;
   const familyId = req.user.id;
+  const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   try {
     // Perform smart geocoding for address
@@ -711,8 +715,11 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
         selectable: true
       };
     
-      // Broadcast to other users in the family room
-      req.app.get('io').to(`family-${familyId}`).emit('node:created', newNode);
+      // Broadcast to ALL users in the family room (including the sender)
+      // The client-side duplicate check will prevent duplicates
+      const ioInstance = req.app.get('io');
+      console.log(`[CREATE NODE] Broadcasting node:created to family-${familyId}, Node ID: ${id}`);
+      ioInstance.to(`family-${familyId}`).emit('node:created', newNode);
       
       res.json({ success: true, id: this.lastID });
     });
@@ -727,6 +734,7 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { position, data } = req.body;
   const familyId = req.user.id;
+  const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   try {
     // First, get the current node to check if geocoding is needed
@@ -764,7 +772,7 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
         return;
       }
       
-      // Broadcast the update to other users in the family room
+      // Broadcast the update to other users in the family room (exclude the sender)
       const updatedNode = {
         id,
         position,
@@ -777,7 +785,14 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
         type: req.body.type // Include if provided
       };
     
-      req.app.get('io').to(`family-${familyId}`).emit('node:updated', updatedNode);
+      const ioInstance = req.app.get('io');
+      if (socketId) {
+        // Exclude the sender from receiving this event
+        ioInstance.to(`family-${familyId}`).except(socketId).emit('node:updated', updatedNode);
+      } else {
+        // Fallback: broadcast to all (for backwards compatibility)
+        ioInstance.to(`family-${familyId}`).emit('node:updated', updatedNode);
+      }
       
       res.json({ success: true, changes: this.changes });
     });
@@ -860,6 +875,7 @@ app.delete('/api/nodes/:id', authenticateToken, (req, res) => {
 app.post('/api/edges', authenticateToken, (req, res) => {
   const { id, source, target, sourceHandle, targetHandle, type } = req.body;
   const familyId = req.user.id;
+  const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   // Basic validation
   if (!id || !source || !target || !type) {
@@ -881,8 +897,15 @@ app.post('/api/edges', authenticateToken, (req, res) => {
       data: req.body.data || {}
     };
     
-    // Broadcast to other users in the family room
-    req.app.get('io').to(`family-${familyId}`).emit('edge:created', newEdge);
+    // Broadcast to other users in the family room (exclude the sender)
+    const ioInstance = req.app.get('io');
+    if (socketId) {
+      // Exclude the sender from receiving this event
+      ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:created', newEdge);
+    } else {
+      // Fallback: broadcast to all (for backwards compatibility)
+      ioInstance.to(`family-${familyId}`).emit('edge:created', newEdge);
+    }
     
     res.json({ success: true, edgeId: id });
   });
@@ -1740,7 +1763,8 @@ app.delete('/api/images/:imageId/chat/:messageId', authenticateToken, (req, res)
 // Catch-all handler: send back React's index.html file for production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../ancestree-app/dist/index.html'));
+    const indexPath = path.join(__dirname, 'dist/index.html');
+    res.sendFile(indexPath);
   });
 }
 

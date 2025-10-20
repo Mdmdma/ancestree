@@ -193,6 +193,8 @@ const FamilyTree = ({
   const [elkDebugData, setElkDebugData] = useState(null);
   const [showElkDebug, setShowElkDebug] = useState(false);
   const { screenToFlowPosition, fitView } = useReactFlow();
+  const [initialFitDone, setInitialFitDone] = useState(false);
+  const [reactFlowReady, setReactFlowReady] = useState(false);
 
   // Real-time collaboration setup
   const { socket, isConnected, userCount, isCollaborating } = useSocket(getSocketServerUrl(), true);
@@ -255,10 +257,14 @@ const FamilyTree = ({
 
     // Listen for remote node creation
     socket.on('node:created', (remoteNode) => {
-      console.log('Remote node created:', remoteNode);
+      console.log('[SOCKET] Received node:created event for node:', remoteNode.id, 'Current socket ID:', socket.id);
       setNodes(nds => {
         // Check if node already exists to prevent duplicates
-        if (nds.find(n => n.id === remoteNode.id)) return nds;
+        if (nds.find(n => n.id === remoteNode.id)) {
+          console.log('[SOCKET] Node already exists, skipping:', remoteNode.id);
+          return nds;
+        }
+        console.log('[SOCKET] Adding new node:', remoteNode.id);
         return [...nds, remoteNode];
       });
       addRecentChangeIndicator(remoteNode.id);
@@ -346,7 +352,7 @@ const FamilyTree = ({
               await api.updateNode(change.id, { 
                 position: change.position, 
                 data: node.data 
-              });
+              }, socket?.id);
             }
           } catch (error) {
             console.error('Failed to update node position:', error);
@@ -379,7 +385,7 @@ const FamilyTree = ({
         }
       }
     }
-  }, [onNodesChange, nodes, debouncedPositionUpdate]);
+  }, [onNodesChange, nodes, debouncedPositionUpdate, socket]);
 
   // Handle edge changes including deletions
   const handleEdgesChange = useCallback(async (changes) => {
@@ -443,6 +449,29 @@ const FamilyTree = ({
 
     loadData();
   }, [setNodes, setEdges, showDebug]);
+
+  // Fit view when BOTH ReactFlow is ready AND nodes are loaded
+  useEffect(() => {
+    console.log('[FIT VIEW] Check conditions - reactFlowReady:', reactFlowReady, 'loading:', loading, 'nodes:', nodes.length, 'initialFitDone:', initialFitDone);
+    if (reactFlowReady && !loading && nodes.length > 0 && !initialFitDone) {
+      // Wait a bit for nodes to fully render
+      const timer = setTimeout(() => {
+        console.log('[FIT VIEW] Calling fitView');
+        try {
+          fitView({ 
+            padding: 0.2,
+            duration: 0
+          });
+          setInitialFitDone(true);
+          console.log('[FIT VIEW] Fit view completed successfully');
+        } catch (error) {
+          console.error('[FIT VIEW] Error calling fitView:', error);
+        }
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [reactFlowReady, loading, nodes.length, fitView, initialFitDone]);
 
   // Function to refresh data from database (for ensuring sync)
   const refreshData = useCallback(async () => {
@@ -976,6 +1005,12 @@ const FamilyTree = ({
     });
   }, [fitView]);
 
+  // Handle ReactFlow initialization - fit view when ready
+  const handleInit = useCallback((reactFlowInstance) => {
+    console.log('[FIT VIEW] ReactFlow onInit called, nodes:', nodes.length);
+    setReactFlowReady(true);
+  }, [nodes.length]);
+
   // Simplified validation - allow all connections
   const isValidConnection = useCallback(() => {
     return true;
@@ -1052,13 +1087,13 @@ const FamilyTree = ({
             data: { isDebugMode: showDebug }
           };
           
-          await api.createEdge(replacementEdge);
+          await api.createEdge(replacementEdge, socket?.id);
           // Edge replacement will be handled by socket listeners:
           // 1. Deletion event will remove the old edge
           // 2. Creation event will add the new edge
         } else {
           // Create new edge normally
-          await api.createEdge(newEdge);
+          await api.createEdge(newEdge, socket?.id);
           // Note: Edge will be added to state via socket listener when backend confirms creation
         }
         
@@ -1136,7 +1171,7 @@ const FamilyTree = ({
                       id: getId() // Generate new ID for the replacement edge
                     };
                     
-                    api.createEdge(updatedFamilyEdge);
+                    api.createEdge(updatedFamilyEdge, socket?.id);
                     
                     // Note: Edge updates will be handled by socket listeners
                     // Remove old edge from local state immediately to prevent display issues
@@ -1190,7 +1225,7 @@ const FamilyTree = ({
                     }
                     
                     if (hiddenEdge) {
-                      api.createEdge(hiddenEdge);
+                      api.createEdge(hiddenEdge, socket?.id);
                       // Note: Hidden edge will be added to state via socket listener
                     }
                   }
@@ -1209,7 +1244,7 @@ const FamilyTree = ({
         console.error('Failed to create edge:', error);
       }
     },
-    [setEdges, showDebug, nodes, edges, setNodes],
+    [setEdges, showDebug, nodes, edges, setNodes, socket],
   );
 
   const onNodeClick = useCallback((event, node) => {
@@ -1649,14 +1684,15 @@ const FamilyTree = ({
           }
           
           if (newNode && newEdge) {
-            // Save to database and add to UI
-            await api.createNode(newNode);
-            setNodes((nds) => [...nds, newNode]);
+            // Save to database - node will be added via socket event
+            console.log('[CREATE NODE] Creating node via API, Node ID:', newNode.id);
+            await api.createNode(newNode, socket?.id);
+            // Note: Don't add node to local state here - let socket listener handle it
 
             // Create edge after a short delay
             setTimeout(async () => {
               try {
-                await api.createEdge(newEdge);
+                await api.createEdge(newEdge, socket?.id);
                 // Note: Edge will be added to state via socket listener when backend confirms creation
                 
                 // Special case: If we created a partner node through family parentconnection, create partner edge to existing bloodline node
@@ -1701,7 +1737,7 @@ const FamilyTree = ({
                   // Create partner edge after a short delay to ensure the first edge is processed
                   setTimeout(async () => {
                     try {
-                      await api.createEdge(partnerEdge);
+                      await api.createEdge(partnerEdge, socket?.id);
                       console.log(`🔗 Successfully created partner edge between ${existingBloodlineNode.data.name} and ${newNode.data.name}`);
                     } catch (error) {
                       console.error('Failed to create partner edge:', error);
@@ -1753,7 +1789,7 @@ const FamilyTree = ({
                       // Create the hidden edge
                       setTimeout(async () => {
                         try {
-                          await api.createEdge(hiddenEdge);
+                          await api.createEdge(hiddenEdge, socket?.id);
                           // Note: Edge will be added to state via socket listener when backend confirms creation
                         } catch (error) {
                           console.error('Failed to create hidden bloodline edge:', error);
@@ -1774,7 +1810,7 @@ const FamilyTree = ({
         }
       }
     },
-    [screenToFlowPosition, setNodes, showDebug, nodes, edges],
+    [screenToFlowPosition, setNodes, showDebug, nodes, edges, socket],
   );
 
   // Function to update node data from parent component (for syncing sidebar changes)
@@ -1822,6 +1858,7 @@ const FamilyTree = ({
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onInit={handleInit}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
@@ -1833,8 +1870,6 @@ const FamilyTree = ({
         isValidConnection={isValidConnection}
         deleteKeyCode="Delete"
         multiSelectionKeyCode="Shift"
-        fitView
-        fitViewOptions={{ padding: 2 }}
         nodeOrigin={nodeOrigin}
         minZoom={0.05}
         maxZoom={2}

@@ -8,10 +8,13 @@ export { API_BASE_URL };
 let authToken = localStorage.getItem('authToken');
 
 // Helper function to get auth headers
-const getAuthHeaders = () => {
+const getAuthHeaders = (socketId = null) => {
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  if (socketId) {
+    headers['X-Socket-Id'] = socketId;
   }
   return headers;
 };
@@ -115,19 +118,19 @@ export const api = {
   },
 
   // Node operations
-  async createNode(node) {
+  async createNode(node, socketId = null) {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(socketId),
       body: JSON.stringify(node)
     });
     return response.json();
   },
 
-  async updateNode(id, updates) {
+  async updateNode(id, updates, socketId = null) {
     const response = await fetch(`${API_BASE_URL}/nodes/${id}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(socketId),
       body: JSON.stringify(updates)
     });
     return response.json();
@@ -153,10 +156,10 @@ export const api = {
   },
 
   // Edge operations
-  async createEdge(edge) {
+  async createEdge(edge, socketId = null) {
     const response = await fetch(`${API_BASE_URL}/edges`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(socketId),
       body: JSON.stringify(edge)
     });
     

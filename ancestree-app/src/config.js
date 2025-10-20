@@ -2,7 +2,7 @@
 export const appConfig = {
   // Header text configuration
   header: {
-    title: "Familie Inntertal",
+    title: "Familie Innrtertal 1",
     subtitle: "Verbindungen über Generationen",
     description: "Hilf jetzt mit unseren Stammbaum zu vervollständigen"
   },
