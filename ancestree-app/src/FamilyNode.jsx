@@ -5,15 +5,6 @@ import CustomHandle from "./CustomHandle";
 export default function FamilyNode({ data }) {
   const { childrenPorts = [] } = data;
 
-  // Handle styles for family node
-  const handleStyles = {
-    parentConnection: { background: "#8b5cf6", width: "12px", height: "12px" },
-    childrenConnection: { background: "#10b981", width: "12px", height: "12px" },
-    childrenPort: { background: "#059669", width: "10px", height: "10px" },
-    routingIn: { background: "#f59e0b", width: "8px", height: "8px" },
-    routingOut: { background: "#ef4444", width: "8px", height: "8px" }
-  };
-
   // Render handles component
   const HandleComponent = () => (
     <>
@@ -21,13 +12,11 @@ export default function FamilyNode({ data }) {
         type="target" 
         position={Position.Top} 
         id="parentconnection"
-        style={handleStyles.parentConnection}
       />
       <CustomHandle 
         type="source" 
         position={Position.Bottom} 
         id="childrenconnection"
-        style={handleStyles.childrenConnection}
       />
       {/* Individual ports for each child connection */}
       {childrenPorts.map((port, index) => {
@@ -44,7 +33,6 @@ export default function FamilyNode({ data }) {
             position={Position.Bottom} 
             id={port.id}
             style={{
-              ...handleStyles.childrenPort,
               transform: `translate(${x}px, ${y}px)`,
               position: 'absolute'
             }}

@@ -237,7 +237,8 @@ export const appConfig = {
       },
       buttons: {
         pictures: '📷 Bilder',
-        delete: '🗑️ Person löschen'
+        delete: '🗑️ Person löschen',
+        deleteFamily: '🗑️ Familie löschen'
       },
       messages: {
         deleteWithConnections: 'Diese Person kann nicht gelöscht werden, da sie noch Verbindungen zu anderen Personen hat. Entferne zuerst alle Verbindungen.',

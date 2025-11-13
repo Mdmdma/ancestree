@@ -5,9 +5,8 @@ import {
   getBezierPath,
   useReactFlow,
 } from "@xyflow/react";
-import { api } from "./api";
 
-export default function PartnerEdge(props) {
+export default function ExPartnerEdge(props) {
   const {
     id,
     sourceX,
@@ -16,17 +15,12 @@ export default function PartnerEdge(props) {
     targetY,
     sourcePosition,
     targetPosition,
-    type,
-    data,
   } = props;
 
   const { setEdges } = useReactFlow();
 
-  // Check if this is an expartner edge
-  const isExpartner = type === 'expartner';
-
-  // Partner edges stay green, expartner edges are gray
-  const edgeColor = isExpartner ? '#999999' : '#4ecdc4';
+  // Ex-partner edges stay green but dashed
+  const edgeColor = '#4ecdc4';
 
   const [, labelX, labelY] = getBezierPath({
     sourceX,
@@ -37,27 +31,6 @@ export default function PartnerEdge(props) {
     targetPosition,
   });
 
-  const handleToggle = async () => {
-    // Toggle between partner and expartner
-    const newType = isExpartner ? 'partner' : 'expartner';
-    
-    try {
-      // Update the edge type in the database
-      await api.updateEdge(id, { type: newType });
-      
-      // Update the edge type in local state
-      setEdges((prevEdges) => 
-        prevEdges.map((edge) => 
-          edge.id === id 
-            ? { ...edge, type: newType }
-            : edge
-        )
-      );
-    } catch (error) {
-      console.error('Failed to toggle edge type:', error);
-    }
-  };
-
   return (
     <>
       <BezierEdge 
@@ -65,7 +38,7 @@ export default function PartnerEdge(props) {
         style={{ 
           stroke: edgeColor, 
           strokeWidth: 1,
-          strokeDasharray: isExpartner ? '5,5' : 'none' // Dashed line for expartner
+          strokeDasharray: '5, 5' // Dashed line
         }} 
       />
       <EdgeLabelRenderer>
@@ -87,7 +60,9 @@ export default function PartnerEdge(props) {
             justifyContent: "center",
             lineHeight: "1",
           }}
-          onClick={handleToggle}
+          onClick={() =>
+            setEdges((prevEdges) => prevEdges.filter((edge) => edge.id !== id))
+          }
         >
           ×
         </button>

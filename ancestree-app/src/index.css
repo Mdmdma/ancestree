@@ -103,8 +103,49 @@ button:focus-visible {
   }
 }
 
+/* React Flow Handle Styles */
+.react-flow__handle {
+  width: 15px !important;
+  height: 15px !important;
+  border: 2px solid rgb(255, 255, 255) !important;
+  border-radius: 50% !important;
+  background: #555 !important;
+}
+
+/* Handle color variants */
+.react-flow__handle.handle-parent {
+  background: #ff6b6b !important;
+}
+
+.react-flow__handle.handle-child {
+  background: #dd7f13ff !important;
+}
+
+.react-flow__handle.handle-partner {
+  background: #45b7d1 !important;
+}
+
+.react-flow__handle.handle-parent-connection {
+  background: #8b5cf6 !important;
+}
+
+.react-flow__handle.handle-children-connection {
+  background: #10b981 !important;
+}
+
+.react-flow__handle.handle-children-port {
+  background: #059669 !important;
+}
+
 /* Mobile-specific styles */
 @media screen and (max-width: 768px) {
+  /* Make handles 100% bigger (double size) on mobile */
+  .react-flow__handle {
+    width: 20px !important;
+    height: 20px !important;
+    border: 2px solid rgb(255, 255, 255) !important;
+  }
+  
   /* Prevent body scrolling on mobile */
   body {
     overflow: hidden;

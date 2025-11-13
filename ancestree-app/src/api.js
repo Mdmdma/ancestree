@@ -180,6 +180,22 @@ export const api = {
     return response.json();
   },
 
+  async updateEdge(id, updates, socketId = null) {
+    const response = await fetch(`${API_BASE_URL}/edges/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(socketId),
+      body: JSON.stringify(updates)
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update edge');
+    }
+    
+    return result;
+  },
+
   // Database operations
   async resetDatabase() {
     const response = await fetch(`${API_BASE_URL}/reset`, {

@@ -155,6 +155,40 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
     gap: '8px'
   };
 
+  // Check if this is a family node
+  const isFamilyNode = node?.type === 'family';
+
+  // If it's a family node, show only the delete button
+  if (isFamilyNode) {
+    return (
+      <div>
+        <h3 style={{ color: 'white' }}>{appConfig.ui.nodeEditor.title}</h3>
+        
+        {/* Delete Button for Family Node */}
+        <div style={{ marginTop: '20px' }}>
+          <button
+            onClick={handleDelete}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+          >
+            {appConfig.ui.nodeEditor.buttons.deleteFamily}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // For person nodes, show all fields
   return (
     <div>
       <h3 style={{ color: 'white' }}>{appConfig.ui.nodeEditor.title}</h3>

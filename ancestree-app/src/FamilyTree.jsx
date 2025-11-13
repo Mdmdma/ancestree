@@ -29,6 +29,7 @@ const nodeTypes = {
 
 const edgeTypes = {
   partner: PartnerEdge,
+  expartner: PartnerEdge,
   bloodline: BloodlineEdge,
   bloodlinehidden: BloodlineEdgeHidden,
   bloodlinefake: BloodlineEdgeFake,
@@ -44,6 +45,11 @@ const getId = () => {
 };
 
 const nodeOrigin = [0.5, 0];
+
+// Helper function to check if an edge is a partner or expartner edge
+const isPartnerEdge = (edge) => {
+  return edge.type === 'partner' || edge.type === 'expartner';
+};
 
 // Helper function to check if a node is on the bloodline
 // Family nodes are always considered bloodline nodes
@@ -105,7 +111,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     // Check if source partner node already has a partner connection
     if (!isBloodlineNode(sourceNode) && sourceHandle?.includes('partner')) {
       const existingPartnerConnections = edges.filter(edge => 
-        edge.type === 'partner' && 
+        isPartnerEdge(edge) && 
         (edge.source === sourceNode.id || edge.target === sourceNode.id)
       );
       if (existingPartnerConnections.length >= 1) {
@@ -119,7 +125,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     // Check if target partner node already has a partner connection
     if (!isBloodlineNode(targetNode) && targetHandle?.includes('partner')) {
       const existingPartnerConnections = edges.filter(edge => 
-        edge.type === 'partner' && 
+        isPartnerEdge(edge) && 
         (edge.source === targetNode.id || edge.target === targetNode.id)
       );
       if (existingPartnerConnections.length >= 1) {
@@ -202,6 +208,9 @@ const FamilyTree = ({
   
   // Track deletion attempts to prevent duplicates
   const deletionAttemptsRef = useRef(new Set());
+
+  // Track edge drag start position for minimum drag distance
+  const edgeDragStartRef = useRef(null);
 
   // Debounced position update for real-time collaboration
   const [debouncedPositionUpdate] = useDebounce((nodeId, position) => {
@@ -312,9 +321,23 @@ const FamilyTree = ({
       console.log('Remote edge created:', remoteEdge);
       setEdges(eds => {
         // Check if edge already exists to prevent duplicates
-        if (eds.find(e => e.id === remoteEdge.id)) return eds;
+        if (eds.find(e => e.id === remoteEdge.id)) {
+          console.log('Edge already exists locally, skipping:', remoteEdge.id);
+          return eds;
+        }
+        console.log('Adding remote edge to local state:', remoteEdge.id);
         return [...eds, remoteEdge];
       });
+    });
+
+    // Listen for remote edge updates
+    socket.on('edge:updated', (remoteEdge) => {
+      console.log('Remote edge updated:', remoteEdge);
+      setEdges(eds => eds.map(e => 
+        e.id === remoteEdge.id 
+          ? { ...e, ...remoteEdge }
+          : e
+      ));
     });
 
     // Listen for remote edge deletions
@@ -330,6 +353,8 @@ const FamilyTree = ({
       socket.off('node:deleted');
       socket.off('node:position');
       socket.off('edge:created');
+      socket.off('edge:updated');
+      socket.off('edge:deleted');
       socket.off('edge:deleted');
     };
   }, [socket, setNodes, setEdges]);
@@ -531,7 +556,7 @@ const FamilyTree = ({
 
         // Find all partners of this bloodline node
         const partnerEdges = edges.filter(edge => 
-          edge.type === 'partner' && 
+          isPartnerEdge(edge) && 
           (edge.source === bloodlineNode.id || edge.target === bloodlineNode.id)
         );
 
@@ -1088,13 +1113,18 @@ const FamilyTree = ({
           };
           
           await api.createEdge(replacementEdge, socket?.id);
-          // Edge replacement will be handled by socket listeners:
-          // 1. Deletion event will remove the old edge
-          // 2. Creation event will add the new edge
+          
+          // Add the replacement edge to local state immediately
+          setEdges((eds) => {
+            // Remove the hidden edge and add the replacement edge
+            return [...eds.filter(e => e.id !== existingHiddenEdge.id), replacementEdge];
+          });
         } else {
           // Create new edge normally
           await api.createEdge(newEdge, socket?.id);
-          // Note: Edge will be added to state via socket listener when backend confirms creation
+          
+          // Add the edge to local state immediately
+          setEdges((eds) => [...eds, newEdge]);
         }
         
         // Special case: When connecting two bloodline nodes with partner edge
@@ -1173,9 +1203,9 @@ const FamilyTree = ({
                     
                     api.createEdge(updatedFamilyEdge, socket?.id);
                     
-                    // Note: Edge updates will be handled by socket listeners
-                    // Remove old edge from local state immediately to prevent display issues
+                    // Remove old edge and add new fake edge to local state immediately
                     updatedEdges = updatedEdges.filter(e => e.id !== familyEdge.id);
+                    updatedEdges.push(updatedFamilyEdge);
                     
                     // Collect family node for hidden edge creation
                     const familyNodeId = familyEdge.source === partnerNode.id ? familyEdge.target : familyEdge.source;
@@ -1226,7 +1256,8 @@ const FamilyTree = ({
                     
                     if (hiddenEdge) {
                       api.createEdge(hiddenEdge, socket?.id);
-                      // Note: Hidden edge will be added to state via socket listener
+                      // Add hidden edge to local state immediately
+                      updatedEdges.push(hiddenEdge);
                     }
                   }
                 });
@@ -1267,10 +1298,34 @@ const FamilyTree = ({
     );
   }, [setNodes, setSelectedNode]);
 
+  const onConnectStart = useCallback((event, { handleId, handleType, nodeId }) => {
+    // Store the starting position of the edge drag
+    const { clientX, clientY } = 'changedTouches' in event ? event.changedTouches[0] : event;
+    edgeDragStartRef.current = { x: clientX, y: clientY };
+  }, []);
+
   const onConnectEnd = useCallback(
     async (event, connectionState) => {
       if (!connectionState.isValid && connectionState.fromNode && connectionState.fromHandle) {
         try {
+          // Check if edge was dragged at least 50 pixels
+          const { clientX, clientY } = 'changedTouches' in event ? event.changedTouches[0] : event;
+          
+          if (edgeDragStartRef.current) {
+            const dragDistance = Math.sqrt(
+              Math.pow(clientX - edgeDragStartRef.current.x, 2) + 
+              Math.pow(clientY - edgeDragStartRef.current.y, 2)
+            );
+            
+            // Reset the drag start position
+            edgeDragStartRef.current = null;
+            
+            // Only create new node if dragged at least 50 pixels
+            if (dragDistance < 50) {
+              return;
+            }
+          }
+          
           const sourceHandle = connectionState.fromHandle.id;
           const sourceNode = connectionState.fromNode;
           
@@ -1343,10 +1398,11 @@ const FamilyTree = ({
           }
           
           const newId = getId();
-          const { clientX, clientY } =
-            'changedTouches' in event ? event.changedTouches[0] : event;
           
-          let dropPosition = screenToFlowPosition({ x: clientX, y: clientY });
+          let dropPosition = screenToFlowPosition({ 
+            x: 'changedTouches' in event ? event.changedTouches[0].clientX : event.clientX, 
+            y: 'changedTouches' in event ? event.changedTouches[0].clientY : event.clientY 
+          });
           
           // Helper function to generate random year offset
           const getRandomYearOffset = (baseYears) => {
@@ -1693,7 +1749,9 @@ const FamilyTree = ({
             setTimeout(async () => {
               try {
                 await api.createEdge(newEdge, socket?.id);
-                // Note: Edge will be added to state via socket listener when backend confirms creation
+                
+                // Add the edge to local state immediately
+                setEdges((eds) => [...eds, newEdge]);
                 
                 // Special case: If we created a partner node through family parentconnection, create partner edge to existing bloodline node
                 if (newNode.type === 'person' && sourceNode.type === 'family' && sourceHandle === 'parentconnection' && isPartnerNode && existingBloodlineNode) {
@@ -1738,6 +1796,10 @@ const FamilyTree = ({
                   setTimeout(async () => {
                     try {
                       await api.createEdge(partnerEdge, socket?.id);
+                      
+                      // Add partner edge to local state immediately
+                      setEdges((eds) => [...eds, partnerEdge]);
+                      
                       console.log(`🔗 Successfully created partner edge between ${existingBloodlineNode.data.name} and ${newNode.data.name}`);
                     } catch (error) {
                       console.error('Failed to create partner edge:', error);
@@ -1749,7 +1811,7 @@ const FamilyTree = ({
                 if (newNode.type === 'family' && sourceNode.type === 'person' && !isBloodlineNode(sourceNode)) {
                   // Find the bloodline node connected to this partner
                   const partnerEdge = edges.find(edge => 
-                    edge.type === 'partner' && 
+                    isPartnerEdge(edge) && 
                     (edge.source === sourceNode.id || edge.target === sourceNode.id)
                   );
                   
@@ -1790,7 +1852,9 @@ const FamilyTree = ({
                       setTimeout(async () => {
                         try {
                           await api.createEdge(hiddenEdge, socket?.id);
-                          // Note: Edge will be added to state via socket listener when backend confirms creation
+                          
+                          // Add hidden edge to local state immediately
+                          setEdges((eds) => [...eds, hiddenEdge]);
                         } catch (error) {
                           console.error('Failed to create hidden bloodline edge:', error);
                         }
@@ -1862,6 +1926,7 @@ const FamilyTree = ({
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}

@@ -19,13 +19,6 @@ export default function PersonNode({ data }) {
 
   const address = formatAddress();
 
-  // Common handle styles
-  const handleStyles = {
-    parent: { background: "#ff6b6b", width: "12px", height: "12px" },
-    child: { background: "#dd7f13ff", width: "12px", height: "12px" },
-    partner: { background: "#45b7d1", width: "12px", height: "12px" }
-  };
-
   // Render handles component
   const HandleComponent = () => (
     <>
@@ -33,25 +26,21 @@ export default function PersonNode({ data }) {
         type="target" 
         position={Position.Top} 
         id="parent"
-        style={handleStyles.parent}
       />
       <CustomHandle 
         type="source" 
         position={Position.Bottom} 
         id="child"
-        style={handleStyles.child}
       />
       <CustomHandle 
         type="source" 
         position={Position.Left} 
         id="partner-left"
-        style={handleStyles.partner}
       />
       <CustomHandle 
         type="target" 
         position={Position.Right} 
         id="partner-right"
-        style={handleStyles.partner}
       />
     </>
   );

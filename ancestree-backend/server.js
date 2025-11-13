@@ -929,6 +929,87 @@ app.delete('/api/edges/:id', authenticateToken, (req, res) => {
   });
 });
 
+// Update edge
+app.put('/api/edges/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const familyId = req.user.id;
+  const socketId = req.headers['x-socket-id'];
+  const { type, source, target, sourceHandle, targetHandle } = req.body;
+  
+  // Build dynamic update query based on provided fields
+  const updates = [];
+  const values = [];
+  
+  if (type !== undefined) {
+    updates.push('type = ?');
+    values.push(type);
+  }
+  if (source !== undefined) {
+    updates.push('source = ?');
+    values.push(source);
+  }
+  if (target !== undefined) {
+    updates.push('target = ?');
+    values.push(target);
+  }
+  if (sourceHandle !== undefined) {
+    updates.push('source_handle = ?');
+    values.push(sourceHandle);
+  }
+  if (targetHandle !== undefined) {
+    updates.push('target_handle = ?');
+    values.push(targetHandle);
+  }
+  
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+  
+  // Add WHERE clause values
+  values.push(id, familyId);
+  
+  const sql = `UPDATE edges SET ${updates.join(', ')} WHERE id = ? AND family_id = ?`;
+  
+  db.run(sql, values, function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'Edge not found' });
+    }
+    
+    // Fetch the updated edge to broadcast
+    db.get('SELECT * FROM edges WHERE id = ? AND family_id = ?', [id, familyId], (err, edge) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      
+      // Create the full edge object for broadcasting
+      const updatedEdge = {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.source_handle,
+        targetHandle: edge.target_handle,
+        type: edge.type,
+        data: req.body.data || {}
+      };
+      
+      // Broadcast to other users in the family room (exclude the sender)
+      const ioInstance = req.app.get('io');
+      if (socketId) {
+        ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:updated', updatedEdge);
+      } else {
+        ioInstance.to(`family-${familyId}`).emit('edge:updated', updatedEdge);
+      }
+      
+      res.json({ success: true, edge: updatedEdge });
+    });
+  });
+});
+
 // Reset database (clear all data)
 app.post('/api/reset', (req, res) => {
   db.serialize(() => {
