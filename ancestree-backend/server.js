@@ -9,7 +9,8 @@ const multerS3 = require('multer-s3');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const { db, insertDefaultNodeForFamily, ensureFamilyHasNodes } = require('./database');
+const fs = require('fs');
+const { authDb, getFamilyDb, getFamilyDbById, insertDefaultNodeForFamily, ensureFamilyHasNodes } = require('./database');
 const axios = require('axios'); // Add axios for API calls
 const http = require('http');
 const { Server } = require('socket.io');
@@ -203,55 +204,68 @@ const upload = multer({
 });
 
 // Cleanup routine to remove items with null keys and duplicate edges
+// This runs across ALL family databases
 function cleanupNullKeys() {
-  console.log('Running cleanup routine for null keys and duplicate edges...');
+  console.log('Running cleanup routine for null keys and duplicate edges across all families...');
   
-  // Remove nodes with null id
-  db.run("DELETE FROM nodes WHERE id IS NULL", function(err) {
-    if (err) {
-      console.error('Error cleaning up nodes with null keys:', err.message);
-    } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} nodes with null keys`);
-    }
-  });
+  // Get all family database names from the databases folder
+  const databasesPath = path.join(__dirname, 'databases');
+  const familyDbFiles = fs.readdirSync(databasesPath)
+    .filter(file => file.startsWith('database_family_') && file.endsWith('.db'));
   
-  // Remove edges with null id
-  db.run("DELETE FROM edges WHERE id IS NULL", function(err) {
-    if (err) {
-      console.error('Error cleaning up edges with null keys:', err.message);
-    } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} edges with null keys`);
-    }
-  });
-  
-  // Also clean up edges with null source or target references
-  db.run("DELETE FROM edges WHERE source IS NULL OR target IS NULL", function(err) {
-    if (err) {
-      console.error('Error cleaning up edges with null references:', err.message);
-    } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} edges with null references`);
-    }
-  });
+  familyDbFiles.forEach(dbFile => {
+    const familyName = dbFile.replace('database_family_', '').replace('.db', '');
+    const familyDb = getFamilyDb(familyName);
+    
+    console.log(`Cleaning up family database: ${familyName}`);
+    
+    // Remove nodes with null id
+    familyDb.run("DELETE FROM nodes WHERE id IS NULL", function(err) {
+      if (err) {
+        console.error(`Error cleaning up nodes with null keys in ${familyName}:`, err.message);
+      } else if (this.changes > 0) {
+        console.log(`Cleaned up ${this.changes} nodes with null keys in ${familyName}`);
+      }
+    });
+    
+    // Remove edges with null id
+    familyDb.run("DELETE FROM edges WHERE id IS NULL", function(err) {
+      if (err) {
+        console.error(`Error cleaning up edges with null keys in ${familyName}:`, err.message);
+      } else if (this.changes > 0) {
+        console.log(`Cleaned up ${this.changes} edges with null keys in ${familyName}`);
+      }
+    });
+    
+    // Also clean up edges with null source or target references
+    familyDb.run("DELETE FROM edges WHERE source IS NULL OR target IS NULL", function(err) {
+      if (err) {
+        console.error(`Error cleaning up edges with null references in ${familyName}:`, err.message);
+      } else if (this.changes > 0) {
+        console.log(`Cleaned up ${this.changes} edges with null references in ${familyName}`);
+      }
+    });
 
-  // Clean up self-loop edges (edges that connect a node with itself)
-  db.run("DELETE FROM edges WHERE source = target", function(err) {
-    if (err) {
-      console.error('Error cleaning up self-loop edges:', err.message);
-    } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} self-loop edges`);
-    }
+    // Clean up self-loop edges (edges that connect a node with itself)
+    familyDb.run("DELETE FROM edges WHERE source = target", function(err) {
+      if (err) {
+        console.error(`Error cleaning up self-loop edges in ${familyName}:`, err.message);
+      } else if (this.changes > 0) {
+        console.log(`Cleaned up ${this.changes} self-loop edges in ${familyName}`);
+      }
+    });
+
+    // Clean up orphaned image references
+    cleanupOrphanedImageReferences(familyDb, familyName);
+
+    // Clean up duplicate edges with same endpoints, keeping only highest rank edge
+    // Only edges of the same type are considered duplicates - different relationship types can coexist
+    cleanupDuplicateEdges(familyDb, familyName);
   });
-
-  // Clean up orphaned image references
-  cleanupOrphanedImageReferences();
-
-  // Clean up duplicate edges with same endpoints, keeping only highest rank edge
-  // Only edges of the same type are considered duplicates - different relationship types can coexist
-  cleanupDuplicateEdges();
 }
 
-function cleanupDuplicateEdges() {
-  console.log('Cleaning up duplicate edges with same endpoints and type...');
+function cleanupDuplicateEdges(familyDb, familyName) {
+  console.log(`Cleaning up duplicate edges with same endpoints and type in ${familyName}...`);
   
   // Find duplicate edges (same source, target, AND type - different relationship types are allowed)
   const query = `
@@ -295,65 +309,65 @@ function cleanupDuplicateEdges() {
     FROM EdgePairs
   `;
   
-  db.all(query, (err, duplicateEdges) => {
+  familyDb.all(query, (err, duplicateEdges) => {
     if (err) {
-      console.error('Error finding duplicate edges:', err.message);
+      console.error(`Error finding duplicate edges in ${familyName}:`, err.message);
       return;
     }
     
     if (duplicateEdges.length === 0) {
-      console.log('No duplicate edges found');
+      console.log(`No duplicate edges found in ${familyName}`);
       return;
     }
     
-    console.log(`Found ${duplicateEdges.length} duplicate edges to remove`);
+    console.log(`Found ${duplicateEdges.length} duplicate edges to remove in ${familyName}`);
     
     // Delete the lower priority duplicate edges
     const idsToDelete = duplicateEdges.map(edge => edge.id_to_delete);
     const placeholders = idsToDelete.map(() => '?').join(',');
     
-    db.run(`DELETE FROM edges WHERE id IN (${placeholders})`, idsToDelete, function(err) {
+    familyDb.run(`DELETE FROM edges WHERE id IN (${placeholders})`, idsToDelete, function(err) {
       if (err) {
-        console.error('Error deleting duplicate edges:', err.message);
+        console.error(`Error deleting duplicate edges in ${familyName}:`, err.message);
       } else {
-        console.log(`Successfully removed ${this.changes} duplicate edges`);
+        console.log(`Successfully removed ${this.changes} duplicate edges in ${familyName}`);
       }
     });
   });
 }
 
-function cleanupOrphanedImageReferences() {
-  console.log('Cleaning up orphaned image references...');
+function cleanupOrphanedImageReferences(familyDb, familyName) {
+  console.log(`Cleaning up orphaned image references in ${familyName}...`);
   
   // Clean up image_people entries that reference non-existent images
-  db.run(`DELETE FROM image_people 
+  familyDb.run(`DELETE FROM image_people 
           WHERE image_id NOT IN (SELECT id FROM images)`, function(err) {
     if (err) {
-      console.error('Error cleaning up orphaned image_people entries:', err.message);
+      console.error(`Error cleaning up orphaned image_people entries in ${familyName}:`, err.message);
     } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} orphaned image_people entries`);
+      console.log(`Cleaned up ${this.changes} orphaned image_people entries in ${familyName}`);
     }
   });
   
   // Clean up image_people entries that reference non-existent people/nodes
-  db.run(`DELETE FROM image_people 
+  familyDb.run(`DELETE FROM image_people 
           WHERE person_id NOT IN (SELECT id FROM nodes)`, function(err) {
     if (err) {
-      console.error('Error cleaning up orphaned image_people person references:', err.message);
+      console.error(`Error cleaning up orphaned image_people person references in ${familyName}:`, err.message);
     } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} orphaned image_people person references`);
+      console.log(`Cleaned up ${this.changes} orphaned image_people person references in ${familyName}`);
     }
   });
   
   // Clean up preferred_image_id references in nodes that point to non-existent images
-  db.run(`UPDATE nodes 
+  familyDb.run(`UPDATE nodes 
           SET preferred_image_id = NULL 
           WHERE preferred_image_id IS NOT NULL 
           AND preferred_image_id NOT IN (SELECT id FROM images)`, function(err) {
     if (err) {
-      console.error('Error cleaning up orphaned preferred image references:', err.message);
+      console.error(`Error cleaning up orphaned preferred image references in ${familyName}:`, err.message);
     } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} orphaned preferred image references`);
+      console.log(`Cleaned up ${this.changes} orphaned preferred image references in ${familyName}`);
     }
   });
 }
@@ -393,7 +407,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     // Check if user exists
-    db.get('SELECT * FROM users WHERE family_name = ?', [familyName], async (err, user) => {
+    authDb.get('SELECT * FROM users WHERE family_name = ?', [familyName], async (err, user) => {
       if (err) {
         console.error('Database error during login:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -448,7 +462,7 @@ app.post('/api/auth/register', async (req, res) => {
 
   try {
     // Check if family name already exists
-    db.get('SELECT id FROM users WHERE family_name = ?', [familyName], async (err, existingUser) => {
+    authDb.get('SELECT id FROM users WHERE family_name = ?', [familyName], async (err, existingUser) => {
       if (err) {
         console.error('Database error during registration:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -464,7 +478,7 @@ app.post('/api/auth/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, saltRounds);
 
         // Create user
-        db.run('INSERT INTO users (family_name, password_hash) VALUES (?, ?)', 
+        authDb.run('INSERT INTO users (family_name, password_hash) VALUES (?, ?)', 
           [familyName, passwordHash], 
           function(err) {
             if (err) {
@@ -510,7 +524,7 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Check if family is already registered
 app.get('/api/auth/status', (req, res) => {
-  db.get('SELECT COUNT(*) as count FROM users', [], (err, result) => {
+  authDb.get('SELECT COUNT(*) as count FROM users', [], (err, result) => {
     if (err) {
       console.error('Database error during status check:', err);
       return res.status(500).json({ error: 'Internal server error' });
@@ -621,81 +635,100 @@ io.on('connection', (socket) => {
 // Get all nodes
 app.get('/api/nodes', authenticateToken, (req, res) => {
   const familyId = req.user.id;
-  db.all("SELECT * FROM nodes WHERE family_id = ?", [familyId], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    
-    const nodes = rows.map(row => ({
-      id: row.id,
-      type: row.type,
-      position: { x: row.position_x, y: row.position_y },
-      data: {
-        name: row.name,
-        surname: row.surname,
-        maidenName: row.maiden_name,
-        birthDate: row.birth_date,
-        deathDate: row.death_date,
-        city: row.city,
-        zip: row.zip,
-        country: row.country,
-        phone: row.phone,
-        email: row.email,
-        latitude: row.latitude,
-        longitude: row.longitude,
-        address_hash: row.address_hash,
-        bloodline: Boolean(row.bloodline),
-        preferredImageId: row.preferred_image_id,
-        isSelected: false
+  const familyName = req.user.familyName;
+  
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.all("SELECT * FROM nodes", [], (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      const nodes = rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        position: { x: row.position_x, y: row.position_y },
+        data: {
+          name: row.name,
+          surname: row.surname,
+          maidenName: row.maiden_name,
+          birthDate: row.birth_date,
+          deathDate: row.death_date,
+          city: row.city,
+          zip: row.zip,
+          country: row.country,
+          phone: row.phone,
+          email: row.email,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          address_hash: row.address_hash,
+          bloodline: Boolean(row.bloodline),
+          preferredImageId: row.preferred_image_id,
+          isSelected: false
       }
     }));
     
     res.json(nodes);
-  });
+    });
+  } catch (error) {
+    console.error('Error getting family database:', error);
+    res.status(500).json({ error: 'Failed to get nodes' });
+  }
 });
 
 // Get all edges
 app.get('/api/edges', authenticateToken, (req, res) => {
   const familyId = req.user.id;
-  db.all("SELECT * FROM edges WHERE family_id = ?", [familyId], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    
-    const edges = rows.map(row => ({
-      id: row.id,
-      source: row.source,
-      target: row.target,
-      sourceHandle: row.source_handle,
-      targetHandle: row.target_handle,
-      type: row.type
-    }));
-    
-    res.json(edges);
-  });
+  const familyName = req.user.familyName;
+  
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.all("SELECT * FROM edges", [], (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      const edges = rows.map(row => ({
+        id: row.id,
+        source: row.source,
+        target: row.target,
+        sourceHandle: row.source_handle,
+        targetHandle: row.target_handle,
+        type: row.type
+      }));
+      
+      res.json(edges);
+    });
+  } catch (error) {
+    console.error('Error getting family database:', error);
+    res.status(500).json({ error: 'Failed to get edges' });
+  }
 });
 
 // Create new node
 app.post('/api/nodes', authenticateToken, async (req, res) => {
   const { id, type, position, data } = req.body;
   const familyId = req.user.id;
+  const familyName = req.user.familyName;
   const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   try {
+    const familyDb = getFamilyDb(familyName);
+    
     // Perform smart geocoding for address
     const geocodingResult = await performSmartGeocoding(data);
     
-    db.run(`INSERT INTO nodes (
+    familyDb.run(`INSERT INTO nodes (
       id, type, position_x, position_y, name, surname, maiden_name, birth_date, death_date,
       city, zip, country, phone, email, latitude, longitude, address_hash,
-      bloodline, preferred_image_id, family_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      bloodline, preferred_image_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       id, type, position.x, position.y, data.name, data.surname, data.maidenName,
       data.birthDate, data.deathDate, data.city, data.zip, data.country, data.phone,
       data.email, geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
-      data.bloodline ? 1 : 0, data.preferredImageId || null, familyId
+      data.bloodline ? 1 : 0, data.preferredImageId || null
     ], function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -734,13 +767,16 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { position, data } = req.body;
   const familyId = req.user.id;
+  const familyName = req.user.familyName;
   const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   try {
+    const familyDb = getFamilyDb(familyName);
+    
     // First, get the current node to check if geocoding is needed
     const getCurrentNode = () => {
       return new Promise((resolve, reject) => {
-        db.get('SELECT * FROM nodes WHERE id = ? AND family_id = ?', [id, familyId], (err, row) => {
+        familyDb.get('SELECT * FROM nodes WHERE id = ?', [id], (err, row) => {
           if (err) reject(err);
           else resolve(row);
         });
@@ -756,16 +792,16 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
     // Perform smart geocoding (only if address changed)
     const geocodingResult = await performSmartGeocoding(data, currentNode);
     
-    db.run(`UPDATE nodes SET 
+    familyDb.run(`UPDATE nodes SET 
       position_x = ?, position_y = ?, name = ?, surname = ?, maiden_name = ?, birth_date = ?,
       death_date = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
       latitude = ?, longitude = ?, address_hash = ?,
       bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND family_id = ?`, [
+      WHERE id = ?`, [
       position?.x, position?.y, data.name, data.surname, data.maidenName, data.birthDate,
       data.deathDate, data.city, data.zip, data.country, data.phone, data.email,
       geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
-      data.bloodline ? 1 : 0, data.preferredImageId || null, id, familyId
+      data.bloodline ? 1 : 0, data.preferredImageId || null, id
     ], function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -806,75 +842,88 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
 app.put('/api/nodes/:personId/preferred-image', authenticateToken, (req, res) => {
   const { personId } = req.params;
   const { imageId } = req.body;
-  const familyId = req.user.id;
+  const familyName = req.user.familyName;
   
-  db.run(`UPDATE nodes SET preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP 
-          WHERE id = ? AND family_id = ?`, 
-  [imageId || null, personId, familyId], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Person not found' });
-    }
-    
-    res.json({ success: true, personId, imageId: imageId || null });
-  });
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.run(`UPDATE nodes SET preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?`, 
+    [imageId || null, personId], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Person not found' });
+      }
+      
+      res.json({ success: true, personId, imageId: imageId || null });
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update preferred image' });
+  }
 });
 
 // Delete node
 app.delete('/api/nodes/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
   const familyId = req.user.id;
+  const familyName = req.user.familyName;
   
-  // First check if this family will have any nodes left after deletion
-  db.get("SELECT COUNT(*) as count FROM nodes WHERE family_id = ?", [familyId], (err, result) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const familyDb = getFamilyDb(familyName);
     
-    if (result.count <= 1) {
-      res.status(400).json({ 
-        error: 'Cannot delete the last node in a family tree. At least one person must remain.' 
-      });
-      return;
-    }
-    
-    // First delete all edges connected to this node (within the same family)
-    db.run("DELETE FROM edges WHERE (source = ? OR target = ?) AND family_id = ?", [id, id, familyId], function(err) {
+    // First check if this family will have any nodes left after deletion
+    familyDb.get("SELECT COUNT(*) as count FROM nodes", [], (err, result) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
       
-      // Then delete the node (ensure it belongs to this family)
-      db.run("DELETE FROM nodes WHERE id = ? AND family_id = ?", [id, familyId], function(err) {
+      if (result.count <= 1) {
+        res.status(400).json({ 
+          error: 'Cannot delete the last node in a family tree. At least one person must remain.' 
+        });
+        return;
+      }
+      
+      // First delete all edges connected to this node
+      familyDb.run("DELETE FROM edges WHERE (source = ? OR target = ?)", [id, id], function(err) {
         if (err) {
           res.status(500).json({ error: err.message });
           return;
         }
         
-        if (this.changes === 0) {
-          res.status(404).json({ error: 'Node not found or access denied' });
-          return;
-        }
-        
-        // Broadcast the deletion to other users in the family room
-        req.app.get('io').to(`family-${familyId}`).emit('node:deleted', { id });
-        
-        res.json({ success: true, changes: this.changes });
+        // Then delete the node
+        familyDb.run("DELETE FROM nodes WHERE id = ?", [id], function(err) {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          
+          if (this.changes === 0) {
+            res.status(404).json({ error: 'Node not found or access denied' });
+            return;
+          }
+          
+          // Broadcast the deletion to other users in the family room
+          req.app.get('io').to(`family-${familyId}`).emit('node:deleted', { id });
+          
+          res.json({ success: true, changes: this.changes });
+        });
       });
     });
-  });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete node' });
+  }
 });
 
 // Create new edge
 app.post('/api/edges', authenticateToken, (req, res) => {
   const { id, source, target, sourceHandle, targetHandle, type } = req.body;
   const familyId = req.user.id;
+  const familyName = req.user.familyName;
   const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   // Basic validation
@@ -883,56 +932,69 @@ app.post('/api/edges', authenticateToken, (req, res) => {
     return;
   }
   
-  // Create edge normally without partner validation
-  db.run(`INSERT INTO edges (id, source, target, source_handle, target_handle, type, family_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`, [id, source, target, sourceHandle, targetHandle, type, familyId], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const familyDb = getFamilyDb(familyName);
     
-    // Create the full edge object for broadcasting
-    const newEdge = {
-      id, source, target, sourceHandle, targetHandle, type,
-      data: req.body.data || {}
-    };
-    
-    // Broadcast to other users in the family room (exclude the sender)
-    const ioInstance = req.app.get('io');
-    if (socketId) {
-      // Exclude the sender from receiving this event
-      ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:created', newEdge);
-    } else {
-      // Fallback: broadcast to all (for backwards compatibility)
-      ioInstance.to(`family-${familyId}`).emit('edge:created', newEdge);
-    }
-    
-    res.json({ success: true, edgeId: id });
-  });
+    // Create edge normally without partner validation
+    familyDb.run(`INSERT INTO edges (id, source, target, source_handle, target_handle, type)
+      VALUES (?, ?, ?, ?, ?, ?)`, [id, source, target, sourceHandle, targetHandle, type], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // Create the full edge object for broadcasting
+      const newEdge = {
+        id, source, target, sourceHandle, targetHandle, type,
+        data: req.body.data || {}
+      };
+      
+      // Broadcast to other users in the family room (exclude the sender)
+      const ioInstance = req.app.get('io');
+      if (socketId) {
+        // Exclude the sender from receiving this event
+        ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:created', newEdge);
+      } else {
+        // Fallback: broadcast to all (for backwards compatibility)
+        ioInstance.to(`family-${familyId}`).emit('edge:created', newEdge);
+      }
+      
+      res.json({ success: true, edgeId: id });
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create edge' });
+  }
 });
 
 // Delete edge
 app.delete('/api/edges/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
   const familyId = req.user.id;
+  const familyName = req.user.familyName;
   
-  db.run("DELETE FROM edges WHERE id = ? AND family_id = ?", [id, familyId], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    
-    // Broadcast the deletion to other users in the family room
-    req.app.get('io').to(`family-${familyId}`).emit('edge:deleted', { id });
-    
-    res.json({ success: true, changes: this.changes });
-  });
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.run("DELETE FROM edges WHERE id = ?", [id], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // Broadcast the deletion to other users in the family room
+      req.app.get('io').to(`family-${familyId}`).emit('edge:deleted', { id });
+      
+      res.json({ success: true, changes: this.changes });
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete edge' });
+  }
 });
 
 // Update edge
 app.put('/api/edges/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
   const familyId = req.user.id;
+  const familyName = req.user.familyName;
   const socketId = req.headers['x-socket-id'];
   const { type, source, target, sourceHandle, targetHandle } = req.body;
   
@@ -965,269 +1027,299 @@ app.put('/api/edges/:id', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'No fields to update' });
   }
   
-  // Add WHERE clause values
-  values.push(id, familyId);
-  
-  const sql = `UPDATE edges SET ${updates.join(', ')} WHERE id = ? AND family_id = ?`;
-  
-  db.run(sql, values, function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+  try {
+    const familyDb = getFamilyDb(familyName);
     
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Edge not found' });
-    }
+    // Add WHERE clause values
+    values.push(id);
     
-    // Fetch the updated edge to broadcast
-    db.get('SELECT * FROM edges WHERE id = ? AND family_id = ?', [id, familyId], (err, edge) => {
+    const sql = `UPDATE edges SET ${updates.join(', ')} WHERE id = ?`;
+    
+    familyDb.run(sql, values, function(err) {
       if (err) {
-        return res.status(500).json({ error: err.message });
+        res.status(500).json({ error: err.message });
+        return;
       }
       
-      // Create the full edge object for broadcasting
-      const updatedEdge = {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.source_handle,
-        targetHandle: edge.target_handle,
-        type: edge.type,
-        data: req.body.data || {}
-      };
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Edge not found' });
+      }
       
-      // Broadcast to other users in the family room (exclude the sender)
-      const ioInstance = req.app.get('io');
-      if (socketId) {
-        ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:updated', updatedEdge);
+      // Fetch the updated edge to broadcast
+      familyDb.get('SELECT * FROM edges WHERE id = ?', [id], (err, edge) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        
+        // Create the full edge object for broadcasting
+        const updatedEdge = {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.source_handle,
+          targetHandle: edge.target_handle,
+          type: edge.type,
+          data: req.body.data || {}
+        };
+        
+        // Broadcast to other users in the family room (exclude the sender)
+        const ioInstance = req.app.get('io');
+        if (socketId) {
+          ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:updated', updatedEdge);
       } else {
         ioInstance.to(`family-${familyId}`).emit('edge:updated', updatedEdge);
       }
       
       res.json({ success: true, edge: updatedEdge });
+      });
     });
-  });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update edge' });
+  }
 });
 
-// Reset database (clear all data)
-app.post('/api/reset', (req, res) => {
-  db.serialize(() => {
-    // Clear all existing data
-    db.run("DELETE FROM edges", (err) => {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-    });
-    
-    db.run("DELETE FROM nodes", (err) => {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
+// Reset database (clear all data for the authenticated user's family)
+app.post('/api/reset', authenticateToken, (req, res) => {
+  const familyName = req.user.familyName;
+  const familyDb = getFamilyDb(familyName);
+
+  try {
+    familyDb.serialize(() => {
+      // Clear all existing data in this family's database
+      familyDb.run("DELETE FROM edges", (err) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+      });
       
-      res.json({ success: true, message: "Database reset successfully" });
+      familyDb.run("DELETE FROM nodes", (err) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        res.json({ success: true, message: "Database reset successfully" });
+      });
     });
-  });
+  } catch (error) {
+    console.error('Error resetting database:', error);
+    res.status(500).json({ error: 'Failed to reset database' });
+  }
 });
 
 // Manual cleanup endpoint
-app.post('/api/cleanup', (req, res) => {
-  let totalNullCleaned = 0;
-  let totalSelfLoopsCleaned = 0;
-  let totalDuplicatesCleaned = 0;
-  let totalOrphanedImagesCleaned = 0;
-  let operations = 0;
-  const maxOperations = 7; // Increased to include orphaned image cleanup
-  
-  function checkComplete() {
-    operations++;
-    if (operations === maxOperations) {
-      res.json({ 
-        success: true, 
-        message: `Cleanup completed. Removed ${totalNullCleaned} items with null keys, ${totalSelfLoopsCleaned} self-loop edges, ${totalDuplicatesCleaned} duplicate edges, and ${totalOrphanedImagesCleaned} orphaned image references.`,
-        nullItemsRemoved: totalNullCleaned,
-        selfLoopEdgesRemoved: totalSelfLoopsCleaned,
-        duplicateEdgesRemoved: totalDuplicatesCleaned,
-        orphanedImageReferencesRemoved: totalOrphanedImagesCleaned
-      });
-    }
-  }
-  
-  // Remove nodes with null id
-  db.run("DELETE FROM nodes WHERE id IS NULL", function(err) {
-    if (err) {
-      res.status(500).json({ error: 'Error cleaning nodes: ' + err.message });
-      return;
-    }
-    totalNullCleaned += this.changes;
-    checkComplete();
-  });
-  
-  // Remove edges with null id
-  db.run("DELETE FROM edges WHERE id IS NULL", function(err) {
-    if (err) {
-      res.status(500).json({ error: 'Error cleaning edges: ' + err.message });
-      return;
-    }
-    totalNullCleaned += this.changes;
-    checkComplete();
-  });
-  
-  // Remove edges with null source or target references
-  db.run("DELETE FROM edges WHERE source IS NULL OR target IS NULL", function(err) {
-    if (err) {
-      res.status(500).json({ error: 'Error cleaning edge references: ' + err.message });
-      return;
-    }
-    totalNullCleaned += this.changes;
-    checkComplete();
-  });
+app.post('/api/cleanup', authenticateToken, (req, res) => {
+  const familyName = req.user.familyName;
+  const familyDb = getFamilyDb(familyName);
 
-  // Remove self-loop edges (edges that connect a node with itself)
-  db.run("DELETE FROM edges WHERE source = target", function(err) {
-    if (err) {
-      res.status(500).json({ error: 'Error cleaning self-loop edges: ' + err.message });
-      return;
-    }
-    totalSelfLoopsCleaned = this.changes;
-    checkComplete();
-  });
-
-  // Clean up orphaned image_people entries
-  db.run(`DELETE FROM image_people WHERE image_id NOT IN (SELECT id FROM images)`, function(err) {
-    if (err) {
-      res.status(500).json({ error: 'Error cleaning orphaned image_people: ' + err.message });
-      return;
-    }
-    totalOrphanedImagesCleaned += this.changes;
-    checkComplete();
-  });
-
-  // Clean up image_people entries that reference non-existent people/nodes
-  db.run(`DELETE FROM image_people WHERE person_id NOT IN (SELECT id FROM nodes)`, function(err) {
-    if (err) {
-      res.status(500).json({ error: 'Error cleaning orphaned image_people person references: ' + err.message });
-      return;
-    }
-    totalOrphanedImagesCleaned += this.changes;
-    checkComplete();
-  });
-
-  // Clean up orphaned preferred image references
-  db.run(`UPDATE nodes SET preferred_image_id = NULL 
-          WHERE preferred_image_id IS NOT NULL 
-          AND preferred_image_id NOT IN (SELECT id FROM images)`, function(err) {
-    if (err) {
-      res.status(500).json({ error: 'Error cleaning orphaned preferred images: ' + err.message });
-      return;
-    }
-    totalOrphanedImagesCleaned += this.changes;
-    checkComplete();
-  });
-
-  // Clean up duplicate edges
-  const duplicateQuery = `
-    WITH EdgePairs AS (
-      SELECT 
-        e1.id as id1,
-        e2.id as id2,
-        e1.source as source1,
-        e1.target as target1,
-        e2.source as source2,
-        e2.target as target2,
-        e1.type as type1,
-        e2.type as type2,
-        CASE e1.type 
-          WHEN 'bloodline' THEN 1
-          WHEN 'bloodlinehidden' THEN 2  
-          WHEN 'bloodlinefake' THEN 3
-          WHEN 'partner' THEN 4
-          ELSE 5
-        END as priority1,
-        CASE e2.type 
-          WHEN 'bloodline' THEN 1
-          WHEN 'bloodlinehidden' THEN 2
-          WHEN 'bloodlinefake' THEN 3  
-          WHEN 'partner' THEN 4
-          ELSE 5
-        END as priority2
-      FROM edges e1
-      JOIN edges e2 ON e1.id < e2.id
-      WHERE (
-        -- Only consider edges duplicates if they have same endpoints AND same type
-        (e1.source = e2.source AND e1.target = e2.target AND e1.type = e2.type) OR
-        (e1.source = e2.target AND e1.target = e2.source AND e1.type = e2.type)
-      )
-    )
-    SELECT 
-      CASE 
-        WHEN priority1 <= priority2 THEN id2
-        ELSE id1 
-      END as id_to_delete
-    FROM EdgePairs
-  `;
-  
-  db.all(duplicateQuery, (err, duplicateEdges) => {
-    if (err) {
-      res.status(500).json({ error: 'Error finding duplicate edges: ' + err.message });
-      return;
+  try {
+    let totalNullCleaned = 0;
+    let totalSelfLoopsCleaned = 0;
+    let totalDuplicatesCleaned = 0;
+    let totalOrphanedImagesCleaned = 0;
+    let operations = 0;
+    const maxOperations = 7; // Increased to include orphaned image cleanup
+    
+    function checkComplete() {
+      operations++;
+      if (operations === maxOperations) {
+        res.json({ 
+          success: true, 
+          message: `Cleanup completed. Removed ${totalNullCleaned} items with null keys, ${totalSelfLoopsCleaned} self-loop edges, ${totalDuplicatesCleaned} duplicate edges, and ${totalOrphanedImagesCleaned} orphaned image references.`,
+          nullItemsRemoved: totalNullCleaned,
+          selfLoopEdgesRemoved: totalSelfLoopsCleaned,
+          duplicateEdgesRemoved: totalDuplicatesCleaned,
+          orphanedImageReferencesRemoved: totalOrphanedImagesCleaned
+        });
+      }
     }
     
-    if (duplicateEdges.length === 0) {
-      checkComplete();
-      return;
-    }
-    
-    // Delete the lower priority duplicate edges
-    const idsToDelete = duplicateEdges.map(edge => edge.id_to_delete);
-    const placeholders = idsToDelete.map(() => '?').join(',');
-    
-    db.run(`DELETE FROM edges WHERE id IN (${placeholders})`, idsToDelete, function(err) {
+    // Remove nodes with null id
+    familyDb.run("DELETE FROM nodes WHERE id IS NULL", function(err) {
       if (err) {
-        res.status(500).json({ error: 'Error deleting duplicate edges: ' + err.message });
+        res.status(500).json({ error: 'Error cleaning nodes: ' + err.message });
         return;
       }
-      totalDuplicatesCleaned = this.changes;
+      totalNullCleaned += this.changes;
       checkComplete();
     });
-  });
+    
+    // Remove edges with null id
+    familyDb.run("DELETE FROM edges WHERE id IS NULL", function(err) {
+      if (err) {
+        res.status(500).json({ error: 'Error cleaning edges: ' + err.message });
+        return;
+      }
+      totalNullCleaned += this.changes;
+      checkComplete();
+    });
+    
+    // Remove edges with null source or target references
+    familyDb.run("DELETE FROM edges WHERE source IS NULL OR target IS NULL", function(err) {
+      if (err) {
+        res.status(500).json({ error: 'Error cleaning edge references: ' + err.message });
+        return;
+      }
+      totalNullCleaned += this.changes;
+      checkComplete();
+    });
+
+    // Remove self-loop edges (edges that connect a node with itself)
+    familyDb.run("DELETE FROM edges WHERE source = target", function(err) {
+      if (err) {
+        res.status(500).json({ error: 'Error cleaning self-loop edges: ' + err.message });
+        return;
+      }
+      totalSelfLoopsCleaned = this.changes;
+      checkComplete();
+    });
+
+    // Clean up orphaned image_people entries
+    familyDb.run(`DELETE FROM image_people WHERE image_id NOT IN (SELECT id FROM images)`, function(err) {
+      if (err) {
+        res.status(500).json({ error: 'Error cleaning orphaned image_people: ' + err.message });
+        return;
+      }
+      totalOrphanedImagesCleaned += this.changes;
+      checkComplete();
+    });
+
+    // Clean up image_people entries that reference non-existent people/nodes
+    familyDb.run(`DELETE FROM image_people WHERE person_id NOT IN (SELECT id FROM nodes)`, function(err) {
+      if (err) {
+        res.status(500).json({ error: 'Error cleaning orphaned image_people person references: ' + err.message });
+        return;
+      }
+      totalOrphanedImagesCleaned += this.changes;
+      checkComplete();
+    });
+
+    // Clean up orphaned preferred image references
+    familyDb.run(`UPDATE nodes SET preferred_image_id = NULL 
+            WHERE preferred_image_id IS NOT NULL 
+            AND preferred_image_id NOT IN (SELECT id FROM images)`, function(err) {
+      if (err) {
+        res.status(500).json({ error: 'Error cleaning orphaned preferred images: ' + err.message });
+        return;
+      }
+      totalOrphanedImagesCleaned += this.changes;
+      checkComplete();
+    });
+
+    // Clean up duplicate edges
+    const duplicateQuery = `
+      WITH EdgePairs AS (
+        SELECT 
+          e1.id as id1,
+          e2.id as id2,
+          e1.source as source1,
+          e1.target as target1,
+          e2.source as source2,
+          e2.target as target2,
+          e1.type as type1,
+          e2.type as type2,
+          CASE e1.type 
+            WHEN 'bloodline' THEN 1
+            WHEN 'bloodlinehidden' THEN 2  
+            WHEN 'bloodlinefake' THEN 3
+            WHEN 'partner' THEN 4
+            ELSE 5
+          END as priority1,
+          CASE e2.type 
+            WHEN 'bloodline' THEN 1
+            WHEN 'bloodlinehidden' THEN 2
+            WHEN 'bloodlinefake' THEN 3  
+            WHEN 'partner' THEN 4
+            ELSE 5
+          END as priority2
+        FROM edges e1
+        JOIN edges e2 ON e1.id < e2.id
+        WHERE (
+          -- Only consider edges duplicates if they have same endpoints AND same type
+          (e1.source = e2.source AND e1.target = e2.target AND e1.type = e2.type) OR
+          (e1.source = e2.target AND e1.target = e2.source AND e1.type = e2.type)
+        )
+      )
+      SELECT 
+        CASE 
+          WHEN priority1 <= priority2 THEN id2
+          ELSE id1 
+        END as id_to_delete
+      FROM EdgePairs
+    `;
+    
+    familyDb.all(duplicateQuery, (err, duplicateEdges) => {
+      if (err) {
+        res.status(500).json({ error: 'Error finding duplicate edges: ' + err.message });
+        return;
+      }
+      
+      if (duplicateEdges.length === 0) {
+        checkComplete();
+        return;
+      }
+      
+      // Delete the lower priority duplicate edges
+      const idsToDelete = duplicateEdges.map(edge => edge.id_to_delete);
+      const placeholders = idsToDelete.map(() => '?').join(',');
+      
+      familyDb.run(`DELETE FROM edges WHERE id IN (${placeholders})`, idsToDelete, function(err) {
+        if (err) {
+          res.status(500).json({ error: 'Error deleting duplicate edges: ' + err.message });
+          return;
+        }
+        totalDuplicatesCleaned = this.changes;
+        checkComplete();
+      });
+    });
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+    res.status(500).json({ error: 'Failed to complete cleanup' });
+  }
 });
 
 // Test endpoint to create self-loop edges for testing cleanup (development only)
-app.post('/api/test/create-self-loops', (req, res) => {
-  // This endpoint is for testing the self-loop cleanup functionality
-  const testEdges = [
-    { id: 'self-loop-1', source: 'node1', target: 'node1', type: 'bloodline' },
-    { id: 'self-loop-2', source: 'node2', target: 'node2', type: 'partner' },
-    { id: 'self-loop-3', source: 'node3', target: 'node3', type: 'bloodlinehidden' },
-    { id: 'normal-edge', source: 'node1', target: 'node2', type: 'bloodline' }, // Normal edge should remain
-  ];
-  
-  let insertCount = 0;
-  const totalInserts = testEdges.length;
-  
-  testEdges.forEach(edge => {
-    db.run(
-      "INSERT OR REPLACE INTO edges (id, source, target, type) VALUES (?, ?, ?, ?)",
-      [edge.id, edge.source, edge.target, edge.type],
-      function(err) {
-        if (err) {
-          console.error('Error inserting test edge:', err.message);
-        } else {
-          insertCount++;
-          if (insertCount === totalInserts) {
-            res.json({ 
-              success: true, 
-              message: `Created ${totalInserts} test edges including self-loops`,
-              testEdges: testEdges
-            });
+app.post('/api/test/create-self-loops', authenticateToken, (req, res) => {
+  const familyName = req.user.familyName;
+  const familyDb = getFamilyDb(familyName);
+
+  try {
+    // This endpoint is for testing the self-loop cleanup functionality
+    const testEdges = [
+      { id: 'self-loop-1', source: 'node1', target: 'node1', type: 'bloodline' },
+      { id: 'self-loop-2', source: 'node2', target: 'node2', type: 'partner' },
+      { id: 'self-loop-3', source: 'node3', target: 'node3', type: 'bloodlinehidden' },
+      { id: 'normal-edge', source: 'node1', target: 'node2', type: 'bloodline' }, // Normal edge should remain
+    ];
+    
+    let insertCount = 0;
+    const totalInserts = testEdges.length;
+    
+    testEdges.forEach(edge => {
+      familyDb.run(
+        "INSERT OR REPLACE INTO edges (id, source, target, type) VALUES (?, ?, ?, ?)",
+        [edge.id, edge.source, edge.target, edge.type],
+        function(err) {
+          if (err) {
+            console.error('Error inserting test edge:', err.message);
+          } else {
+            insertCount++;
+            if (insertCount === totalInserts) {
+              res.json({ 
+                success: true, 
+                message: `Created ${totalInserts} test edges including self-loops`,
+                testEdges: testEdges
+              });
+            }
           }
         }
-      }
-    );
-  });
+      );
+    });
+  } catch (error) {
+    console.error('Error creating test edges:', error);
+    res.status(500).json({ error: 'Failed to create test edges' });
+  }
 });
 
 // ============= GEOCODING ENDPOINTS =============
@@ -1281,6 +1373,9 @@ app.post('/api/geocode', async (req, res) => {
 
 // Upload image
 app.post('/api/images/upload', authenticateToken, (req, res) => {
+  const familyId = req.user.id;
+  const familyName = req.user.familyName;
+  
   // Use multer upload middleware with error handling
   upload.single('image')(req, res, function(err) {
     // Handle multer errors
@@ -1330,388 +1425,443 @@ app.post('/api/images/upload', authenticateToken, (req, res) => {
       });
     }
 
-    const imageId = uuidv4();
-    const familyId = req.user.id;
-    const imageData = {
-      id: imageId,
-      filename: req.file.key.split('/').pop(), // Extract filename from S3 key
-      original_filename: req.file.originalname,
-      s3_key: req.file.key,
-      s3_url: req.file.location,
-      description: req.body.description || '',
-      file_size: req.file.size,
-      mime_type: req.file.mimetype,
-      uploaded_by: req.body.uploaded_by || 'anonymous',
-      family_id: familyId
-    };
+    try {
+      const familyDb = getFamilyDb(familyName);
+      const imageId = uuidv4();
+      const imageData = {
+        id: imageId,
+        filename: req.file.key.split('/').pop(), // Extract filename from S3 key
+        original_filename: req.file.originalname,
+        s3_key: req.file.key,
+        s3_url: req.file.location,
+        description: req.body.description || '',
+        file_size: req.file.size,
+        mime_type: req.file.mimetype,
+        uploaded_by: req.body.uploaded_by || 'anonymous'
+      };
 
-    db.run(`INSERT INTO images (
-      id, filename, original_filename, s3_key, s3_url, description, 
-      file_size, mime_type, uploaded_by, family_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-      imageData.id,
-      imageData.filename,
-      imageData.original_filename,
-      imageData.s3_key,
-      imageData.s3_url,
-      imageData.description,
-      imageData.file_size,
-      imageData.mime_type,
-      imageData.uploaded_by,
-      imageData.family_id
-    ], function(err) {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ 
-          error: `Database error: ${err.message}`,
-          code: 'DATABASE_ERROR'
+      familyDb.run(`INSERT INTO images (
+        id, filename, original_filename, s3_key, s3_url, description, 
+        file_size, mime_type, uploaded_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        imageData.id,
+        imageData.filename,
+        imageData.original_filename,
+        imageData.s3_key,
+        imageData.s3_url,
+        imageData.description,
+        imageData.file_size,
+        imageData.mime_type,
+        imageData.uploaded_by
+      ], function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ 
+            error: `Database error: ${err.message}`,
+            code: 'DATABASE_ERROR'
+          });
+        }
+
+        res.json({
+          success: true,
+          image: imageData
         });
-      }
-
-      res.json({
-        success: true,
-        image: imageData
       });
-    });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      res.status(500).json({ error: 'Failed to upload image' });
+    }
   });
 });
 
 // Get all images
 app.get('/api/images', authenticateToken, (req, res) => {
-  const familyId = req.user.id;
-  db.all(`SELECT i.*, 
-    json_group_array(
-      CASE 
-        WHEN ip.person_id IS NOT NULL THEN 
-          json_object(
-            'person_id', ip.person_id,
-            'person_name', COALESCE(n.name, ''),
-            'person_surname', COALESCE(n.surname, ''),
-            'position_x', ip.position_x,
-            'position_y', ip.position_y,
-            'width', ip.width,
-            'height', ip.height
-          )
-        ELSE NULL
-      END
-    ) as people
-    FROM images i
-    LEFT JOIN image_people ip ON i.id = ip.image_id AND ip.family_id = ?
-    LEFT JOIN nodes n ON ip.person_id = n.id AND n.family_id = ?
-    WHERE i.family_id = ?
-    GROUP BY i.id
-    ORDER BY i.created_at DESC`, 
-  [familyId, familyId, familyId], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-
-    const images = rows.map(row => {
-      let people = [];
-      if (row.people) {
-        try {
-          // Parse the JSON array
-          const parsedPeople = JSON.parse(row.people);
-          // Filter out null values and convert to camelCase
-          people = parsedPeople.filter(p => p !== null).map(p => ({
-            personId: p.person_id,
-            personName: p.person_name,
-            personSurname: p.person_surname,
-            positionX: p.position_x,
-            positionY: p.position_y,
-            width: p.width,
-            height: p.height
-          }));
-        } catch (e) {
-          console.error('Error parsing people JSON:', e);
-          people = [];
-        }
+  const familyName = req.user.familyName;
+  
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.all(`SELECT i.*, 
+      json_group_array(
+        CASE 
+          WHEN ip.person_id IS NOT NULL THEN 
+            json_object(
+              'person_id', ip.person_id,
+              'person_name', COALESCE(n.name, ''),
+              'person_surname', COALESCE(n.surname, ''),
+              'position_x', ip.position_x,
+              'position_y', ip.position_y,
+              'width', ip.width,
+              'height', ip.height
+            )
+          ELSE NULL
+        END
+      ) as people
+      FROM images i
+      LEFT JOIN image_people ip ON i.id = ip.image_id
+      LEFT JOIN nodes n ON ip.person_id = n.id
+      GROUP BY i.id
+      ORDER BY i.created_at DESC`, 
+    [], (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
       }
 
-      return {
-        id: row.id,
-        filename: row.filename,
-        originalFilename: row.original_filename,
-        s3Key: row.s3_key,
-        s3Url: row.s3_url,
-        description: row.description,
-        uploadDate: row.upload_date,
-        fileSize: row.file_size,
-        mimeType: row.mime_type,
-        uploadedBy: row.uploaded_by,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        people: people
-      };
-    });
+      const images = rows.map(row => {
+        let people = [];
+        if (row.people) {
+          try {
+            // Parse the JSON array
+            const parsedPeople = JSON.parse(row.people);
+            // Filter out null values and convert to camelCase
+            people = parsedPeople.filter(p => p !== null).map(p => ({
+              personId: p.person_id,
+              personName: p.person_name,
+              personSurname: p.person_surname,
+              positionX: p.position_x,
+              positionY: p.position_y,
+              width: p.width,
+              height: p.height
+            }));
+          } catch (e) {
+            console.error('Error parsing people JSON:', e);
+            people = [];
+          }
+        }
 
-    res.json(images);
-  });
+        return {
+          id: row.id,
+          filename: row.filename,
+          originalFilename: row.original_filename,
+          s3Key: row.s3_key,
+          s3Url: row.s3_url,
+          description: row.description,
+          uploadDate: row.upload_date,
+          fileSize: row.file_size,
+          mimeType: row.mime_type,
+          uploadedBy: row.uploaded_by,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          people: people
+        };
+      });
+
+      res.json(images);
+    });
+  } catch (error) {
+    console.error('Error getting images:', error);
+    res.status(500).json({ error: 'Failed to get images' });
+  }
 });
 
 // Get specific image with people
 app.get('/api/images/:id', authenticateToken, (req, res) => {
   const imageId = req.params.id;
-  const familyId = req.user.id;
+  const familyName = req.user.familyName;
   
-  db.get(`SELECT * FROM images WHERE id = ? AND family_id = ?`, [imageId, familyId], (err, imageRow) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    
-    if (!imageRow) {
-      return res.status(404).json({ error: 'Image not found' });
-    }
-
-    // Get associated people
-    db.all(`SELECT ip.*, n.name, n.surname 
-            FROM image_people ip 
-            JOIN nodes n ON ip.person_id = n.id 
-            WHERE ip.image_id = ? AND ip.family_id = ? AND n.family_id = ?`, 
-    [imageId, familyId, familyId], (err, peopleRows) => {
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.get(`SELECT * FROM images WHERE id = ?`, [imageId], (err, imageRow) => {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
+      
+      if (!imageRow) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
 
-      const image = {
-        id: imageRow.id,
-        filename: imageRow.filename,
-        originalFilename: imageRow.original_filename,
-        s3Key: imageRow.s3_key,
-        s3Url: imageRow.s3_url,
-        description: imageRow.description,
-        uploadDate: imageRow.upload_date,
-        fileSize: imageRow.file_size,
-        mimeType: imageRow.mime_type,
-        uploadedBy: imageRow.uploaded_by,
-        createdAt: imageRow.created_at,
-        updatedAt: imageRow.updated_at,
-        people: peopleRows.map(row => ({
-          id: row.id,
-          personId: row.person_id,
-          personName: row.name,
-          personSurname: row.surname,
-          positionX: row.position_x,
-          positionY: row.position_y,
-          width: row.width,
-          height: row.height,
-          createdAt: row.created_at
-        }))
-      };
+      // Get associated people
+      familyDb.all(`SELECT ip.*, n.name, n.surname 
+              FROM image_people ip 
+              JOIN nodes n ON ip.person_id = n.id 
+              WHERE ip.image_id = ?`, 
+      [imageId], (err, peopleRows) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
 
-      res.json(image);
+        const image = {
+          id: imageRow.id,
+          filename: imageRow.filename,
+          originalFilename: imageRow.original_filename,
+          s3Key: imageRow.s3_key,
+          s3Url: imageRow.s3_url,
+          description: imageRow.description,
+          uploadDate: imageRow.upload_date,
+          fileSize: imageRow.file_size,
+          mimeType: imageRow.mime_type,
+          uploadedBy: imageRow.uploaded_by,
+          createdAt: imageRow.created_at,
+          updatedAt: imageRow.updated_at,
+          people: peopleRows.map(row => ({
+            id: row.id,
+            personId: row.person_id,
+            personName: row.name,
+            personSurname: row.surname,
+            positionX: row.position_x,
+            positionY: row.position_y,
+            width: row.width,
+            height: row.height,
+            createdAt: row.created_at
+          }))
+        };
+
+        res.json(image);
+      });
     });
-  });
+  } catch (error) {
+    console.error('Error getting image:', error);
+    res.status(500).json({ error: 'Failed to get image' });
+  }
 });
 
 // Add person to image (tag person in image)
 app.post('/api/images/:imageId/people', authenticateToken, (req, res) => {
   const { imageId } = req.params;
   const { personId, positionX, positionY, width, height } = req.body;
-  const familyId = req.user.id;
+  const familyName = req.user.familyName;
 
   if (!personId) {
     return res.status(400).json({ error: 'Person ID is required' });
   }
 
-  db.run(`INSERT INTO image_people (image_id, person_id, position_x, position_y, width, height, family_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`, 
-  [imageId, personId, positionX, positionY, width, height, familyId], function(err) {
-    if (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
-        return res.status(400).json({ error: 'Person is already tagged in this image' });
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.run(`INSERT INTO image_people (image_id, person_id, position_x, position_y, width, height)
+            VALUES (?, ?, ?, ?, ?, ?)`, 
+    [imageId, personId, positionX, positionY, width, height], function(err) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({ error: 'Person is already tagged in this image' });
+        }
+        return res.status(500).json({ error: err.message });
       }
-      return res.status(500).json({ error: err.message });
-    }
 
-    res.json({
-      success: true,
-      id: this.lastID,
-      imageId,
-      personId,
-      positionX,
-      positionY,
-      width,
-      height
+      res.json({
+        success: true,
+        id: this.lastID,
+        imageId,
+        personId,
+        positionX,
+        positionY,
+        width,
+        height
+      });
     });
-  });
+  } catch (error) {
+    console.error('Error adding person to image:', error);
+    res.status(500).json({ error: 'Failed to add person to image' });
+  }
 });
 
 // Remove person from image
 app.delete('/api/images/:imageId/people/:personId', authenticateToken, (req, res) => {
   const { imageId, personId } = req.params;
-  const familyId = req.user.id;
+  const familyName = req.user.familyName;
 
-  db.run(`DELETE FROM image_people WHERE image_id = ? AND person_id = ? AND family_id = ?`, 
-  [imageId, personId, familyId], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.run(`DELETE FROM image_people WHERE image_id = ? AND person_id = ?`, 
+    [imageId, personId], function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
 
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Person tag not found in image' });
-    }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Person tag not found in image' });
+      }
 
-    res.json({ success: true, message: 'Person removed from image' });
-  });
+      res.json({ success: true, message: 'Person removed from image' });
+    });
+  } catch (error) {
+    console.error('Error removing person from image:', error);
+    res.status(500).json({ error: 'Failed to remove person from image' });
+  }
 });
 
 // Update person position in image
-app.put('/api/images/:imageId/people/:personId', (req, res) => {
+app.put('/api/images/:imageId/people/:personId', authenticateToken, (req, res) => {
   const { imageId, personId } = req.params;
   const { positionX, positionY, width, height } = req.body;
+  const familyName = req.user.familyName;
 
-  db.run(`UPDATE image_people 
-          SET position_x = ?, position_y = ?, width = ?, height = ?
-          WHERE image_id = ? AND person_id = ?`, 
-  [positionX, positionY, width, height, imageId, personId], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.run(`UPDATE image_people 
+            SET position_x = ?, position_y = ?, width = ?, height = ?
+            WHERE image_id = ? AND person_id = ?`, 
+    [positionX, positionY, width, height, imageId, personId], function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
 
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Person tag not found in image' });
-    }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Person tag not found in image' });
+      }
 
-    res.json({
-      success: true,
-      imageId,
-      personId,
-      positionX,
-      positionY,
-      width,
-      height
+      res.json({
+        success: true,
+        imageId,
+        personId,
+        positionX,
+        positionY,
+        width,
+        height
+      });
     });
-  });
+  } catch (error) {
+    console.error('Error updating person position:', error);
+    res.status(500).json({ error: 'Failed to update person position' });
+  }
 });
 
 // Update image description
-app.put('/api/images/:id', (req, res) => {
+app.put('/api/images/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
   const { description } = req.body;
+  const familyName = req.user.familyName;
 
-  db.run(`UPDATE images SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, 
-  [description, id], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+  try {
+    const familyDb = getFamilyDb(familyName);
+    familyDb.run(`UPDATE images SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, 
+    [description, id], function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
 
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Image not found' });
-    }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
 
-    res.json({ success: true, message: 'Image description updated' });
-  });
+      res.json({ success: true, message: 'Image description updated' });
+    });
+  } catch (error) {
+    console.error('Error updating image description:', error);
+    res.status(500).json({ error: 'Failed to update image description' });
+  }
 });
 
 // Delete image (also removes from S3)
-app.delete('/api/images/:id', (req, res) => {
+app.delete('/api/images/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
+  const familyName = req.user.familyName;
 
-  // First get the image to get S3 key
-  db.get(`SELECT s3_key FROM images WHERE id = ?`, [id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-
-    if (!row) {
-      return res.status(404).json({ error: 'Image not found' });
-    }
-
-    // Delete from S3
-    const deleteParams = {
-      Bucket: S3_BUCKET_NAME,
-      Key: row.s3_key
-    };
-
-    s3.deleteObject(deleteParams, (s3Err, data) => {
-      if (s3Err) {
-        console.error('S3 deletion error:', s3Err);
-        // Continue with database deletion even if S3 deletion fails
+  try {
+    const familyDb = getFamilyDb(familyName);
+    
+    // First get the image to get S3 key
+    familyDb.get(`SELECT s3_key FROM images WHERE id = ?`, [id], (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
       }
 
-      // Delete from database (this will cascade delete image_people records)
-      db.run(`DELETE FROM images WHERE id = ?`, [id], function(dbErr) {
-        if (dbErr) {
-          return res.status(500).json({ error: dbErr.message });
+      if (!row) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
+
+      // Delete from S3
+      const deleteParams = {
+        Bucket: S3_BUCKET_NAME,
+        Key: row.s3_key
+      };
+
+      s3.deleteObject(deleteParams, (s3Err, data) => {
+        if (s3Err) {
+          console.error('S3 deletion error:', s3Err);
+          // Continue with database deletion even if S3 deletion fails
         }
 
-        if (this.changes === 0) {
+        // Delete from database (this will cascade delete image_people records)
+        familyDb.run(`DELETE FROM images WHERE id = ?`, [id], function(dbErr) {
+          if (dbErr) {
+            return res.status(500).json({ error: dbErr.message });
+          }
+
+          if (this.changes === 0) {
           return res.status(404).json({ error: 'Image not found' });
         }
 
-        res.json({ 
-          success: true, 
-          message: 'Image deleted successfully',
-          s3Deleted: !s3Err
+          res.json({ 
+            success: true, 
+            message: 'Image deleted successfully',
+            s3Deleted: !s3Err
+          });
         });
       });
     });
-  });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({ error: 'Failed to delete image' });
+  }
 });
 
 // Fetch images for a specific person
 app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
   const { personId } = req.params;
-  const familyId = req.user.id;
+  const familyName = req.user.familyName;
+  const familyDb = getFamilyDb(familyName);
 
-  const query = `
-    SELECT i.id, i.s3_url, i.description, i.original_filename, i.created_at
-    FROM images i
-    INNER JOIN image_people ip ON i.id = ip.image_id
-    WHERE ip.person_id = ? AND i.family_id = ? AND ip.family_id = ?
-    ORDER BY i.created_at DESC
-  `;
+  try {
+    const query = `
+      SELECT i.id, i.s3_url, i.description, i.original_filename, i.created_at
+      FROM images i
+      INNER JOIN image_people ip ON i.id = ip.image_id
+      WHERE ip.person_id = ?
+      ORDER BY i.created_at DESC
+    `;
 
-  db.all(query, [personId, familyId, familyId], (err, rows) => {
-    if (err) {
-      console.error('Database error in /api/people/:personId/images:', err.message);
-      res.status(500).json({ error: err.message });
-      return;
-    }
+    familyDb.all(query, [personId], (err, rows) => {
+      if (err) {
+        console.error('Database error in /api/people/:personId/images:', err.message);
+        res.status(500).json({ error: err.message });
+        return;
+      }
 
-    // For each image, get all tagged people
-    const images = [];
-    let processedImages = 0;
-    
-    if (rows.length === 0) {
-      return res.json([]);
-    }
-
-    rows.forEach(row => {
-      const imageId = row.id;
+      // For each image, get all tagged people
+      const images = [];
+      let processedImages = 0;
       
-      // Get all people tagged in this image
-      db.all(`
-        SELECT ip.person_id as personId, n.name as personName, n.surname as personSurname
-        FROM image_people ip
-        JOIN nodes n ON ip.person_id = n.id
-        WHERE ip.image_id = ?
-      `, [imageId], (err, peopleRows) => {
-        if (err) {
-          console.error('Error fetching people for image:', err.message);
-          processedImages++;
-        } else {
-          images.push({
-            id: row.id,
-            s3Url: row.s3_url,
-            description: row.description,
-            originalFilename: row.original_filename,
-            createdAt: row.created_at,
-            people: peopleRows
-          });
-          processedImages++;
-        }
+      if (rows.length === 0) {
+        return res.json([]);
+      }
+
+      rows.forEach(row => {
+        const imageId = row.id;
         
-        // When all images are processed, send response
-        if (processedImages === rows.length) {
-          // Sort by creation date (most recent first)
-          images.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-          res.json(images);
-        }
+        // Get all people tagged in this image
+        familyDb.all(`
+          SELECT ip.person_id as personId, n.name as personName, n.surname as personSurname
+          FROM image_people ip
+          JOIN nodes n ON ip.person_id = n.id
+          WHERE ip.image_id = ?
+        `, [imageId], (err, peopleRows) => {
+          if (err) {
+            console.error('Error fetching people for image:', err.message);
+            processedImages++;
+          } else {
+            images.push({
+              id: row.id,
+              s3Url: row.s3_url,
+              description: row.description,
+              originalFilename: row.original_filename,
+              createdAt: row.created_at,
+              people: peopleRows
+            });
+            processedImages++;
+          }
+          
+          // When all images are processed, send response
+          if (processedImages === rows.length) {
+            // Sort by creation date (most recent first)
+            images.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            res.json(images);
+          }
+        });
       });
     });
-  });
+  } catch (error) {
+    console.error('Error fetching images for person:', error);
+    res.status(500).json({ error: 'Failed to fetch images for person' });
+  }
 });
 
 // === CHAT ENDPOINTS ===
@@ -1719,126 +1869,146 @@ app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
 // Get chat messages for a specific image
 app.get('/api/images/:imageId/chat', authenticateToken, (req, res) => {
   const { imageId } = req.params;
-  const familyId = req.user.id;
+  const familyName = req.user.familyName;
+  const familyDb = getFamilyDb(familyName);
 
-  const query = `
-    SELECT id, user_name, message, created_at
-    FROM chat_messages 
-    WHERE image_id = ? AND family_id = ?
-    ORDER BY created_at ASC
-  `;
+  try {
+    const query = `
+      SELECT id, user_name, message, created_at
+      FROM chat_messages 
+      WHERE image_id = ?
+      ORDER BY created_at ASC
+    `;
 
-  db.all(query, [imageId, familyId], (err, rows) => {
-    if (err) {
-      console.error('Database error in /api/images/:imageId/chat:', err.message);
-      res.status(500).json({ error: err.message });
-      return;
-    }
+    familyDb.all(query, [imageId], (err, rows) => {
+      if (err) {
+        console.error('Database error in /api/images/:imageId/chat:', err.message);
+        res.status(500).json({ error: err.message });
+        return;
+      }
 
-    const messages = rows.map(row => ({
-      id: row.id,
-      userName: row.user_name,
-      message: row.message,
-      createdAt: row.created_at
-    }));
+      const messages = rows.map(row => ({
+        id: row.id,
+        userName: row.user_name,
+        message: row.message,
+        createdAt: row.created_at
+      }));
 
-    res.json(messages);
-  });
+      res.json(messages);
+    });
+  } catch (error) {
+    console.error('Error fetching chat messages:', error);
+    res.status(500).json({ error: 'Failed to fetch chat messages' });
+  }
 });
 
 // Post a new chat message for an image
 app.post('/api/images/:imageId/chat', authenticateToken, (req, res) => {
   const { imageId } = req.params;
   const { userName, message } = req.body;
+  const familyName = req.user.familyName;
   const familyId = req.user.id;
+  const familyDb = getFamilyDb(familyName);
 
-  if (!userName || !message) {
-    return res.status(400).json({ error: 'User name and message are required' });
-  }
-
-  if (message.trim().length === 0) {
-    return res.status(400).json({ error: 'Message cannot be empty' });
-  }
-
-  if (userName.trim().length === 0) {
-    return res.status(400).json({ error: 'User name cannot be empty' });
-  }
-
-  // Verify the image exists and belongs to this family
-  db.get('SELECT id FROM images WHERE id = ? AND family_id = ?', [imageId, familyId], (err, row) => {
-    if (err) {
-      console.error('Database error checking image:', err.message);
-      return res.status(500).json({ error: err.message });
+  try {
+    if (!userName || !message) {
+      return res.status(400).json({ error: 'User name and message are required' });
     }
 
-    if (!row) {
-      return res.status(404).json({ error: 'Image not found' });
+    if (message.trim().length === 0) {
+      return res.status(400).json({ error: 'Message cannot be empty' });
     }
 
-    // Insert the new chat message
-    const query = `
-      INSERT INTO chat_messages (image_id, family_id, user_name, message, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-    `;
+    if (userName.trim().length === 0) {
+      return res.status(400).json({ error: 'User name cannot be empty' });
+    }
 
-    db.run(query, [imageId, familyId, userName.trim(), message.trim()], function(err) {
+    // Verify the image exists
+    familyDb.get('SELECT id FROM images WHERE id = ?', [imageId], (err, row) => {
       if (err) {
-        console.error('Database error in /api/images/:imageId/chat POST:', err.message);
-        res.status(500).json({ error: err.message });
-        return;
+        console.error('Database error checking image:', err.message);
+        return res.status(500).json({ error: err.message });
       }
 
-      const newMessage = {
-        id: this.lastID,
-        userName: userName.trim(),
-        message: message.trim(),
-        createdAt: new Date().toISOString()
-      };
+      if (!row) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
 
-      // Emit the new message to all clients in this family room for real-time updates
-      req.app.get('io').to(`family-${familyId}`).emit('chat:message', {
-        imageId: imageId,
-        message: newMessage
-      });
+      // Insert the new chat message
+      const query = `
+        INSERT INTO chat_messages (image_id, user_name, message, created_at)
+        VALUES (?, ?, ?, datetime('now'))
+      `;
 
-      res.json({
-        success: true,
-        message: newMessage
+      familyDb.run(query, [imageId, userName.trim(), message.trim()], function(err) {
+        if (err) {
+          console.error('Database error in /api/images/:imageId/chat POST:', err.message);
+          res.status(500).json({ error: err.message });
+          return;
+        }
+
+        const newMessage = {
+          id: this.lastID,
+          userName: userName.trim(),
+          message: message.trim(),
+          createdAt: new Date().toISOString()
+        };
+
+        // Emit the new message to all clients in this family room for real-time updates
+        req.app.get('io').to(`family-${familyId}`).emit('chat:message', {
+          imageId: imageId,
+          message: newMessage
+        });
+
+        res.json({
+          success: true,
+          message: newMessage
+        });
       });
     });
-  });
+  } catch (error) {
+    console.error('Error posting chat message:', error);
+    res.status(500).json({ error: 'Failed to post chat message' });
+  }
 });
 
 // Delete a chat message (optional - allows users to delete their own messages)
 app.delete('/api/images/:imageId/chat/:messageId', authenticateToken, (req, res) => {
   const { imageId, messageId } = req.params;
+  const familyName = req.user.familyName;
   const familyId = req.user.id;
+  const familyDb = getFamilyDb(familyName);
 
-  // Verify the message exists and belongs to this family and image
-  const query = `
-    DELETE FROM chat_messages 
-    WHERE id = ? AND image_id = ? AND family_id = ?
-  `;
+  try {
+    // Verify the message exists and delete it
+    const query = `
+      DELETE FROM chat_messages 
+      WHERE id = ? AND image_id = ?
+    `;
 
-  db.run(query, [messageId, imageId, familyId], function(err) {
-    if (err) {
-      console.error('Database error in /api/images/:imageId/chat/:messageId DELETE:', err.message);
-      res.status(500).json({ error: err.message });
-      return;
-    }
+    familyDb.run(query, [messageId, imageId], function(err) {
+      if (err) {
+        console.error('Database error in /api/images/:imageId/chat/:messageId DELETE:', err.message);
+        res.status(500).json({ error: err.message });
+        return;
+      }
 
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Message not found' });
-    }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
 
-    // Emit the message deletion to all clients in this family room
-    req.app.get('io').to(`family-${familyId}`).emit('chat:messageDeleted', {
-      imageId: imageId,
-      messageId: messageId
+      // Emit the message deletion to all clients in this family room
+      req.app.get('io').to(`family-${familyId}`).emit('chat:messageDeleted', {
+        imageId: imageId,
+        messageId: messageId
+      });
+
+      res.json({ success: true, message: 'Chat message deleted successfully' });
     });
-
-    res.json({ success: true, message: 'Chat message deleted successfully' });
-  });
+  } catch (error) {
+    console.error('Error deleting chat message:', error);
+    res.status(500).json({ error: 'Failed to delete chat message' });
+  }
 });
 
 // Catch-all handler: send back React's index.html file for production
