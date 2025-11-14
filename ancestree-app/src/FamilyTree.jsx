@@ -732,10 +732,16 @@ const FamilyTree = ({
           'elk.direction': 'DOWN',
           'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
           'elk.layered.crossingMinimization.semiInteractive': 'true',
+          'elk.layered.crossingMinimization.hierarchicalSweepiness': '0.9', // High value to respect port positions
           'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+          'elk.layered.nodePlacement.favorStraightEdges': 'true', // Prefer straight edges
           'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+          'elk.layered.considerModelOrder.portModelOrder': 'true', // Respect port order
+          'elk.layered.considerModelOrder.crossingCounterPortInfluence': '0.8', // Ports influence crossing
           'elk.separateConnectedComponents': 'false',
-          'elk.layered.thoroughness': '1'
+          'elk.layered.thoroughness': '7', // Higher thoroughness for better optimization
+          'elk.spacing.portPort': '15', // Space between ports
+          'elk.spacing.nodeNode': '80' // Space between clusters
         },
         children: [],
         edges: []
@@ -805,8 +811,14 @@ const FamilyTree = ({
               id: `port-family-${familyNode.id}-edge-${edge.id}`,
               layoutOptions: {
                 'elk.port.side': portSide,
-                'elk.port.index': `${portIndex}`,
-                'elk.port.anchor': `(${portX}, ${portY})`
+                'elk.port.index': `${portIndex}`, // Port index for ordering
+                'elk.port.anchor': `(${portX}, ${portY})`,
+                'elk.port.borderOffset': '0' // Align ports to cluster border
+              },
+              // Port properties to influence ordering
+              properties: {
+                'portAlignment': 'BEGIN',
+                'portConstraints': 'FIXED_ORDER' // Keep ports in specified order
               },
               // Store metadata for debug purposes and edge mapping
               metadata: {
@@ -816,11 +828,13 @@ const FamilyTree = ({
                 familyNodeX: familyNode.x,
                 familyNodeY: familyNode.y,
                 edgeId: edge.id, // Store the edge ID for mapping
-                targetNodeId: otherNodeId
+                targetNodeId: otherNodeId,
+                portOrder: portIndex, // Explicit port ordering value
+                portPositionX: portX // X position for downstream ordering hints
               }
             });
             
-            portIndex++;
+            portIndex--;
           });
         });
         
@@ -831,7 +845,63 @@ const FamilyTree = ({
           ports: ports,
           layoutOptions: {
             'elk.priority': `${Math.max(1, connectionCount)}`,
-            'elk.layered.layerConstraint': 'FIRST_SEPARATE'
+            'elk.portConstraints': 'FIXED_ORDER', // Enforce port ordering
+            'elk.layered.crossingMinimization.forceNodeModelOrder': 'true' // Force model order
+          }
+        });
+      });
+
+      // Calculate downstream cluster ordering based on upstream port positions
+      // This creates a map of which clusters should be ordered left-to-right
+      const downstreamClusterOrdering = new Map();
+      
+      elkClusters.forEach((sourceCluster, sourceIndex) => {
+        const sourcePorts = elkGraph.children[sourceIndex].ports || [];
+        
+        // Group downstream connections by target cluster and calculate average port X position
+        const targetClusterPositions = new Map();
+        
+        sourcePorts.forEach(port => {
+          const targetNodeId = port.metadata?.targetNodeId;
+          if (!targetNodeId) return;
+          
+          // Find which cluster the target node belongs to
+          const targetClusterIndex = elkClusters.findIndex(c =>
+            c.clusterNodes.some(n => n.id === targetNodeId)
+          );
+          
+          if (targetClusterIndex !== -1 && targetClusterIndex !== sourceIndex) {
+            if (!targetClusterPositions.has(targetClusterIndex)) {
+              targetClusterPositions.set(targetClusterIndex, []);
+            }
+            targetClusterPositions.get(targetClusterIndex).push(port.metadata.portPositionX);
+          }
+        });
+        
+        // Calculate average port X position for each downstream cluster
+        const orderedTargets = Array.from(targetClusterPositions.entries())
+          .map(([targetIndex, portXPositions]) => ({
+            targetIndex,
+            avgPortX: portXPositions.reduce((sum, x) => sum + x, 0) / portXPositions.length
+          }))
+          .sort((a, b) => b.avgPortX - a.avgPortX); // INVERTED: Sort right-to-left (highest X first)
+        
+        if (orderedTargets.length > 0) {
+          downstreamClusterOrdering.set(sourceIndex, orderedTargets);
+        }
+      });
+      
+      // Apply ordering hints to ELK clusters based on downstream relationships
+      downstreamClusterOrdering.forEach((orderedTargets, sourceIndex) => {
+        orderedTargets.forEach((target, orderIndex) => {
+          const targetCluster = elkGraph.children[target.targetIndex];
+          if (targetCluster) {
+            // Set layer ID and position hint based on port ordering
+            targetCluster.layoutOptions = {
+              ...targetCluster.layoutOptions,
+              'elk.layered.layerChoiceConstraint': `${sourceIndex + 1}`, // Layer after source
+              'elk.layered.crossingMinimization.positionChoiceConstraint': `${orderIndex}` // Left-to-right order
+            };
           }
         });
       });
@@ -896,14 +966,33 @@ const FamilyTree = ({
               });
             });
             
+            // Get port metadata for ordering hints
+            let sourcePortMeta = null;
+            let targetPortMeta = null;
+            
+            elkGraph.children[finalSourceIndex]?.ports?.forEach(port => {
+              if (port.id === sourcePort) sourcePortMeta = port.metadata;
+            });
+            
+            if (finalTargetIndex < elkGraph.children.length) {
+              elkGraph.children[finalTargetIndex]?.ports?.forEach(port => {
+                if (port.id === targetPort) targetPortMeta = port.metadata;
+              });
+            }
+            
+            // Calculate edge priority based on port positions (leftmost gets higher priority)
+            const edgePriority = sourcePortMeta ? 
+              Math.max(1, Math.floor((sourcePortMeta.portPositionX || 0) / 50)) : 5;
+            
             // Create edge with unique ID based on the original edge
             const elkEdge = {
               id: `edge-inter-${edge.id}`,
               sources: [sourcePort ? `${sourcePort}` : `cluster-${finalSourceIndex}`],
               targets: [targetPort ? `${targetPort}` : `cluster-${finalTargetIndex}`],
               layoutOptions: {
-                'elk.layered.priority': '5',
-                'elk.layered.crossingMinimization.positionChoiceConstraint': '0'
+                'elk.layered.priority': `${edgePriority}`, // Priority based on port X position
+                'elk.layered.crossingMinimization.positionChoiceConstraint': `${sourcePortMeta?.portOrder || 0}`,
+                'elk.edgeRouting': 'ORTHOGONAL' // Use orthogonal routing for cleaner edges
               }
             };
             
