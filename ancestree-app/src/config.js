@@ -338,7 +338,7 @@ export const appConfig = {
       title: "💬 Diskussion",
       noMessages: "Noch keine Nachrichten. Starte die Diskussion über dieses Bild!",
       namePlaceholder: "Dein Name...",
-      messagePlaceholder: "Schreibe einen Kommentar zu diesem Bild...",
+      messagePlaceholder: "Schreibe einen Kommentar zu diesem Bild... (Strg+Enter zum Senden)",
       sendButton: "Senden",
       nameRequired: "Bitte gib deinen Namen ein",
       messageRequired: "Bitte schreibe eine Nachricht",

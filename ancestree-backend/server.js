@@ -1891,7 +1891,8 @@ app.get('/api/images/:imageId/chat', authenticateToken, (req, res) => {
         id: row.id,
         userName: row.user_name,
         message: row.message,
-        createdAt: row.created_at
+        // Convert SQLite datetime format to ISO format for consistent timezone handling
+        createdAt: row.created_at ? new Date(row.created_at + 'Z').toISOString() : new Date().toISOString()
       }));
 
       res.json(messages);

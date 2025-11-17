@@ -24,7 +24,8 @@ const Sidebar = ({
   updateNodeDataAndPosition,
   nodeHasConnections,
   galleryViewMode,
-  onGalleryViewModeChange
+  onGalleryViewModeChange,
+  socket
 }) => {
   const { autoLayout, fitTreeToView } = treeOperations || {};
 
@@ -146,6 +147,7 @@ const Sidebar = ({
                 isDebugMode={showDebug}
                 nodes={nodes}
                 edges={edges}
+                socket={socket}
               />
             ) : (
               <div style={{ color: 'white' }}>
@@ -223,6 +225,7 @@ const Sidebar = ({
             onPersonSelect={onPersonSelectFromGallery}
             onTaggingModeChange={onTaggingModeChange}
             onViewModeChange={onGalleryViewModeChange}
+            socket={socket}
           />
         )}
         

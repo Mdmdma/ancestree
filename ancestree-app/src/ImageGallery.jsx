@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
 import PictureSlideshow from './PictureSlideshow';
 
-const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange }) => {
+const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -19,6 +19,9 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  
+  // Ref for the scrollable content container
+  const galleryContentRef = useRef(null);
 
   // Notify parent of viewMode changes for mobile sidebar height adjustment
   useEffect(() => {
@@ -26,6 +29,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       onViewModeChange(viewMode);
     }
   }, [viewMode, onViewModeChange]);
+
+  // Scroll to top when viewMode changes (but not on initial mount)
+  useEffect(() => {
+    if (galleryContentRef.current) {
+      galleryContentRef.current.scrollTop = 0;
+    }
+  }, [viewMode]); // Only trigger when viewMode changes
 
   // Debug state changes
   useEffect(() => {
@@ -327,6 +337,15 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const handleDescriptionChange = useCallback((e) => {
     setDescriptionValue(e.target.value);
   }, []);
+
+  // Handle keyboard shortcuts in description textarea
+  const handleDescriptionKeyDown = useCallback((e) => {
+    // Ctrl+Enter to save
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      saveDescription();
+    }
+  }, [saveDescription]);
 
   // Render gallery view
   const renderGallery = () => (
@@ -924,6 +943,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
               <textarea
                 value={descriptionValue}
                 onChange={handleDescriptionChange}
+                onKeyDown={handleDescriptionKeyDown}
                 placeholder="Enter image description..."
                 style={{
                   width: '100%',
@@ -1089,7 +1109,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         </h3>
       </div>
 
-      <div className="gallery-content" style={{ 
+      <div className="gallery-content" ref={galleryContentRef} style={{ 
         flex: 1, 
         padding: '0 20px 20px 20px', 
         overflowY: 'auto', 
@@ -1113,6 +1133,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
               setShowFamilyGallery(false);
             }}
             onPersonSelect={onPersonSelect}
+            socket={socket}
           />
         </>
       )}

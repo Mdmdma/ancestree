@@ -53,7 +53,8 @@ const PictureSlideshow = ({
   preferredImageId, 
   onPreferredImageChange,
   onClose, 
-  onPersonSelect 
+  onPersonSelect,
+  socket
 }) => {
   console.log('PictureSlideshow: Component called with mode:', mode, 'personId:', personId);
   const [images, setImages] = useState([]);
@@ -149,6 +150,15 @@ const PictureSlideshow = ({
   const handleDescriptionChange = useCallback((e) => {
     setDescriptionValue(e.target.value);
   }, []);
+
+  // Handle keyboard shortcuts in description textarea
+  const handleDescriptionKeyDown = useCallback((e) => {
+    // Ctrl+Enter to save
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      saveDescription();
+    }
+  }, [saveDescription]);
 
   const setAsPreferredImage = useCallback(async () => {
     if (!currentImage || mode !== 'person') return;
@@ -549,6 +559,7 @@ const PictureSlideshow = ({
                   <textarea
                     value={descriptionValue}
                     onChange={handleDescriptionChange}
+                    onKeyDown={handleDescriptionKeyDown}
                     placeholder={config.descriptionPlaceholder}
                     style={{
                       width: '100%',
@@ -725,6 +736,7 @@ const PictureSlideshow = ({
               <ChatComponent 
                 imageId={currentImage?.id} 
                 onError={(error) => console.error('Chat error:', error)}
+                socket={socket}
               />
             </div>
 

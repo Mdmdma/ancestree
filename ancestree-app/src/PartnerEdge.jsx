@@ -75,7 +75,7 @@ export default function PartnerEdge(props) {
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             pointerEvents: "all",
             backgroundColor: "transparent",
-            color: "red",
+            color: isExpartner ? "orange" : "red",
             border: "none",
             width: "12px",
             height: "12px",

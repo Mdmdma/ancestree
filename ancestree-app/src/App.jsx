@@ -4,7 +4,8 @@ import FamilyTree from './FamilyTree';
 import AppHeader from './AppHeader';
 import Sidebar from './Sidebar';
 import Login from './Login';
-import { api, getAuthToken } from './api';
+import { api, getAuthToken, getSocketServerUrl } from './api';
+import { useSocket } from './hooks/useSocket';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
 import '@xyflow/react/dist/style.css';
@@ -23,6 +24,9 @@ const AddNodeOnEdgeDrop = () => {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [galleryViewMode, setGalleryViewMode] = useState('gallery'); // Track gallery view mode for mobile sidebar height
+
+  // Initialize socket connection when authenticated
+  const { socket } = useSocket(getSocketServerUrl(), isAuthenticated);
 
   // Check authentication on app load
   useEffect(() => {
@@ -329,6 +333,7 @@ const AddNodeOnEdgeDrop = () => {
                 isTaggingMode={isTaggingMode}
                 isMapMode={isMapMode}
                 onNodeUpdate={handleTreeUpdate}
+                socket={socket}
               />
             </div>
           </>
@@ -356,6 +361,7 @@ const AddNodeOnEdgeDrop = () => {
           nodeHasConnections={nodeHasConnections}
           galleryViewMode={galleryViewMode}
           onGalleryViewModeChange={setGalleryViewMode}
+          socket={socket}
         />
       )}
     </div>

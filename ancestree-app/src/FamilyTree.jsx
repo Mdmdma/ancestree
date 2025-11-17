@@ -191,7 +191,8 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
 const FamilyTree = ({ 
   setSelectedNode, 
   showDebug, 
-  onNodeUpdate 
+  onNodeUpdate,
+  socket: externalSocket
 }) => {
   const [loading, setLoading] = useState(true);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -203,7 +204,11 @@ const FamilyTree = ({
   const [reactFlowReady, setReactFlowReady] = useState(false);
 
   // Real-time collaboration setup
-  const { socket, isConnected, userCount, isCollaborating } = useSocket(getSocketServerUrl(), true);
+  // Use external socket if provided, otherwise create own
+  const internalSocketData = useSocket(getSocketServerUrl(), !externalSocket);
+  const { socket, isConnected, userCount, isCollaborating } = externalSocket 
+    ? { socket: externalSocket, isConnected: true, userCount: 0, isCollaborating: false }
+    : internalSocketData;
   const [, setRecentChanges] = useState(new Set());
   
   // Track deletion attempts to prevent duplicates

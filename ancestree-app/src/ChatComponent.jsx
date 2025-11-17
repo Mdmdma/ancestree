@@ -2,14 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
 
-const ChatComponent = ({ imageId, onError }) => {
+const ChatComponent = ({ imageId, onError, socket }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
 
   // Get stored name from session storage
   useEffect(() => {
@@ -42,19 +43,75 @@ const ChatComponent = ({ imageId, onError }) => {
     } finally {
       setLoading(false);
     }
-  }, [imageId, onError]);
+  }, [imageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
 
-  // Scroll to bottom only when explicitly requested (e.g., after sending a message)
+  // Scroll to bottom when messages first load
   useEffect(() => {
-    if (shouldAutoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      setShouldAutoScroll(false); // Reset the flag
+    if (!loading && messages.length > 0 && messagesContainerRef.current) {
+      // Use direct scroll instead of scrollIntoView to prevent parent scrolling
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [messages, shouldAutoScroll]);  // Handle form submission
+  }, [loading]);
+
+  // Check if user is scrolled near the bottom
+  const checkScrollPosition = useCallback(() => {
+    if (!messagesContainerRef.current) return;
+    
+    const container = messagesContainerRef.current;
+    const scrollThreshold = 100; // pixels from bottom
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < scrollThreshold;
+    
+    setIsUserScrolledUp(!isNearBottom);
+  }, []);
+
+  // Handle scroll events to track user position
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    container.addEventListener('scroll', checkScrollPosition);
+    
+    return () => {
+      container.removeEventListener('scroll', checkScrollPosition);
+    };
+  }, [checkScrollPosition]);
+
+  // Auto-scroll when new messages arrive (only if user is near bottom)
+  useEffect(() => {
+    if (!isUserScrolledUp && messagesContainerRef.current) {
+      // Use direct scroll instead of scrollIntoView to prevent parent scrolling
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages, isUserScrolledUp]);
+
+  // Listen for real-time chat messages from Socket.IO
+  useEffect(() => {
+    if (!socket || !imageId) return;
+
+    const handleNewMessage = (data) => {
+      // Only add message if it's for the current image
+      if (data.imageId === imageId) {
+        setMessages(prev => {
+          // Check if message already exists to avoid duplicates
+          if (prev.some(msg => msg.id === data.message.id)) {
+            return prev;
+          }
+          return [...prev, data.message];
+        });
+      }
+    };
+
+    socket.on('chat:message', handleNewMessage);
+
+    // Cleanup listener on unmount or when dependencies change
+    return () => {
+      socket.off('chat:message', handleNewMessage);
+    };
+  }, [socket, imageId]);  // Handle form submission
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
@@ -73,10 +130,11 @@ const ChatComponent = ({ imageId, onError }) => {
       const result = await api.postChatMessage(imageId, userName.trim(), message.trim());
       
       if (result.success) {
-        // Add the new message to the local state
-        setMessages(prev => [...prev, result.message]);
+        // Don't add the message locally - let Socket.IO broadcast it back
+        // This prevents duplicates and ensures all clients see messages in the same order
         setMessage(''); // Clear the input
-        setShouldAutoScroll(true); // Trigger auto-scroll for new message
+        // Force scroll to bottom when user sends a message
+        setIsUserScrolledUp(false);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -86,12 +144,34 @@ const ChatComponent = ({ imageId, onError }) => {
     } finally {
       setSending(false);
     }
-  }, [userName, message, imageId, onError]);
+  }, [userName, message, imageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Format timestamp for display
+  // Handle keyboard shortcuts in textarea
+  const handleTextareaKeyDown = useCallback((e) => {
+    // Ctrl+Enter to submit
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  }, [handleSubmit]);
+
+  // Format timestamp for display with timezone handling
   const formatTimestamp = useCallback((timestamp) => {
     const now = new Date();
-    const messageTime = new Date(timestamp);
+    // Parse the timestamp - handle both ISO and SQLite datetime formats
+    let messageTime;
+    
+    // SQLite stores datetime in format: 'YYYY-MM-DD HH:MM:SS' (UTC)
+    // We need to parse it as UTC and convert to local time
+    if (timestamp.includes('T')) {
+      // ISO format
+      messageTime = new Date(timestamp);
+    } else {
+      // SQLite format - treat as UTC
+      messageTime = new Date(timestamp + 'Z');
+    }
+    
+    // Calculate time difference in local time
     const diffMs = now - messageTime;
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -106,7 +186,8 @@ const ChatComponent = ({ imageId, onError }) => {
     } else if (diffDays < 7) {
       return appConfig.ui.chat.timeFormat.daysAgo.replace('{days}', diffDays);
     } else {
-      return messageTime.toLocaleDateString('de-DE') + ' ' + messageTime.toLocaleTimeString('de-DE', { 
+      // Format in user's local timezone
+      return messageTime.toLocaleDateString() + ' ' + messageTime.toLocaleTimeString([], { 
         hour: '2-digit', 
         minute: '2-digit' 
       });
@@ -128,7 +209,7 @@ const ChatComponent = ({ imageId, onError }) => {
         onError('Fehler beim Löschen der Nachricht: ' + error.message);
       }
     }
-  }, [imageId, onError]);
+  }, [imageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Styles
   const containerStyle = {
@@ -262,7 +343,7 @@ const ChatComponent = ({ imageId, onError }) => {
         {appConfig.ui.chat.title}
       </div>
       
-      <div style={messagesContainerStyle}>
+      <div style={messagesContainerStyle} ref={messagesContainerRef}>
         {loading ? (
           <div style={emptyStateStyle}>
             {appConfig.ui.chat.loadingMessages}
@@ -272,13 +353,14 @@ const ChatComponent = ({ imageId, onError }) => {
             {appConfig.ui.chat.noMessages}
           </div>
         ) : (
-          messages.map((msg) => (
-            <div key={msg.id} style={messageStyle}>
-              <div style={messageHeaderStyle}>
-                <div>
-                  <span style={messageNameStyle}>{msg.userName}</span>
-                  <span style={messageTimeStyle}> • {formatTimestamp(msg.createdAt)}</span>
-                </div>
+          <>
+            {messages.map((msg) => (
+              <div key={msg.id} style={messageStyle}>
+                <div style={messageHeaderStyle}>
+                  <div>
+                    <span style={messageNameStyle}>{msg.userName}</span>
+                    <span style={messageTimeStyle}> • {formatTimestamp(msg.createdAt)}</span>
+                  </div>
                 <button
                   onClick={() => handleDeleteMessage(msg.id)}
                   style={deleteButtonStyle}
@@ -289,9 +371,10 @@ const ChatComponent = ({ imageId, onError }) => {
               </div>
               <div style={messageTextStyle}>{msg.message}</div>
             </div>
-          ))
+          ))}
+          <div ref={messagesEndRef} />
+          </>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       <form onSubmit={handleSubmit} style={formStyle}>
@@ -306,6 +389,7 @@ const ChatComponent = ({ imageId, onError }) => {
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleTextareaKeyDown}
           placeholder={appConfig.ui.chat.messagePlaceholder}
           style={textareaStyle}
           required
@@ -322,4 +406,10 @@ const ChatComponent = ({ imageId, onError }) => {
   );
 };
 
-export default ChatComponent;
+// Memoize the component to prevent unnecessary re-renders when parent state changes
+export default React.memo(ChatComponent, (prevProps, nextProps) => {
+  // Only re-render if imageId or socket changes
+  // Ignore onError changes as it's just for error reporting
+  return prevProps.imageId === nextProps.imageId && 
+         prevProps.socket === nextProps.socket;
+});

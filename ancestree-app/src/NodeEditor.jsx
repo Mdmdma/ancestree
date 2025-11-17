@@ -3,7 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import PictureSlideshow from './PictureSlideshow';
 import { appConfig } from './config';
 
-function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [] }) {
+function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [], socket }) {
   const { deleteElements } = useReactFlow();
   
   const [formData, setFormData] = useState({
@@ -437,6 +437,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
             onUpdate(node.id, { ...formData, preferredImageId: imageId });
           }}
           onClose={() => setShowSlideshow(false)}
+          socket={socket}
         />
       )}
 
