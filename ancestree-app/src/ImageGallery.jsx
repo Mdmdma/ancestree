@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
 import PictureSlideshow from './PictureSlideshow';
@@ -19,9 +19,6 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
-  
-  // Ref for the scrollable content container
-  const galleryContentRef = useRef(null);
 
   // Notify parent of viewMode changes for mobile sidebar height adjustment
   useEffect(() => {
@@ -29,13 +26,6 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       onViewModeChange(viewMode);
     }
   }, [viewMode, onViewModeChange]);
-
-  // Scroll to top when viewMode changes (but not on initial mount)
-  useEffect(() => {
-    if (galleryContentRef.current) {
-      galleryContentRef.current.scrollTop = 0;
-    }
-  }, [viewMode]); // Only trigger when viewMode changes
 
   // Debug state changes
   useEffect(() => {
@@ -1109,7 +1099,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         </h3>
       </div>
 
-      <div className="gallery-content" ref={galleryContentRef} style={{ 
+      <div className="gallery-content" style={{ 
         flex: 1, 
         padding: '0 20px 20px 20px', 
         overflowY: 'auto', 
