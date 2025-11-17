@@ -200,6 +200,7 @@ button:focus-visible {
     order: 2;
     flex-shrink: 0 !important;
     transition: height 0.3s ease, min-height 0.3s ease, max-height 0.3s ease;
+    overflow: hidden !important;
   }
 
   /* Expand sidebar to 70vh when confirming upload OR editing a person */
@@ -208,6 +209,13 @@ button:focus-visible {
     height: 70vh !important;
     min-height: 70vh !important;
     max-height: 70vh !important;
+  }
+  
+  /* Ensure tab content is properly constrained and scrollable on mobile */
+  .sidebar-container > div:last-child {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
   }
   
   /* Map container - reduce minimum height for mobile */
@@ -221,10 +229,14 @@ button:focus-visible {
     height: 100vh !important;
     border-radius: 0 !important;
     max-width: 100vw !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
   
   .slideshow-header {
     padding: 12px !important;
+    flex-shrink: 0 !important;
   }
   
   .slideshow-header h3 {
@@ -233,19 +245,27 @@ button:focus-visible {
   
   .slideshow-content {
     flex-direction: column !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
   }
   
   .slideshow-image-container {
-    height: 50% !important;
+    height: 40% !important;
     flex: none !important;
+    flex-shrink: 0 !important;
   }
   
-    /* Slideshow sidebar */
+  /* Slideshow sidebar */
   .slideshow-sidebar {
     width: 100% !important;
-    height: 50% !important;
+    height: 60% !important;
     padding: 12px !important;
-    max-height: 50vh !important;
+    max-height: 60% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    flex: 1 !important;
+    -webkit-overflow-scrolling: touch !important;
   }
   
   /* Hide image gallery header (title) on mobile */
@@ -256,6 +276,16 @@ button:focus-visible {
   /* Adjust gallery content padding on mobile */
   .gallery-content {
     padding: 10px !important;
+  }
+  
+  /* Add padding to bottom of editor to ensure delete button is visible */
+  .sidebar-container[data-expanded="true"] > div:last-child > div {
+    padding-bottom: 80px !important;
+  }
+  
+  /* Ensure gallery images grid has proper bottom spacing */
+  .gallery-content > div {
+    padding-bottom: 20px !important;
   }
   
   /* Make buttons side by side on mobile */
@@ -466,5 +496,27 @@ button:focus-visible {
   p.mobile-hide-instructions,
   div.mobile-hide-instructions {
     display: none !important;
+  }
+  
+  /* Ensure all content within sidebar tab content is scrollable */
+  .sidebar-container > div:nth-child(3) {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Add safe padding at bottom of scrollable areas on mobile */
+  .sidebar-container > div:nth-child(3) > div {
+    padding-bottom: 60px !important;
+  }
+  
+  /* Slideshow specific adjustments for better visibility */
+  .slideshow-sidebar > div {
+    margin-bottom: 15px !important;
+  }
+  
+  .slideshow-sidebar > div:last-child {
+    margin-bottom: 0 !important;
+    padding-bottom: 20px !important;
   }
 }
