@@ -338,7 +338,10 @@ const ChatComponent = ({ imageId, onError, socket }) => {
   };
 
   return (
-    <div style={containerStyle}>
+    <div 
+      className={`chat-component ${messages.length === 0 ? 'chat-empty' : 'chat-has-messages'}`}
+      style={containerStyle}
+    >
       <div style={headerStyle}>
         {appConfig.ui.chat.title}
       </div>

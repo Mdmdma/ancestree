@@ -550,7 +550,7 @@ const PictureSlideshow = ({
           {!isFullscreen && (
           <div className="slideshow-sidebar" style={sidebarStyle}>
             {/* Description Section */}
-            <div>
+            <div className="slideshow-description-section">
               <h4 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>
                 {config.descriptionTitle}
               </h4>
@@ -561,6 +561,7 @@ const PictureSlideshow = ({
                     onChange={handleDescriptionChange}
                     onKeyDown={handleDescriptionKeyDown}
                     placeholder={config.descriptionPlaceholder}
+                    className="slideshow-description-textarea"
                     style={{
                       width: '100%',
                       minHeight: '100px',
@@ -610,11 +611,14 @@ const PictureSlideshow = ({
                 </div>
               ) : (
                 <div>
-                  <p style={{ 
-                    margin: '0 0 10px 0', 
-                    color: '#cccccc',
-                    fontStyle: currentImage?.description ? 'normal' : 'italic'
-                  }}>
+                  <p 
+                    className="slideshow-description-text"
+                    style={{ 
+                      margin: '0 0 10px 0', 
+                      color: '#cccccc',
+                      fontStyle: currentImage?.description ? 'normal' : 'italic'
+                    }}
+                  >
                     {currentImage?.description || config.noDescription}
                   </p>
                   <button

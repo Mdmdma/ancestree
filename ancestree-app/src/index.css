@@ -319,6 +319,62 @@ button:focus-visible {
     font-size: 48px !important;
   }
   
+  /* Description section optimizations for mobile */
+  .slideshow-description-section {
+    /* Reduce vertical space on mobile */
+    margin-bottom: 10px !important;
+  }
+  
+  .slideshow-description-section h4 {
+    font-size: 13px !important;
+    margin-bottom: 6px !important;
+  }
+  
+  /* Description text - show only one line when empty, auto-expand when has content */
+  .slideshow-description-text {
+    max-height: none !important;
+    overflow: visible !important;
+    line-height: 1.3 !important;
+    font-size: 12px !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+  }
+  
+  /* Description textarea on mobile - minimal when editing */
+  .slideshow-description-textarea {
+    min-height: 60px !important;
+    font-size: 12px !important;
+    padding: 8px !important;
+  }
+  
+  /* Gallery description section optimizations for mobile */
+  .gallery-description-section {
+    margin-bottom: 12px !important;
+  }
+  
+  .gallery-description-section h4 {
+    font-size: 13px !important;
+  }
+  
+  /* Gallery description text - show only one line when empty, auto-expand when has content */
+  .gallery-description-text {
+    font-size: 12px !important;
+    padding: 10px !important;
+    line-height: 1.3 !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+  }
+  
+  /* Gallery description textarea on mobile - minimal when editing */
+  .gallery-description-textarea {
+    height: 60px !important;
+    min-height: 60px !important;
+    font-size: 12px !important;
+    padding: 8px !important;
+  }
+
+
+  
   .drag-overlay div:last-child {
     font-size: 18px !important;
   }

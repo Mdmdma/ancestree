@@ -902,7 +902,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       </div>
 
       {selectedImage.description || !editingDescription ? (
-        <div style={{ marginBottom: '20px' }}>
+        <div className="gallery-description-section" style={{ marginBottom: '20px' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -935,6 +935,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
                 onChange={handleDescriptionChange}
                 onKeyDown={handleDescriptionKeyDown}
                 placeholder="Enter image description..."
+                className="gallery-description-textarea"
                 style={{
                   width: '100%',
                   height: '80px',
@@ -980,21 +981,24 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
               </div>
             </div>
           ) : (
-            <div style={{ 
-              fontSize: '14px', 
-              lineHeight: '1.5', 
-              color: '#cccccc',
-              backgroundColor: '#2a2a2a',
-              padding: '15px',
-              borderRadius: '5px',
-              border: '1px solid #444'
-            }}>
+            <div 
+              className="gallery-description-text"
+              style={{ 
+                fontSize: '14px', 
+                lineHeight: '1.5', 
+                color: '#cccccc',
+                backgroundColor: '#2a2a2a',
+                padding: '15px',
+                borderRadius: '5px',
+                border: '1px solid #444'
+              }}
+            >
               {selectedImage.description || <em style={{ color: '#888' }}>No description available</em>}
             </div>
           )}
         </div>
       ) : (
-        <div style={{ marginBottom: '20px' }}>
+        <div className="gallery-description-section" style={{ marginBottom: '20px' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
