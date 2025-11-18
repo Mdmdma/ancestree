@@ -4,6 +4,7 @@ import FamilyTree from './FamilyTree';
 import AppHeader from './AppHeader';
 import Sidebar from './Sidebar';
 import Login from './Login';
+import AdminPanel from './AdminPanel';
 import { api, getAuthToken, getSocketServerUrl } from './api';
 import { useSocket } from './hooks/useSocket';
 import ELK from 'elkjs/lib/elk.bundled.js';
@@ -24,9 +25,11 @@ const AddNodeOnEdgeDrop = () => {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [galleryViewMode, setGalleryViewMode] = useState('gallery'); // Track gallery view mode for mobile sidebar height
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
   // Initialize socket connection when authenticated
-  const { socket } = useSocket(getSocketServerUrl(), isAuthenticated);
+  const socketData = useSocket(getSocketServerUrl(), isAuthenticated);
 
   // Check authentication on app load
   useEffect(() => {
@@ -60,6 +63,19 @@ const AddNodeOnEdgeDrop = () => {
     api.logout();
     setIsAuthenticated(false);
     setUser(null);
+  };
+
+  // Handle admin panel
+  const handleAdminClick = () => {
+    setShowAdminPanel(true);
+  };
+
+  const handleAdminClose = () => {
+    setShowAdminPanel(false);
+  };
+
+  const handleAdminAuthenticate = () => {
+    setIsAdminAuthenticated(true);
   };
 
   // Keyboard shortcuts
@@ -319,7 +335,7 @@ const AddNodeOnEdgeDrop = () => {
           </div>
         ) : (
           <>
-            <AppHeader user={user} onLogout={handleLogout} />
+            <AppHeader user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} />
             <div className="tree-container" style={{ 
               width: '100%', 
               height: 'calc(100vh - 60px)',
@@ -333,7 +349,7 @@ const AddNodeOnEdgeDrop = () => {
                 isTaggingMode={isTaggingMode}
                 isMapMode={isMapMode}
                 onNodeUpdate={handleTreeUpdate}
-                socket={socket}
+                socketData={socketData}
               />
             </div>
           </>
@@ -361,7 +377,17 @@ const AddNodeOnEdgeDrop = () => {
           nodeHasConnections={nodeHasConnections}
           galleryViewMode={galleryViewMode}
           onGalleryViewModeChange={setGalleryViewMode}
-          socket={socket}
+          socket={socketData.socket}
+        />
+      )}
+
+      {/* Admin Panel */}
+      {isAuthenticated && (
+        <AdminPanel
+          isOpen={showAdminPanel}
+          onClose={handleAdminClose}
+          isAuthenticated={isAdminAuthenticated}
+          onAuthenticate={handleAdminAuthenticate}
         />
       )}
     </div>

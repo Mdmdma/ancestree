@@ -82,6 +82,7 @@ const initializeAuthDb = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       family_name TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      admin_password_hash TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`, (err) => {
@@ -89,6 +90,25 @@ const initializeAuthDb = () => {
         console.error('Error creating users table:', err);
       } else {
         console.log('Authentication database initialized');
+        
+        // Check if admin_password_hash column exists, if not add it (for existing databases)
+        authDb.all("PRAGMA table_info(users)", (err, columns) => {
+          if (err) {
+            console.error('Error checking table structure:', err);
+            return;
+          }
+          
+          const hasAdminPassword = columns.some(col => col.name === 'admin_password_hash');
+          if (!hasAdminPassword) {
+            authDb.run("ALTER TABLE users ADD COLUMN admin_password_hash TEXT", (err) => {
+              if (err) {
+                console.error('Error adding admin_password_hash column:', err);
+              } else {
+                console.log('Added admin_password_hash column to users table');
+              }
+            });
+          }
+        });
       }
     });
   });

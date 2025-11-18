@@ -16,8 +16,7 @@ import BloodlineEdge from './BloodlineEdge';
 import BloodlineEdgeHidden from './BloodlineEdgeHidden';
 import BloodlineEdgeFake from './BloodlineEdgeFake';
 import ElkDebugOverlay from './ElkDebugOverlay';
-import { api, getSocketServerUrl } from './api';
-import { useSocket } from './hooks/useSocket';
+import { api } from './api';
 import { useDebounce } from './hooks/useDebounce';
 
 import '@xyflow/react/dist/style.css';
@@ -192,7 +191,7 @@ const FamilyTree = ({
   setSelectedNode, 
   showDebug, 
   onNodeUpdate,
-  socket: externalSocket
+  socketData
 }) => {
   const [loading, setLoading] = useState(true);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -203,12 +202,8 @@ const FamilyTree = ({
   const [initialFitDone, setInitialFitDone] = useState(false);
   const [reactFlowReady, setReactFlowReady] = useState(false);
 
-  // Real-time collaboration setup
-  // Use external socket if provided, otherwise create own
-  const internalSocketData = useSocket(getSocketServerUrl(), !externalSocket);
-  const { socket, isConnected, userCount, isCollaborating } = externalSocket 
-    ? { socket: externalSocket, isConnected: true, userCount: 0, isCollaborating: false }
-    : internalSocketData;
+  // Real-time collaboration setup - use provided socket data
+  const { socket, isConnected, userCount, isCollaborating } = socketData || {};
   const [, setRecentChanges] = useState(new Set());
   
   // Track deletion attempts to prevent duplicates
@@ -2050,8 +2045,8 @@ const FamilyTree = ({
         />
       </ReactFlow>
       
-      {/* Real-time Collaboration Indicator */}
-      {isConnected && (
+      {/* Real-time Collaboration Indicator - only visible in debug mode */}
+      {isConnected && showDebug && userCount > 0 && (
         <div
           className="mobile-hide-online-users"
           style={{
@@ -2094,7 +2089,7 @@ const FamilyTree = ({
           style={{
             position: 'absolute',
             top: '10px',
-            left: isConnected ? '250px' : '10px', // Position next to collaboration indicator if present
+            left: (isConnected && userCount > 0) ? '250px' : '10px', // Position next to collaboration indicator if showing
             padding: '8px 16px',
             backgroundColor: showElkDebug ? '#FF5722' : '#2196F3',
             color: 'white',

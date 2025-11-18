@@ -548,6 +548,130 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
   });
 });
 
+// Admin authentication endpoint
+app.post('/api/auth/admin-login', authenticateToken, async (req, res) => {
+  const { adminPassword } = req.body;
+
+  if (!adminPassword) {
+    return res.status(400).json({ error: 'Admin password is required' });
+  }
+
+  try {
+    // Get user's admin password hash
+    authDb.get('SELECT admin_password_hash FROM users WHERE id = ?', [req.user.id], async (err, user) => {
+      if (err) {
+        console.error('Database error during admin login:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // If no admin password is set, set default "adminn"
+      if (!user.admin_password_hash) {
+        const saltRounds = 10;
+        const defaultAdminHash = await bcrypt.hash('adminn', saltRounds);
+        
+        authDb.run('UPDATE users SET admin_password_hash = ? WHERE id = ?', 
+          [defaultAdminHash, req.user.id], 
+          async (updateErr) => {
+            if (updateErr) {
+              console.error('Error setting default admin password:', updateErr);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+
+            // Verify with default password
+            const passwordMatch = await bcrypt.compare(adminPassword, defaultAdminHash);
+            if (!passwordMatch) {
+              return res.status(401).json({ error: 'Invalid admin password' });
+            }
+
+            res.json({ success: true, message: 'Admin authentication successful' });
+          }
+        );
+      } else {
+        // Verify admin password
+        const passwordMatch = await bcrypt.compare(adminPassword, user.admin_password_hash);
+        if (!passwordMatch) {
+          return res.status(401).json({ error: 'Invalid admin password' });
+        }
+
+        res.json({ success: true, message: 'Admin authentication successful' });
+      }
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Change family password endpoint (admin only)
+app.post('/api/auth/change-family-password', authenticateToken, async (req, res) => {
+  const { newPassword } = req.body;
+
+  if (!newPassword) {
+    return res.status(400).json({ error: 'New password is required' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+
+  try {
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    authDb.run('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+      [passwordHash, req.user.id], 
+      function(err) {
+        if (err) {
+          console.error('Database error during password change:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        res.json({ success: true, message: 'Family password updated successfully' });
+      }
+    );
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Change admin password endpoint (admin only)
+app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) => {
+  const { newAdminPassword } = req.body;
+
+  if (!newAdminPassword) {
+    return res.status(400).json({ error: 'New admin password is required' });
+  }
+
+  if (newAdminPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+
+  try {
+    const saltRounds = 10;
+    const adminPasswordHash = await bcrypt.hash(newAdminPassword, saltRounds);
+
+    authDb.run('UPDATE users SET admin_password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+      [adminPasswordHash, req.user.id], 
+      function(err) {
+        if (err) {
+          console.error('Database error during admin password change:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        res.json({ success: true, message: 'Admin password updated successfully' });
+      }
+    );
+  } catch (error) {
+    console.error('Admin password change error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ============= PROTECTED API ENDPOINTS =============
 
 // Socket.IO connection handling for real-time collaboration

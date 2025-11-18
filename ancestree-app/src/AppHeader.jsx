@@ -1,7 +1,7 @@
 import React from 'react';
 import { appConfig } from './config';
 
-const AppHeader = ({ user, onLogout }) => {
+const AppHeader = ({ user, onLogout, onAdminClick }) => {
   return (
     <article className="container app-header" style={{ 
       display: 'flex', 
@@ -37,27 +37,44 @@ const AppHeader = ({ user, onLogout }) => {
         </button>
       )}
 
-      {/* User Info */}
+      {/* User Info - Clickable for Admin Panel */}
       {user && (
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          fontSize: '14px',
-          color: '#333',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5px',
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          padding: '6px 12px',
-          borderRadius: '6px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          zIndex: 1000
-        }}>
+        <button
+          onClick={onAdminClick}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            fontSize: '14px',
+            color: '#333',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            zIndex: 1000,
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+            e.target.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+            e.target.style.transform = 'translateY(0)';
+          }}
+        >
           <span>👨‍👩‍👧‍👦</span>
           <span>{user.familyName} Family</span>
-        </div>
+          <span style={{ fontSize: '10px', opacity: 0.7 }}>⚙️</span>
+        </button>
       )}
 
       <h1 className="mobile-hide-title" style={{ 

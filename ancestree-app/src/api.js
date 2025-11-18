@@ -101,6 +101,55 @@ export const api = {
     setAuthToken(null);
   },
 
+  // Admin operations
+  async adminLogin(adminPassword) {
+    const response = await fetch(`${API_BASE_URL}/auth/admin-login`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ adminPassword })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Admin authentication failed');
+    }
+    
+    return result;
+  },
+
+  async changeFamilyPassword(newPassword) {
+    const response = await fetch(`${API_BASE_URL}/auth/change-family-password`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ newPassword })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to change family password');
+    }
+    
+    return result;
+  },
+
+  async changeAdminPassword(newAdminPassword) {
+    const response = await fetch(`${API_BASE_URL}/auth/change-admin-password`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ newAdminPassword })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to change admin password');
+    }
+    
+    return result;
+  },
+
   // Load initial data
   async loadNodes() {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
