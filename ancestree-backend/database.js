@@ -81,8 +81,12 @@ const initializeAuthDb = () => {
     authDb.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       family_name TEXT NOT NULL UNIQUE,
+      display_name TEXT,
       password_hash TEXT NOT NULL,
       admin_password_hash TEXT,
+      purpose TEXT,
+      encryption_enabled BOOLEAN DEFAULT 0,
+      encryption_salt TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`, (err) => {
@@ -91,20 +95,66 @@ const initializeAuthDb = () => {
       } else {
         console.log('Authentication database initialized');
         
-        // Check if admin_password_hash column exists, if not add it (for existing databases)
+        // Check and add missing columns for existing databases
         authDb.all("PRAGMA table_info(users)", (err, columns) => {
           if (err) {
             console.error('Error checking table structure:', err);
             return;
           }
           
-          const hasAdminPassword = columns.some(col => col.name === 'admin_password_hash');
-          if (!hasAdminPassword) {
+          const columnNames = columns.map(col => col.name);
+          
+          // Check and add admin_password_hash
+          if (!columnNames.includes('admin_password_hash')) {
             authDb.run("ALTER TABLE users ADD COLUMN admin_password_hash TEXT", (err) => {
               if (err) {
                 console.error('Error adding admin_password_hash column:', err);
               } else {
                 console.log('Added admin_password_hash column to users table');
+              }
+            });
+          }
+          
+          // Check and add display_name
+          if (!columnNames.includes('display_name')) {
+            authDb.run("ALTER TABLE users ADD COLUMN display_name TEXT", (err) => {
+              if (err) {
+                console.error('Error adding display_name column:', err);
+              } else {
+                console.log('Added display_name column to users table');
+              }
+            });
+          }
+          
+          // Check and add purpose
+          if (!columnNames.includes('purpose')) {
+            authDb.run("ALTER TABLE users ADD COLUMN purpose TEXT", (err) => {
+              if (err) {
+                console.error('Error adding purpose column:', err);
+              } else {
+                console.log('Added purpose column to users table');
+              }
+            });
+          }
+          
+          // Check and add encryption_enabled
+          if (!columnNames.includes('encryption_enabled')) {
+            authDb.run("ALTER TABLE users ADD COLUMN encryption_enabled BOOLEAN DEFAULT 0", (err) => {
+              if (err) {
+                console.error('Error adding encryption_enabled column:', err);
+              } else {
+                console.log('Added encryption_enabled column to users table');
+              }
+            });
+          }
+          
+          // Check and add encryption_salt
+          if (!columnNames.includes('encryption_salt')) {
+            authDb.run("ALTER TABLE users ADD COLUMN encryption_salt TEXT", (err) => {
+              if (err) {
+                console.error('Error adding encryption_salt column:', err);
+              } else {
+                console.log('Added encryption_salt column to users table');
               }
             });
           }

@@ -67,11 +67,11 @@ export const api = {
     return result;
   },
 
-  async register(familyName, password) {
+  async register(familyName, password, displayName, adminPassword) {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ familyName, password })
+      body: JSON.stringify({ familyName, password, displayName, adminPassword })
     });
     
     const result = await response.json();
@@ -145,6 +145,80 @@ export const api = {
     
     if (!response.ok) {
       throw new Error(result.error || 'Failed to change admin password');
+    }
+    
+    return result;
+  },
+
+  // Family settings operations
+  async getFamilySettings() {
+    const response = await fetch(`${API_BASE_URL}/family/settings`, {
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to fetch family settings');
+    }
+    
+    return result;
+  },
+
+  async getFamilyPurpose(familyName) {
+    const response = await fetch(`${API_BASE_URL}/family/purpose/${encodeURIComponent(familyName)}`);
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to fetch family purpose');
+    }
+    
+    return result;
+  },
+
+  async updateDisplayName(displayName) {
+    const response = await fetch(`${API_BASE_URL}/family/display-name`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ displayName })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update display name');
+    }
+    
+    return result;
+  },
+
+  async updatePurpose(purpose) {
+    const response = await fetch(`${API_BASE_URL}/family/purpose`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ purpose })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update purpose');
+    }
+    
+    return result;
+  },
+
+  async setEncryption(enabled, salt) {
+    const response = await fetch(`${API_BASE_URL}/family/encryption`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ enabled, salt })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update encryption setting');
     }
     
     return result;
@@ -429,6 +503,15 @@ export const api = {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ description })
+    });
+    return response.json();
+  },
+
+  async updateImage(id, updates) {
+    const response = await fetch(`${API_BASE_URL}/images/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
     });
     return response.json();
   },

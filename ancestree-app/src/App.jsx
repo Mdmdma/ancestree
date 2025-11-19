@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import Login from './Login';
 import AdminPanel from './AdminPanel';
 import { api, getAuthToken, getSocketServerUrl } from './api';
+import { encryptedApi } from './encryptedApi';
 import { useSocket } from './hooks/useSocket';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
@@ -53,9 +54,14 @@ const AddNodeOnEdgeDrop = () => {
   }, []);
 
   // Handle successful login
-  const handleLoginSuccess = (userData) => {
+  const handleLoginSuccess = async (userData, password) => {
     setIsAuthenticated(true);
     setUser(userData);
+    try {
+      await encryptedApi.initialize(password);
+    } catch (err) {
+      console.error('Failed to initialize encryption layer:', err);
+    }
   };
 
   // Handle logout
@@ -388,6 +394,7 @@ const AddNodeOnEdgeDrop = () => {
           onClose={handleAdminClose}
           isAuthenticated={isAdminAuthenticated}
           onAuthenticate={handleAdminAuthenticate}
+          familyName={user?.familyName}
         />
       )}
     </div>

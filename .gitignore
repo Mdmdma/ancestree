@@ -60,3 +60,16 @@ coverage/
 # Build outputs
 dist/
 build/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+playwright.config.ts
+package.json
+package-lock.json
+/tests/
+test-imports.js
+.github/workflows/playwright.yml

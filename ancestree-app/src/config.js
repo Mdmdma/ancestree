@@ -263,6 +263,44 @@ export const appConfig = {
       close: "Schließen"
     },
 
+    // Admin Panel texts
+    adminPanel: {
+      title: "⚙️ Admin Panel",
+      authPrompt: "Enter the admin password to access panel settings.",
+      defaultAdminNote: "Default password: adminn",
+      menu: {
+        familyParameters: "Family Parameters",
+        passwords: "Passwords",
+        security: "Security"
+      },
+      familyParameters: {
+        title: "Family Parameters",
+        displayNameLabel: "Display Name",
+        purposeLabel: "Purpose / Description",
+        saveButton: "Save Family Parameters"
+      },
+      passwords: {
+        title: "Passwords",
+        familyPasswordLabel: "Family Password",
+        adminPasswordLabel: "Admin Password",
+        saveButton: "Update Password"
+      },
+      security: {
+        title: "Security",
+        encryptionLabel: "Enable client-side encryption",
+        encryptionHint: "When enabled, all stored data will be encrypted client-side using the family password."
+      }
+    },
+
+    // Admin panel small labels and actions
+    adminPanelCommon: {
+      authenticateButton: 'Authenticate',
+      authenticating: 'Authenticating...',
+      updateButton: 'Update',
+      currentFamilyPasswordLabel: 'Current Family Password (required to re-encrypt):',
+      noDescription: 'No description set.'
+    },
+
     // Map View component
     mapView: {
       title: "🗺️ Wer wohnt wo",

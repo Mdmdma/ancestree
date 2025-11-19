@@ -3,7 +3,9 @@ import { api } from './api.js';
 
 export default function Login({ onLoginSuccess }) {
   const [familyName, setFamilyName] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,13 +33,13 @@ export default function Login({ onLoginSuccess }) {
     try {
       let result;
       if (isRegistering) {
-        result = await api.register(familyName, password);
+        result = await api.register(familyName, password, displayName, adminPassword);
       } else {
         result = await api.login(familyName, password);
       }
 
       console.log('Authentication successful:', result);
-      onLoginSuccess(result.user); // Pass the user data
+      onLoginSuccess(result.user, password); // Pass the user data and password for encryption
     } catch (error) {
       setError(error.message);
     } finally {
@@ -49,7 +51,9 @@ export default function Login({ onLoginSuccess }) {
     setIsRegistering(!isRegistering);
     setError('');
     setFamilyName('');
+    setDisplayName('');
     setPassword('');
+    setAdminPassword('');
   };
 
   return (
@@ -132,13 +136,13 @@ export default function Login({ onLoginSuccess }) {
               fontWeight: 'bold',
               color: '#ecf0f1'
             }}>
-              Family Name:
+              {isRegistering ? 'Unique Family Identifier:' : 'Family Name:'}
             </label>
             <input
               type="text"
               value={familyName}
               onChange={(e) => setFamilyName(e.target.value)}
-              placeholder="Enter your family name"
+              placeholder={isRegistering ? "e.g., smith-family-2024" : "Enter your family name"}
               required
               style={{
                 width: '100%',
@@ -151,7 +155,96 @@ export default function Login({ onLoginSuccess }) {
                 boxSizing: 'border-box'
               }}
             />
+            {isRegistering && (
+              <small style={{
+                display: 'block',
+                marginTop: '5px',
+                fontSize: '12px',
+                color: '#bdc3c7'
+              }}>
+                This is used for login (cannot be changed later)
+              </small>
+            )}
           </div>
+
+          {isRegistering && (
+            <div>
+              <label style={{
+                display: 'block',
+                marginBottom: '5px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#ecf0f1'
+              }}>
+                Admin Password:
+              </label>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Create admin password (min 6 chars)"
+                required
+                minLength={6}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  border: '2px solid #5a6c7d',
+                  backgroundColor: '#ffffff',
+                  color: '#2c3e50',
+                  fontSize: '14px',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <small style={{
+                display: 'block',
+                marginTop: '5px',
+                fontSize: '12px',
+                color: '#bdc3c7'
+              }}>
+                Required to access admin panel and settings
+              </small>
+            </div>
+          )}
+
+          {isRegistering && (
+            <div>
+              <label style={{
+                display: 'block',
+                marginBottom: '5px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#ecf0f1'
+              }}>
+                Display Name:
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g., The Smith Family"
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  border: '2px solid #5a6c7d',
+                  backgroundColor: '#ffffff',
+                  color: '#2c3e50',
+                  fontSize: '14px',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <small style={{
+                display: 'block',
+                marginTop: '5px',
+                fontSize: '12px',
+                color: '#bdc3c7'
+              }}>
+                This is shown in the app (can be changed later)
+              </small>
+            </div>
+          )}
 
           <div>
             <label style={{

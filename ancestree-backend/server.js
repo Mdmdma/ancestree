@@ -438,7 +438,8 @@ app.post('/api/auth/login', async (req, res) => {
         token,
         user: {
           id: user.id,
-          familyName: user.family_name
+          familyName: user.family_name,
+          displayName: user.display_name || user.family_name
         }
       });
     });
@@ -450,14 +451,22 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Register endpoint (for family registration)
 app.post('/api/auth/register', async (req, res) => {
-  const { familyName, password } = req.body;
+  const { familyName, password, displayName, adminPassword } = req.body;
 
   if (!familyName || !password) {
     return res.status(400).json({ error: 'Family name and password are required' });
   }
 
+  if (!adminPassword) {
+    return res.status(400).json({ error: 'Admin password is required' });
+  }
+
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+
+  if (adminPassword.length < 6) {
+    return res.status(400).json({ error: 'Admin password must be at least 6 characters long' });
   }
 
   try {
@@ -473,13 +482,17 @@ app.post('/api/auth/register', async (req, res) => {
       }
 
       try {
-        // Hash password
+        // Hash passwords
         const saltRounds = 10;
         const passwordHash = await bcrypt.hash(password, saltRounds);
+        const adminPasswordHash = await bcrypt.hash(adminPassword, saltRounds);
+
+        // Use displayName if provided, otherwise use familyName
+        const finalDisplayName = displayName || familyName;
 
         // Create user
-        authDb.run('INSERT INTO users (family_name, password_hash) VALUES (?, ?)', 
-          [familyName, passwordHash], 
+        authDb.run('INSERT INTO users (family_name, password_hash, admin_password_hash, display_name) VALUES (?, ?, ?, ?)', 
+          [familyName, passwordHash, adminPasswordHash, finalDisplayName], 
           function(err) {
             if (err) {
               console.error('Database error during user creation:', err);
@@ -506,7 +519,8 @@ app.post('/api/auth/register', async (req, res) => {
               token,
               user: {
                 id: familyId,
-                familyName
+                familyName,
+                displayName: finalDisplayName
               }
             });
           }
@@ -539,12 +553,21 @@ app.get('/api/auth/status', (req, res) => {
 
 // Verify token endpoint
 app.get('/api/auth/verify', authenticateToken, (req, res) => {
-  res.json({
-    success: true,
-    user: {
-      id: req.user.id,
-      familyName: req.user.familyName
+  // Include display name if available
+  authDb.get('SELECT display_name FROM users WHERE id = ?', [req.user.id], (err, row) => {
+    if (err) {
+      console.error('Error fetching display name during token verify:', err);
+      return res.status(500).json({ error: 'Internal server error' });
     }
+
+    res.json({
+      success: true,
+      user: {
+        id: req.user.id,
+        familyName: req.user.familyName,
+        displayName: row ? row.display_name : undefined
+      }
+    });
   });
 });
 
@@ -670,6 +693,117 @@ app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) 
     console.error('Admin password change error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Get family settings (display name, purpose, encryption status)
+app.get('/api/family/settings', authenticateToken, (req, res) => {
+  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt FROM users WHERE id = ?', 
+    [req.user.id], 
+    (err, settings) => {
+      if (err) {
+        console.error('Database error fetching family settings:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!settings) {
+        return res.status(404).json({ error: 'Family not found' });
+      }
+
+      res.json({
+        displayName: settings.display_name,
+        purpose: settings.purpose,
+        encryptionEnabled: Boolean(settings.encryption_enabled),
+        encryptionSalt: settings.encryption_salt
+      });
+    }
+  );
+});
+
+// Get family purpose (public, no auth required for admin panel preview)
+app.get('/api/family/purpose/:familyName', (req, res) => {
+  const { familyName } = req.params;
+  
+  authDb.get('SELECT purpose FROM users WHERE family_name = ?', 
+    [familyName], 
+    (err, result) => {
+      if (err) {
+        console.error('Database error fetching family purpose:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!result) {
+        return res.status(404).json({ error: 'Family not found' });
+      }
+
+      res.json({ purpose: result.purpose || '' });
+    }
+  );
+});
+
+// Update display name
+app.post('/api/family/display-name', authenticateToken, (req, res) => {
+  const { displayName } = req.body;
+
+  if (!displayName) {
+    return res.status(400).json({ error: 'Display name is required' });
+  }
+
+  authDb.run('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [displayName, req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating display name:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Display name updated successfully' });
+    }
+  );
+});
+
+// Update purpose
+app.post('/api/family/purpose', authenticateToken, (req, res) => {
+  const { purpose } = req.body;
+
+  authDb.run('UPDATE users SET purpose = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [purpose || '', req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating purpose:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Purpose updated successfully' });
+    }
+  );
+});
+
+// Set encryption status
+app.post('/api/family/encryption', authenticateToken, (req, res) => {
+  const { enabled, salt } = req.body;
+
+  if (enabled && !salt) {
+    return res.status(400).json({ error: 'Encryption salt is required when enabling encryption' });
+  }
+
+  const updateData = enabled 
+    ? [1, salt, req.user.id]
+    : [0, null, req.user.id];
+
+  authDb.run('UPDATE users SET encryption_enabled = ?, encryption_salt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    updateData, 
+    function(err) {
+      if (err) {
+        console.error('Database error updating encryption status:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: enabled ? 'Encryption enabled successfully' : 'Encryption disabled successfully' 
+      });
+    }
+  );
 });
 
 // ============= PROTECTED API ENDPOINTS =============

@@ -72,7 +72,7 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
           }}
         >
           <span>👨‍👩‍👧‍👦</span>
-          <span>{user.familyName} Family</span>
+          <span>{user.displayName || (user.familyName + ' Family')}</span>
           <span style={{ fontSize: '10px', opacity: 0.7 }}>⚙️</span>
         </button>
       )}
