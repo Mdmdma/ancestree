@@ -165,6 +165,29 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
+// Validate AWS credentials are configured
+const AWS_CREDENTIALS_CONFIGURED = !!(
+  process.env.AWS_ACCESS_KEY_ID && 
+  process.env.AWS_SECRET_ACCESS_KEY && 
+  process.env.AWS_REGION && 
+  process.env.S3_BUCKET_NAME
+);
+
+if (!AWS_CREDENTIALS_CONFIGURED) {
+  console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.warn('⚠️  WARNING: AWS S3 credentials are not configured!');
+  console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.warn('Image uploads will NOT work until you configure:');
+  console.warn('  - AWS_ACCESS_KEY_ID');
+  console.warn('  - AWS_SECRET_ACCESS_KEY');
+  console.warn('  - AWS_REGION');
+  console.warn('  - S3_BUCKET_NAME');
+  console.warn('');
+  console.warn('Please create a .env file with these values.');
+  console.warn('See .env.example for a template.');
+  console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+}
+
 // Configure AWS S3
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -1702,6 +1725,16 @@ app.post('/api/images/upload', authenticateToken, (req, res) => {
   const familyId = req.user.id;
   const familyName = req.user.familyName;
   
+  // Check if AWS credentials are configured before attempting upload
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    console.error('Image upload attempted but AWS credentials are not configured');
+    return res.status(500).json({ 
+      error: 'Server configuration error: AWS S3 credentials not configured. Please contact the administrator.',
+      code: 'AWS_NOT_CONFIGURED',
+      adminMessage: 'Configure AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and S3_BUCKET_NAME in the .env file'
+    });
+  }
+  
   // Use multer upload middleware with error handling
   upload.single('image')(req, res, function(err) {
     // Handle multer errors
@@ -1736,10 +1769,30 @@ app.post('/api/images/upload', authenticateToken, (req, res) => {
         });
       }
       
-      // S3 or other errors
+      // S3 or other errors - provide more helpful messages
+      let errorMessage = err.message;
+      let errorCode = 'UPLOAD_FAILED';
+      
+      // Check for common AWS S3 errors
+      if (err.message.includes('Access Denied') || err.code === 'AccessDenied') {
+        errorMessage = 'AWS S3 Access Denied. Please check that AWS credentials are correctly configured.';
+        errorCode = 'S3_ACCESS_DENIED';
+        console.error('S3 Access Denied - Possible causes:');
+        console.error('  1. AWS credentials are missing or incorrect in .env file');
+        console.error('  2. IAM user does not have S3 permissions');
+        console.error('  3. S3 bucket does not exist or is in a different region');
+      } else if (err.message.includes('Network') || err.code === 'NetworkingError') {
+        errorMessage = 'Network error connecting to AWS S3. Please check your internet connection.';
+        errorCode = 'S3_NETWORK_ERROR';
+      } else if (err.message.includes('NoSuchBucket')) {
+        errorMessage = 'S3 bucket does not exist. Please check S3_BUCKET_NAME in configuration.';
+        errorCode = 'S3_BUCKET_NOT_FOUND';
+      }
+      
       return res.status(500).json({ 
-        error: `Upload failed: ${err.message}`,
-        code: 'UPLOAD_FAILED'
+        error: errorMessage,
+        code: errorCode,
+        originalError: err.message
       });
     }
     

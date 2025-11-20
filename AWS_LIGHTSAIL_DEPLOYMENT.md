@@ -95,16 +95,27 @@ cd ../ancestree-backend
 
 ## Step 6: Configure Environment
 
+**⚠️ CRITICAL STEP - DO NOT SKIP!**
+
 Create the production environment file:
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Configure your `.env` file:
+Configure your `.env` file with **ACTUAL VALUES** (replace all placeholders):
 ```env
-# Google Maps API Key
-VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+# AWS S3 Configuration (REQUIRED for image uploads)
+AWS_ACCESS_KEY_ID=your_access_key          # ← Replace with actual AWS access key
+AWS_SECRET_ACCESS_KEY=your_secret_key      # ← Replace with actual AWS secret key
+AWS_REGION=eu-central-1                    # ← Your S3 bucket region
+S3_BUCKET_NAME=your-bucket-name            # ← Your S3 bucket name
+
+# Google Maps API Key (REQUIRED for map functionality)
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key  # ← Replace with actual key
+
+# JWT Configuration (REQUIRED for authentication)
+JWT_SECRET=change-this-to-a-secure-random-string  # ← Generate with: openssl rand -base64 32
 
 # API URL - use your domain or static IP
 VITE_API_BASE_URL=/api
@@ -112,12 +123,17 @@ VITE_API_BASE_URL=/api
 # Production environment
 NODE_ENV=production
 PORT=3001
+```
 
-# AWS S3 Configuration (if using image uploads)
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_REGION=us-east-1
-S3_BUCKET_NAME=your-bucket-name
+**How to verify your configuration:**
+```bash
+# Check that .env file has no placeholder values
+grep -E "(your_|change-this)" .env
+# This should return NOTHING. If you see any matches, you have placeholders!
+```
+
+> **💡 Tip:** See `TROUBLESHOOTING.md` for common configuration issues.
+
 
 # Frontend URL for CORS (use your domain or IP)
 FRONTEND_URL=http://YOUR_STATIC_IP
@@ -275,6 +291,24 @@ The SQLite database file should be writable by the node process. If you have per
 chmod 644 ancestree.db
 ```
 
+## 🆘 Troubleshooting
+
+For detailed troubleshooting guides, see **`TROUBLESHOOTING.md`**.
+
+Common issues covered:
+- ❌ **"Access Denied" on image upload** → AWS credentials not configured
+- ❌ **"401 Unauthorized"** → JWT_SECRET not set
+- ❌ **Map not loading** → Google Maps API key issue
+- ❌ **CORS errors** → FRONTEND_URL not configured
+- ❌ **Server won't start** → Port conflicts, missing dependencies
+
+Quick diagnostic command:
+```bash
+# Run this to check your configuration
+cd ancestree-deploy
+grep -E "(your_|change-this)" .env && echo "⚠️  WARNING: Found placeholder values in .env!" || echo "✓ No placeholders found"
+```
+
 ## Security Considerations
 
 1. **Always use HTTPS in production**
@@ -283,6 +317,8 @@ chmod 644 ancestree.db
 4. **Regularly backup your database**
 5. **Monitor your application logs**
 6. **Consider setting up automated security updates**
+7. **Never commit .env files to version control**
+8. **Rotate AWS credentials periodically**
 
 ## Cost Estimation
 

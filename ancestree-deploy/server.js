@@ -164,6 +164,29 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
+// Validate AWS credentials are configured
+const AWS_CREDENTIALS_CONFIGURED = !!(
+  process.env.AWS_ACCESS_KEY_ID && 
+  process.env.AWS_SECRET_ACCESS_KEY && 
+  process.env.AWS_REGION && 
+  process.env.S3_BUCKET_NAME
+);
+
+if (!AWS_CREDENTIALS_CONFIGURED) {
+  console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.warn('⚠️  WARNING: AWS S3 credentials are not configured!');
+  console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.warn('Image uploads will NOT work until you configure:');
+  console.warn('  - AWS_ACCESS_KEY_ID');
+  console.warn('  - AWS_SECRET_ACCESS_KEY');
+  console.warn('  - AWS_REGION');
+  console.warn('  - S3_BUCKET_NAME');
+  console.warn('');
+  console.warn('Please create a .env file with these values.');
+  console.warn('See .env.example for a template.');
+  console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+}
+
 // Configure AWS S3
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -1176,50 +1199,135 @@ app.post('/api/geocode', async (req, res) => {
 // ============= IMAGE ENDPOINTS =============
 
 // Upload image
-app.post('/api/images/upload', authenticateToken, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No image file provided' });
-  }
-
-  const imageId = uuidv4();
+app.post('/api/images/upload', authenticateToken, (req, res) => {
   const familyId = req.user.id;
-  const imageData = {
-    id: imageId,
-    filename: req.file.key.split('/').pop(), // Extract filename from S3 key
-    original_filename: req.file.originalname,
-    s3_key: req.file.key,
-    s3_url: req.file.location,
-    description: req.body.description || '',
-    file_size: req.file.size,
-    mime_type: req.file.mimetype,
-    uploaded_by: req.body.uploaded_by || 'anonymous',
-    family_id: familyId
-  };
-
-  db.run(`INSERT INTO images (
-    id, filename, original_filename, s3_key, s3_url, description, 
-    file_size, mime_type, uploaded_by, family_id
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    imageData.id,
-    imageData.filename,
-    imageData.original_filename,
-    imageData.s3_key,
-    imageData.s3_url,
-    imageData.description,
-    imageData.file_size,
-    imageData.mime_type,
-    imageData.uploaded_by,
-    imageData.family_id
-  ], function(err) {
+  
+  // Check if AWS credentials are configured before attempting upload
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    console.error('Image upload attempted but AWS credentials are not configured');
+    return res.status(500).json({ 
+      error: 'Server configuration error: AWS S3 credentials not configured. Please contact the administrator.',
+      code: 'AWS_NOT_CONFIGURED',
+      adminMessage: 'Configure AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and S3_BUCKET_NAME in the .env file'
+    });
+  }
+  
+  // Use multer upload middleware with error handling
+  upload.single('image')(req, res, function(err) {
+    // Handle multer errors
     if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: err.message });
+      console.error('Multer error:', err);
+      
+      if (err instanceof multer.MulterError) {
+        // Multer-specific errors
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ 
+            error: 'File too large. Maximum file size is 10MB.',
+            code: 'FILE_TOO_LARGE'
+          });
+        }
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          return res.status(400).json({ 
+            error: 'Unexpected file field.',
+            code: 'INVALID_FIELD'
+          });
+        }
+        return res.status(400).json({ 
+          error: `Upload error: ${err.message}`,
+          code: 'UPLOAD_ERROR'
+        });
+      }
+      
+      // File filter errors
+      if (err.message.includes('Only image files')) {
+        return res.status(400).json({ 
+          error: 'Only image files are allowed (JPEG, PNG, GIF, WebP).',
+          code: 'INVALID_FILE_TYPE'
+        });
+      }
+      
+      // S3 or other errors - provide more helpful messages
+      let errorMessage = err.message;
+      let errorCode = 'UPLOAD_FAILED';
+      
+      // Check for common AWS S3 errors
+      if (err.message.includes('Access Denied') || err.code === 'AccessDenied') {
+        errorMessage = 'AWS S3 Access Denied. Please check that AWS credentials are correctly configured.';
+        errorCode = 'S3_ACCESS_DENIED';
+        console.error('S3 Access Denied - Possible causes:');
+        console.error('  1. AWS credentials are missing or incorrect in .env file');
+        console.error('  2. IAM user does not have S3 permissions');
+        console.error('  3. S3 bucket does not exist or is in a different region');
+      } else if (err.message.includes('Network') || err.code === 'NetworkingError') {
+        errorMessage = 'Network error connecting to AWS S3. Please check your internet connection.';
+        errorCode = 'S3_NETWORK_ERROR';
+      } else if (err.message.includes('NoSuchBucket')) {
+        errorMessage = 'S3 bucket does not exist. Please check S3_BUCKET_NAME in configuration.';
+        errorCode = 'S3_BUCKET_NOT_FOUND';
+      }
+      
+      return res.status(500).json({ 
+        error: errorMessage,
+        code: errorCode,
+        originalError: err.message
+      });
+    }
+    
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No image file provided.',
+        code: 'NO_FILE'
+      });
     }
 
-    res.json({
-      success: true,
-      image: imageData
-    });
+    try {
+      const imageId = uuidv4();
+      const imageData = {
+        id: imageId,
+        filename: req.file.key.split('/').pop(), // Extract filename from S3 key
+        original_filename: req.file.originalname,
+        s3_key: req.file.key,
+        s3_url: req.file.location,
+        description: req.body.description || '',
+        file_size: req.file.size,
+        mime_type: req.file.mimetype,
+        uploaded_by: req.body.uploaded_by || 'anonymous',
+        family_id: familyId
+      };
+
+      db.run(`INSERT INTO images (
+        id, filename, original_filename, s3_key, s3_url, description, 
+        file_size, mime_type, uploaded_by, family_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        imageData.id,
+        imageData.filename,
+        imageData.original_filename,
+        imageData.s3_key,
+        imageData.s3_url,
+        imageData.description,
+        imageData.file_size,
+        imageData.mime_type,
+        imageData.uploaded_by,
+        imageData.family_id
+      ], function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ 
+            error: `Database error: ${err.message}`,
+            code: 'DATABASE_ERROR'
+          });
+        }
+
+        res.json({
+          success: true,
+          image: imageData
+        });
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      res.status(500).json({ error: 'Failed to upload image' });
+    }
   });
 });
 
