@@ -17,6 +17,7 @@ import BloodlineEdgeHidden from './BloodlineEdgeHidden';
 import BloodlineEdgeFake from './BloodlineEdgeFake';
 import ElkDebugOverlay from './ElkDebugOverlay';
 import { api } from './api';
+import { encryptedApi } from './encryptedApi';
 import { useDebounce } from './hooks/useDebounce';
 
 import '@xyflow/react/dist/style.css';
@@ -374,7 +375,7 @@ const FamilyTree = ({
           try {
             const node = nodes.find(n => n.id === change.id);
             if (node) {
-              await api.updateNode(change.id, { 
+              await encryptedApi.updateNode(change.id, { 
                 position: change.position, 
                 data: node.data 
               }, socket?.id);
@@ -398,7 +399,7 @@ const FamilyTree = ({
         deletionAttemptsRef.current.add(change.id);
         
         try {
-          await api.deleteNode(change.id);
+          await encryptedApi.deleteNode(change.id);
           console.log('FamilyTree: Successfully deleted node:', change.id);
         } catch (error) {
           console.error('Failed to delete node:', error);
@@ -420,7 +421,7 @@ const FamilyTree = ({
     for (const change of changes) {
       if (change.type === 'remove') {
         try {
-          await api.deleteEdge(change.id);
+          await encryptedApi.deleteEdge(change.id);
         } catch (error) {
           console.error('Failed to delete edge:', error);
         }
@@ -433,8 +434,8 @@ const FamilyTree = ({
     const loadData = async () => {
       try {
         const [nodesData, edgesData] = await Promise.all([
-          api.loadNodes(),
-          api.loadEdges()
+          encryptedApi.loadNodes(),
+          encryptedApi.loadEdges()
         ]);
         
         // Ensure nodes have proper React Flow properties
@@ -502,8 +503,8 @@ const FamilyTree = ({
   const refreshData = useCallback(async () => {
     try {
       const [nodesData, edgesData] = await Promise.all([
-        api.loadNodes(),
-        api.loadEdges()
+        encryptedApi.loadNodes(),
+        encryptedApi.loadEdges()
       ]);
       
       // Process nodes with React Flow properties
@@ -1096,7 +1097,7 @@ const FamilyTree = ({
         const node = nodes.find(n => n.id === nodeId);
         if (node) {
           try {
-            await api.updateNode(nodeId, { 
+            await encryptedApi.updateNode(nodeId, { 
               position: position, 
               data: node.data 
             });
@@ -1192,7 +1193,7 @@ const FamilyTree = ({
       try {
         if (existingHiddenEdge) {
           // Replace hidden bloodline edge with normal bloodline edge
-          await api.deleteEdge(existingHiddenEdge.id);
+          await encryptedApi.deleteEdge(existingHiddenEdge.id);
           
           const replacementEdge = {
             ...existingHiddenEdge,
@@ -1201,7 +1202,7 @@ const FamilyTree = ({
             data: { isDebugMode: showDebug }
           };
           
-          await api.createEdge(replacementEdge, socket?.id);
+          await encryptedApi.createEdge(replacementEdge, socket?.id);
           
           // Add the replacement edge to local state immediately
           setEdges((eds) => {
@@ -1210,7 +1211,7 @@ const FamilyTree = ({
           });
         } else {
           // Create new edge normally
-          await api.createEdge(newEdge, socket?.id);
+          await encryptedApi.createEdge(newEdge, socket?.id);
           
           // Add the edge to local state immediately
           setEdges((eds) => [...eds, newEdge]);
@@ -1258,7 +1259,7 @@ const FamilyTree = ({
                 data: { ...partnerNode.data, bloodline: false }
               };
               
-              await api.updateNode(partnerNode.id, { 
+              await encryptedApi.updateNode(partnerNode.id, { 
                 position: partnerNode.position, 
                 data: updatedPartnerNode.data 
               });
@@ -1282,7 +1283,7 @@ const FamilyTree = ({
                 for (const familyEdge of partnerFamilyEdges) {
                   if (familyEdge.type === 'bloodline') {
                     // Delete old edge and create new fake bloodline edge
-                    api.deleteEdge(familyEdge.id);
+                    encryptedApi.deleteEdge(familyEdge.id);
                     
                     const updatedFamilyEdge = { 
                       ...familyEdge, 
@@ -1290,7 +1291,7 @@ const FamilyTree = ({
                       id: getId() // Generate new ID for the replacement edge
                     };
                     
-                    api.createEdge(updatedFamilyEdge, socket?.id);
+                    encryptedApi.createEdge(updatedFamilyEdge, socket?.id);
                     
                     // Remove old edge and add new fake edge to local state immediately
                     updatedEdges = updatedEdges.filter(e => e.id !== familyEdge.id);
@@ -1344,7 +1345,7 @@ const FamilyTree = ({
                     }
                     
                     if (hiddenEdge) {
-                      api.createEdge(hiddenEdge, socket?.id);
+                      encryptedApi.createEdge(hiddenEdge, socket?.id);
                       // Add hidden edge to local state immediately
                       updatedEdges.push(hiddenEdge);
                     }
@@ -1831,13 +1832,13 @@ const FamilyTree = ({
           if (newNode && newEdge) {
             // Save to database - node will be added via socket event
             console.log('[CREATE NODE] Creating node via API, Node ID:', newNode.id);
-            await api.createNode(newNode, socket?.id);
+            await encryptedApi.createNode(newNode, socket?.id);
             // Note: Don't add node to local state here - let socket listener handle it
 
             // Create edge after a short delay
             setTimeout(async () => {
               try {
-                await api.createEdge(newEdge, socket?.id);
+                await encryptedApi.createEdge(newEdge, socket?.id);
                 
                 // Add the edge to local state immediately
                 setEdges((eds) => [...eds, newEdge]);
@@ -1884,7 +1885,7 @@ const FamilyTree = ({
                   // Create partner edge after a short delay to ensure the first edge is processed
                   setTimeout(async () => {
                     try {
-                      await api.createEdge(partnerEdge, socket?.id);
+                      await encryptedApi.createEdge(partnerEdge, socket?.id);
                       
                       // Add partner edge to local state immediately
                       setEdges((eds) => [...eds, partnerEdge]);
@@ -1940,7 +1941,7 @@ const FamilyTree = ({
                       // Create the hidden edge
                       setTimeout(async () => {
                         try {
-                          await api.createEdge(hiddenEdge, socket?.id);
+                          await encryptedApi.createEdge(hiddenEdge, socket?.id);
                           
                           // Add hidden edge to local state immediately
                           setEdges((eds) => [...eds, hiddenEdge]);

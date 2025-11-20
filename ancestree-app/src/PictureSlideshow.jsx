@@ -1,3 +1,4 @@
+import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { appConfig } from './config';
 import { api } from './api';
@@ -79,7 +80,7 @@ const PictureSlideshow = ({
       } else {
         // Load all family images
         console.log('PictureSlideshow: Loading all family images...');
-        imagesData = await api.loadImages();
+        imagesData = await encryptedApi.loadImages();
       }
       
       console.log('PictureSlideshow: Loaded images data:', imagesData);
@@ -134,7 +135,7 @@ const PictureSlideshow = ({
 
   const saveDescription = useCallback(async () => {
     try {
-      await api.updateImageDescription(images[currentIndex].id, descriptionValue);
+      await encryptedApi.updateImageDescription(images[currentIndex].id, descriptionValue);
 
       // Update the current image and images array
       const updatedImages = [...images];

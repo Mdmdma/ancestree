@@ -3,7 +3,7 @@
  * Wraps all API calls to automatically encrypt/decrypt data based on session state
  */
 
-import { baseApi } from './api';
+import { api as baseApi } from './api';
 import {
   isEncryptionEnabled,
   getDerivedKey,
@@ -232,27 +232,14 @@ export const encryptedApi = {
   async loadNodes() {
     const nodes = await baseApi.loadNodes();
     
-    const encEnabled = isEncryptionEnabled();
-    const key = getDerivedKey();
-    console.log('[EncryptedAPI] loadNodes - encryption enabled:', encEnabled, 'has key:', !!key, 'nodes count:', nodes.length);
-    
-    if (!encEnabled) {
-      console.log('[EncryptedAPI] Returning nodes without decryption (encryption disabled)');
-      return nodes;
-    }
-    
-    if (!key) {
-      console.warn('[EncryptedAPI] Encryption enabled but no key - returning encrypted data');
+    if (!isEncryptionEnabled()) {
       return nodes;
     }
     
     // Decrypt all nodes
-    console.log('[EncryptedAPI] Decrypting', nodes.length, 'nodes...');
     const decryptedNodes = [];
     for (const node of nodes) {
-      const decrypted = await decryptNodeData(node);
-      console.log('[EncryptedAPI] Node', node.id, 'decryption - first field:', node.data?.firstName?.substring(0, 20), '→', decrypted.data?.firstName?.substring(0, 20));
-      decryptedNodes.push(decrypted);
+      decryptedNodes.push(await decryptNodeData(node));
     }
     
     return decryptedNodes;

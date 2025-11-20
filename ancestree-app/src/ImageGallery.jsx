@@ -1,3 +1,4 @@
+import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
@@ -35,7 +36,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   // Load images from database
   const loadImages = useCallback(async () => {
     try {
-      const imagesData = await api.loadImages();
+      const imagesData = await encryptedApi.loadImages();
       setImages(imagesData);
     } catch (error) {
       console.error('Failed to load images:', error);
@@ -102,7 +103,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     setRetryCount(0);
     
     try {
-      const result = await api.uploadImage(
+      const result = await encryptedApi.uploadImage(
         selectedFile, 
         description, 
         'user',
@@ -194,7 +195,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     }
 
     try {
-      const result = await api.deleteImage(imageId);
+      const result = await encryptedApi.deleteImage(imageId);
       if (result.success) {
         await loadImages();
         setSelectedImage(null);
@@ -302,7 +303,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
 
   const saveDescription = useCallback(async () => {
     try {
-      const result = await api.updateImageDescription(selectedImage.id, descriptionValue);
+      const result = await encryptedApi.updateImageDescription(selectedImage.id, descriptionValue);
       if (result.success) {
         // Update the selected image and images array
         const updatedImage = { ...selectedImage, description: descriptionValue };

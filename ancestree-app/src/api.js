@@ -224,6 +224,38 @@ export const api = {
     return result;
   },
 
+  async updateSkipGeocoding(skipGeocoding) {
+    const response = await fetch(`${API_BASE_URL}/family/skip-geocoding`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ skipGeocoding })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update skip geocoding setting');
+    }
+    
+    return result;
+  },
+
+  async geocodeForEncryption(city, zip, country) {
+    const response = await fetch(`${API_BASE_URL}/geocode-for-encryption`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ city, zip, country })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to geocode address');
+    }
+    
+    return result;
+  },
+
   // Load initial data
   async loadNodes() {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
@@ -649,3 +681,12 @@ export const api = {
     return response.json();
   }
 };
+
+// Export the base API for internal use by encryptedApi
+export const baseApi = api;
+
+// Note: The main 'api' export above is the base API without encryption.
+// Components should use this base API, but for data operations (nodes, edges, images),
+// the encryptedApi wrapper will automatically handle encryption/decryption when enabled.
+// Importing { api } from './api' gives you the base API.
+// Importing { encryptedApi } from './encryptedApi' gives you the encryption-aware wrapper.

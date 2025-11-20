@@ -7,6 +7,7 @@ import Login from './Login';
 import AdminPanel from './AdminPanel';
 import { api, getAuthToken, getSocketServerUrl } from './api';
 import { encryptedApi } from './encryptedApi';
+import { clearSession } from './encryptionSession';
 import { useSocket } from './hooks/useSocket';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
@@ -57,16 +58,13 @@ const AddNodeOnEdgeDrop = () => {
   const handleLoginSuccess = async (userData, password) => {
     setIsAuthenticated(true);
     setUser(userData);
-    try {
-      await encryptedApi.initialize(password);
-    } catch (err) {
-      console.error('Failed to initialize encryption layer:', err);
-    }
+    // Note: Encryption session is initialized in Login.jsx via initializeSession()
   };
 
   // Handle logout
   const handleLogout = () => {
     api.logout();
+    clearSession(); // Clear encryption session
     setIsAuthenticated(false);
     setUser(null);
   };
@@ -134,7 +132,7 @@ const AddNodeOnEdgeDrop = () => {
         return;
       }
 
-      const response = await api.updateNode(nodeId, { position: node.position, data: newData });
+      const response = await encryptedApi.updateNode(nodeId, { position: node.position, data: newData });
       
       if (response.success) {
         // Update the local state
@@ -196,7 +194,7 @@ const AddNodeOnEdgeDrop = () => {
 
       const finalPosition = newPosition || currentNode.position;
       
-      const response = await api.updateNode(nodeId, { position: finalPosition, data: newData });
+      const response = await encryptedApi.updateNode(nodeId, { position: finalPosition, data: newData });
       
       if (response.success) {
         // Update the local state
@@ -395,6 +393,7 @@ const AddNodeOnEdgeDrop = () => {
           isAuthenticated={isAdminAuthenticated}
           onAuthenticate={handleAdminAuthenticate}
           familyName={user?.familyName}
+          onDataReload={() => treeOperations?.refreshData()}
         />
       )}
     </div>

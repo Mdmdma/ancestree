@@ -695,9 +695,9 @@ app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) 
   }
 });
 
-// Get family settings (display name, purpose, encryption status)
+// Get family settings (display name, purpose, encryption status, skip_geocoding)
 app.get('/api/family/settings', authenticateToken, (req, res) => {
-  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt FROM users WHERE id = ?', 
+  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, skip_geocoding FROM users WHERE id = ?', 
     [req.user.id], 
     (err, settings) => {
       if (err) {
@@ -713,7 +713,8 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
         displayName: settings.display_name,
         purpose: settings.purpose,
         encryptionEnabled: Boolean(settings.encryption_enabled),
-        encryptionSalt: settings.encryption_salt
+        encryptionSalt: settings.encryption_salt,
+        skipGeocoding: Boolean(settings.skip_geocoding)
       });
     }
   );
@@ -774,6 +775,23 @@ app.post('/api/family/purpose', authenticateToken, (req, res) => {
       }
 
       res.json({ success: true, message: 'Purpose updated successfully' });
+    }
+  );
+});
+
+// Update skip_geocoding setting
+app.post('/api/family/skip-geocoding', authenticateToken, (req, res) => {
+  const { skipGeocoding } = req.body;
+
+  authDb.run('UPDATE users SET skip_geocoding = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [skipGeocoding ? 1 : 0, req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating skip_geocoding:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Skip geocoding setting updated successfully' });
     }
   );
 });
@@ -1624,6 +1642,56 @@ app.post('/api/geocode', async (req, res) => {
   } catch (error) {
     console.error('Geocoding error:', error.message);
     res.status(500).json({ error: 'Failed to geocode address' });
+  }
+});
+
+// Geocode for encryption - accepts unencrypted address components
+app.post('/api/geocode-for-encryption', authenticateToken, async (req, res) => {
+  const { city, zip, country } = req.body;
+  
+  // Build address from components
+  const addressParts = [city, zip, country].filter(Boolean);
+  if (addressParts.length === 0) {
+    return res.json({ latitude: null, longitude: null });
+  }
+  
+  const address = addressParts.join(', ');
+  
+  try {
+    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!googleMapsApiKey) {
+      return res.status(500).json({ error: 'Google Maps API key not configured' });
+    }
+    
+    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+      params: {
+        address: address.trim(),
+        key: googleMapsApiKey
+      }
+    });
+    
+    if (response.data.status === 'OK' && response.data.results.length > 0) {
+      const result = response.data.results[0];
+      const location = result.geometry.location;
+      
+      // Return coordinates as numbers (client will encrypt them as strings)
+      res.json({
+        latitude: location.lat,
+        longitude: location.lng
+      });
+    } else if (response.data.status === 'ZERO_RESULTS') {
+      // Address not found - return null coordinates
+      res.json({ latitude: null, longitude: null });
+    } else if (response.data.status === 'OVER_QUERY_LIMIT') {
+      res.status(429).json({ error: 'Google Maps API quota exceeded' });
+    } else {
+      console.error('Google Maps API error:', response.data);
+      res.json({ latitude: null, longitude: null });
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error.message);
+    // Return null coordinates on error rather than failing
+    res.json({ latitude: null, longitude: null });
   }
 });
 

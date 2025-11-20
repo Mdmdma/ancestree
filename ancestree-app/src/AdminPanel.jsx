@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
+import { runEncryptionPerformanceTest, formatTestResults, getDatabaseFieldEstimates } from './encryptionPerformanceTest';
+import { enableEncryption, disableEncryption } from './encryptionBatchOperations';
+import { updateEncryptionStatus, updateSkipGeocoding as updateSessionSkipGeocoding, getFamilyPassword } from './encryptionSession';
 
-const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName }) => {
+const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName, onDataReload }) => {
   const [adminPassword, setAdminPassword] = useState('');
   const [newFamilyPassword, setNewFamilyPassword] = useState('');
   const [confirmFamilyPassword, setConfirmFamilyPassword] = useState('');
@@ -14,11 +17,28 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   const [activeTab, setActiveTab] = useState('familyParameters');
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState(null);
+  const [skipGeocoding, setSkipGeocoding] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [authError, setAuthError] = useState('');
   const [encryptionProgress, setEncryptionProgress] = useState(null);
+  
+  // Password confirmation dialog state
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordForEncryption, setPasswordForEncryption] = useState('');
+  const [pendingEncryptionAction, setPendingEncryptionAction] = useState(null); // 'enable' or 'disable'
+  const [passwordDialogError, setPasswordDialogError] = useState('');
+  
+  // Performance test state
+  const [testRunning, setTestRunning] = useState(false);
+  const [testProgress, setTestProgress] = useState(null);
+  const [testResults, setTestResults] = useState(null);
+  const [testConfig, setTestConfig] = useState({
+    fieldCount: 10000,
+    folds: 10,
+    withPadding: true
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -42,6 +62,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
         setDisplayName(settings.displayName || '');
         setEncryptionEnabled(Boolean(settings.encryptionEnabled));
         setEncryptionSalt(settings.encryptionSalt || null);
+        setSkipGeocoding(Boolean(settings.skipGeocoding));
       } catch (err) {
         // ignore if not authenticated
       }
@@ -143,6 +164,32 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRunPerformanceTest = async () => {
+    setTestRunning(true);
+    setTestProgress({ phase: 'starting', percent: 0, message: 'Initializing test...' });
+    setTestResults(null);
+    setError('');
+    
+    try {
+      const results = await runEncryptionPerformanceTest({
+        fieldCount: testConfig.fieldCount,
+        folds: testConfig.folds,
+        withPadding: testConfig.withPadding,
+        onProgress: (progress) => {
+          setTestProgress(progress);
+        }
+      });
+      
+      setTestResults(results);
+      setTestProgress({ phase: 'complete', percent: 100, message: 'Test complete!' });
+    } catch (err) {
+      setError('Test failed: ' + err.message);
+      console.error('Performance test error:', err);
+    } finally {
+      setTestRunning(false);
     }
   };
 
@@ -297,6 +344,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
               <button onClick={() => setActiveTab('familyParameters')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'familyParameters' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.familyParameters}</button>
               <button onClick={() => setActiveTab('passwords')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'passwords' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.passwords}</button>
               <button onClick={() => setActiveTab('security')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'security' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.security}</button>
+              <button onClick={() => setActiveTab('test')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'test' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>🧪 Test</button>
             </div>
 
             {/* Content area */}
@@ -460,37 +508,12 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                     <label style={{ color: 'white', flex: 1 }}>{appConfig.ui.adminPanel.security.encryptionLabel}</label>
                     <button
                       disabled={loading || encryptionProgress !== null}
-                      onClick={async () => {
-                        const enabled = !encryptionEnabled;
-                        setLoading(true);
-                        setError('');
-                        setSuccess('');
-                        setEncryptionProgress({ phase: 'loading', percent: 0, message: 'Initializing...' });
-                        try {
-                          if (enabled) {
-                            // enable encryption via encryptedApi
-                            const { encryptedApi } = await import('./encryptedApi');
-                            await encryptedApi.enableEncryption((progress) => {
-                              setEncryptionProgress(progress);
-                            });
-                            setEncryptionEnabled(true);
-                          } else {
-                            const { encryptedApi } = await import('./encryptedApi');
-                            await encryptedApi.disableEncryption((progress) => {
-                              setEncryptionProgress(progress);
-                            });
-                            setEncryptionEnabled(false);
-                          }
-                          setSuccess(enabled ? 'Encryption enabled' : 'Encryption disabled');
-                        } catch (err) {
-                          setError(err.message);
-                          // Revert state on error
-                          setEncryptionEnabled(!enabled);
-                        } finally {
-                          setLoading(false);
-                          setEncryptionProgress(null);
-                          setTimeout(() => setSuccess(''), 3000);
-                        }
+                      onClick={() => {
+                        // Show password dialog to confirm encryption toggle
+                        setPendingEncryptionAction(encryptionEnabled ? 'disable' : 'enable');
+                        setShowPasswordDialog(true);
+                        setPasswordForEncryption('');
+                        setPasswordDialogError('');
                       }}
                       style={{
                         position: 'relative',
@@ -518,12 +541,464 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       }} />
                     </button>
                   </div>
+                  
+                  {/* Skip Geocoding Toggle */}
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ color: 'white', flex: 1 }}>
+                      Skip Geocoding
+                      <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                        When enabled, coordinates are sent to server for geocoding (not zero-knowledge)
+                      </div>
+                    </label>
+                    <button
+                      disabled={loading}
+                      onClick={async () => {
+                        const newValue = !skipGeocoding;
+                        setLoading(true);
+                        setError('');
+                        setSuccess('');
+                        try {
+                          await api.updateSkipGeocoding(newValue);
+                          setSkipGeocoding(newValue);
+                          updateSessionSkipGeocoding(newValue);
+                          setSuccess(`Geocoding ${newValue ? 'disabled' : 'enabled'}`);
+                          setTimeout(() => setSuccess(''), 3000);
+                        } catch (err) {
+                          setError(`Failed to update geocoding: ${err.message}`);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      style={{
+                        position: 'relative',
+                        width: '60px',
+                        height: '30px',
+                        borderRadius: '15px',
+                        border: 'none',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        backgroundColor: skipGeocoding ? '#27ae60' : '#7f8c8d',
+                        transition: 'background-color 0.3s ease',
+                        opacity: loading ? 0.6 : 1,
+                        padding: 0
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: skipGeocoding ? '33px' : '3px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: 'white',
+                        transition: 'left 0.3s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'test' && (
+                <div style={{ backgroundColor: '#34495e', padding: '20px', borderRadius: '8px' }}>
+                  <h3 style={{ marginTop: 0 }}>🧪 Encryption Performance Test</h3>
+                  <p style={{ color: '#bdc3c7', fontSize: '14px', marginBottom: '20px' }}>
+                    Test the performance implications of encrypting all database fields separately with padding.
+                    This simulates a worst-case scenario for field-level encryption.
+                  </p>
+
+                  {/* Test Configuration */}
+                  <div style={{ backgroundColor: '#2c3e50', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '15px', fontSize: '16px' }}>Test Configuration</h4>
+                    
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px' }}>
+                        Number of Fields: {testConfig.fieldCount.toLocaleString()}
+                      </label>
+                      <input
+                        type="range"
+                        min="100"
+                        max="20000"
+                        step="1000"
+                        value={testConfig.fieldCount}
+                        onChange={(e) => setTestConfig({ ...testConfig, fieldCount: parseInt(e.target.value) })}
+                        disabled={testRunning}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px' }}>
+                        Test Folds (Iterations): {testConfig.folds}
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        step="1"
+                        value={testConfig.folds}
+                        onChange={(e) => setTestConfig({ ...testConfig, folds: parseInt(e.target.value) })}
+                        disabled={testRunning}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                        <input
+                          type="checkbox"
+                          checked={testConfig.withPadding}
+                          onChange={(e) => setTestConfig({ ...testConfig, withPadding: e.target.checked })}
+                          disabled={testRunning}
+                        />
+                        Use Padding (256 chars) - Recommended for production
+                      </label>
+                      <p style={{ fontSize: '12px', color: '#95a5a6', marginTop: '4px', marginLeft: '24px' }}>
+                        Padding hides the actual length of encrypted data for better security.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Database Context */}
+                  <div style={{ backgroundColor: '#2c3e50', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '16px' }}>Database Context</h4>
+                    <div style={{ fontSize: '13px', color: '#ecf0f1' }}>
+                      {(() => {
+                        const estimates = getDatabaseFieldEstimates();
+                        return (
+                          <>
+                            <p style={{ margin: '4px 0' }}>• Typical tree: {estimates.estimatedTotal}</p>
+                            <p style={{ margin: '4px 0' }}>• Large tree: {estimates.largeTree}</p>
+                            <p style={{ margin: '8px 0 4px', fontSize: '12px', color: '#95a5a6' }}>
+                              Testing with {testConfig.fieldCount.toLocaleString()} fields simulates a {
+                                testConfig.fieldCount < 3000 ? 'typical' :
+                                testConfig.fieldCount < 8000 ? 'large' : 'very large'
+                              } family tree.
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Progress Display */}
+                  {testProgress && (
+                    <div style={{ backgroundColor: '#2c3e50', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
+                      <div style={{ marginBottom: '10px', color: '#ecf0f1', fontSize: '14px' }}>
+                        {testProgress.message}
+                        {testProgress.fold && ` (Fold ${testProgress.fold}/${testProgress.totalFolds})`}
+                      </div>
+                      <div style={{
+                        width: '100%',
+                        height: '24px',
+                        backgroundColor: '#1a252f',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        position: 'relative'
+                      }}>
+                        <div style={{
+                          width: `${testProgress.percent}%`,
+                          height: '100%',
+                          backgroundColor: testProgress.phase === 'complete' ? '#27ae60' : '#3498db',
+                          transition: 'width 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          color: 'white'
+                        }}>
+                          {testProgress.percent?.toFixed(0)}%
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Run Test Button */}
+                  <button
+                    onClick={handleRunPerformanceTest}
+                    disabled={testRunning}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      backgroundColor: testRunning ? '#95a5a6' : '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      cursor: testRunning ? 'not-allowed' : 'pointer',
+                      marginBottom: '15px'
+                    }}
+                  >
+                    {testRunning ? '⏳ Running Test...' : '▶️ Run Performance Test'}
+                  </button>
+
+                  {/* Results Display */}
+                  {testResults && (
+                    <div style={{ backgroundColor: '#2c3e50', padding: '15px', borderRadius: '8px' }}>
+                      <h4 style={{ marginTop: 0, marginBottom: '15px', fontSize: '16px' }}>Test Results</h4>
+                      <pre style={{
+                        backgroundColor: '#1a252f',
+                        padding: '15px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        lineHeight: '1.6',
+                        overflow: 'auto',
+                        maxHeight: '400px',
+                        color: '#ecf0f1',
+                        fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+                        whiteSpace: 'pre-wrap',
+                        wordWrap: 'break-word'
+                      }}>
+                        {formatTestResults(testResults)}
+                      </pre>
+                      
+                      {/* Quick Summary Cards */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '15px' }}>
+                        <div style={{ backgroundColor: '#1a252f', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3498db' }}>
+                            {testResults.summary.throughput.fieldsPerSecondEncryption}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#95a5a6', marginTop: '4px' }}>
+                            Enc/sec
+                          </div>
+                        </div>
+                        <div style={{ backgroundColor: '#1a252f', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#2ecc71' }}>
+                            {testResults.summary.throughput.fieldsPerSecondDecryption}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#95a5a6', marginTop: '4px' }}>
+                            Dec/sec
+                          </div>
+                        </div>
+                        <div style={{ backgroundColor: '#1a252f', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#e74c3c' }}>
+                            {testResults.summary.dataOverhead}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#95a5a6', marginTop: '4px' }}>
+                            Overhead
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Export Button */}
+                      <button
+                        onClick={() => {
+                          const blob = new Blob([formatTestResults(testResults)], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `encryption-test-${Date.now()}.txt`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          marginTop: '15px',
+                          backgroundColor: '#16a085',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        💾 Export Results
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         ) : null}
       </div>
+      
+      {/* Password Confirmation Dialog */}
+      {showPasswordDialog && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            style={{
+              backgroundColor: '#2c3e50',
+              padding: '30px',
+              borderRadius: '8px',
+              maxWidth: '450px',
+              width: '90%',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ color: 'white', marginTop: 0, marginBottom: '20px' }}>
+              {pendingEncryptionAction === 'enable' ? '🔒 Enable Encryption' : '🔓 Disable Encryption'}
+            </h3>
+            
+            <p style={{ color: '#bdc3c7', marginBottom: '20px' }}>
+              {pendingEncryptionAction === 'enable'
+                ? 'This will encrypt all data in the database. Please enter your family password to confirm.'
+                : 'This will decrypt all data in the database. Please enter your family password to confirm.'}
+            </p>
+            
+            {passwordDialogError && (
+              <div style={{
+                backgroundColor: '#e74c3c',
+                color: 'white',
+                padding: '12px',
+                borderRadius: '6px',
+                marginBottom: '12px',
+                fontSize: '14px'
+              }}>
+                {passwordDialogError}
+              </div>
+            )}
+            
+            <input
+              type="password"
+              placeholder="Enter family password"
+              value={passwordForEncryption}
+              onChange={(e) => setPasswordForEncryption(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  document.getElementById('confirm-encryption-btn').click();
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                marginBottom: '20px',
+                backgroundColor: '#34495e',
+                border: '1px solid #7f8c8d',
+                borderRadius: '4px',
+                color: 'white',
+                fontSize: '14px'
+              }}
+              autoFocus
+            />
+            
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                id="confirm-encryption-btn"
+                onClick={async () => {
+                  if (!passwordForEncryption) {
+                    setPasswordDialogError('Please enter your family password');
+                    return;
+                  }
+                  
+                  // Verify the password matches the session password
+                  const sessionPassword = getFamilyPassword();
+                  if (passwordForEncryption !== sessionPassword) {
+                    setPasswordDialogError('Incorrect password');
+                    return;
+                  }
+                  
+                  // Clear dialog error and close dialog
+                  setPasswordDialogError('');
+                  setShowPasswordDialog(false);
+                  setLoading(true);
+                  setError('');
+                  setSuccess('');
+                  setEncryptionProgress({ phase: 'loading', percent: 0, message: 'Initializing...' });
+                  
+                  try {
+                    if (pendingEncryptionAction === 'enable') {
+                      // Call enableEncryption with progress callback (password is already in session)
+                      const result = await enableEncryption((progress) => {
+                        setEncryptionProgress(progress);
+                      });
+                      
+                      // Update local and session state with the new salt
+                      setEncryptionEnabled(true);
+                      setEncryptionSalt(result.salt);
+                      await updateEncryptionStatus(true, result.salt);
+                      setSuccess('Encryption enabled successfully');
+                      
+                      // Reload all data so UI shows decrypted values immediately
+                      if (onDataReload) {
+                        console.log('[AdminPanel] Reloading data after enabling encryption...');
+                        await onDataReload();
+                      }
+                    } else {
+                      // Call disableEncryption with progress callback (password is already in session)
+                      await disableEncryption((progress) => {
+                        setEncryptionProgress(progress);
+                      });
+                      
+                      setEncryptionEnabled(false);
+                      setEncryptionSalt(null);
+                      await updateEncryptionStatus(false, null);
+                      setSuccess('Encryption disabled successfully');
+                      
+                      // Reload all data so UI shows unencrypted values immediately
+                      if (onDataReload) {
+                        console.log('[AdminPanel] Reloading data after disabling encryption...');
+                        await onDataReload();
+                      }
+                    }
+                  } catch (err) {
+                    setError(`Encryption operation failed: ${err.message}`);
+                    console.error('Encryption toggle error:', err);
+                  } finally {
+                    setLoading(false);
+                    setEncryptionProgress(null);
+                    setPasswordForEncryption('');
+                    setPendingEncryptionAction(null);
+                    setTimeout(() => setSuccess(''), 3000);
+                  }
+                }}
+                disabled={!passwordForEncryption}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  backgroundColor: passwordForEncryption ? '#27ae60' : '#7f8c8d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  cursor: passwordForEncryption ? 'pointer' : 'not-allowed',
+                  fontWeight: 'bold'
+                }}
+              >
+                Confirm
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowPasswordDialog(false);
+                  setPasswordForEncryption('');
+                  setPendingEncryptionAction(null);
+                  setPasswordDialogError('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  backgroundColor: '#95a5a6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

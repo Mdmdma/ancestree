@@ -1,3 +1,4 @@
+import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import { appConfig } from './config';
 import { api } from './api';

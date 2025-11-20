@@ -1,3 +1,4 @@
+import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
@@ -33,7 +34,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     
     try {
       setLoading(true);
-      const chatMessages = await api.getChatMessages(imageId);
+      const chatMessages = await encryptedApi.getChatMessages(imageId);
       setMessages(chatMessages);
     } catch (error) {
       console.error('Error loading chat messages:', error);

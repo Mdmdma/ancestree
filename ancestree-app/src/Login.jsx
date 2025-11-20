@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api.js';
+import { initializeSession } from './encryptionSession';
 
 export default function Login({ onLoginSuccess }) {
   const [familyName, setFamilyName] = useState('');
@@ -39,6 +40,20 @@ export default function Login({ onLoginSuccess }) {
       }
 
       console.log('Authentication successful:', result);
+      
+      // Initialize encryption session
+      try {
+        const familySettings = await api.getFamilySettings();
+        await initializeSession(password, {
+          ...familySettings,
+          familyName: result.user.familyName
+        });
+        console.log('[Login] Encryption session initialized');
+      } catch (encError) {
+        console.error('[Login] Failed to initialize encryption session:', encError);
+        // Don't fail login if encryption init fails
+      }
+      
       onLoginSuccess(result.user, password); // Pass the user data and password for encryption
     } catch (error) {
       setError(error.message);
