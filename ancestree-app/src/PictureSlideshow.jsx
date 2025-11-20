@@ -76,7 +76,7 @@ const PictureSlideshow = ({
       if (mode === 'person') {
         // Load images for specific person
         console.log('PictureSlideshow: Loading images for person:', personId);
-        imagesData = await api.loadPersonImages(personId);
+        imagesData = await encryptedApi.loadPersonImages(personId);
       } else {
         // Load all family images
         console.log('PictureSlideshow: Loading all family images...');

@@ -82,16 +82,19 @@ export const EDGE_DB_ENCRYPTED_COLUMNS = [
 
 /**
  * Image fields to encrypt
- * Note: id, s3_key, s3_url are NOT encrypted (needed for file access)
+ * Per user requirements: uploadedBy, originalFilename, filename, s3Key, s3Url, description
+ * Description max length: 1000 characters
  */
 export const IMAGE_ENCRYPTED_FIELDS = [
   'filename',
   'originalFilename',
-  'description',
+  'description',  // Max 1000 chars
+  'uploadedBy',
+  's3Key',
+  's3Url',
   'uploadDate',  // Date as string
   'fileSize',    // Size as string
   'mimeType',
-  'uploadedBy',
   'title',       // If images have titles
   'location',    // If images have location text
   'date',        // If images have date text
@@ -105,10 +108,12 @@ export const IMAGE_DB_ENCRYPTED_COLUMNS = [
   'filename',
   'original_filename',
   'description',
+  'uploaded_by',
+  's3_key',
+  's3_url',
   'upload_date',
   'file_size',
-  'mime_type',
-  'uploaded_by'
+  'mime_type'
 ];
 
 /**
@@ -135,10 +140,11 @@ export const IMAGE_PEOPLE_DB_ENCRYPTED_COLUMNS = [
 /**
  * Chat message fields to encrypt
  * Note: id, image_id are NOT encrypted
+ * Per user requirements: userName and message encrypted, max message length: 300 characters
  */
 export const CHAT_MESSAGE_ENCRYPTED_FIELDS = [
   'userName',
-  'message',
+  'message',     // Max 300 chars
   'createdAt'
 ];
 
@@ -202,6 +208,7 @@ export const getEncryptedDbColumns = (dataType) => {
 /**
  * Fields that should NEVER be encrypted
  * These are structural/reference fields needed for DB operations
+ * NOTE: s3_key and s3_url ARE now encrypted per user requirements
  */
 export const NEVER_ENCRYPT_FIELDS = [
   'id',
@@ -211,10 +218,6 @@ export const NEVER_ENCRYPT_FIELDS = [
   'person_id',
   'imageId',
   'personId',
-  's3_key',
-  's3_url',
-  's3Key',
-  's3Url',
   'preferred_image_id',
   'preferredImageId'
 ];

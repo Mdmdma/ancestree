@@ -45,6 +45,7 @@ const geocodeAddress = async (city, zip, country) => {
  */
 const encryptNodeData = async (node) => {
   if (!isEncryptionEnabled()) {
+    console.log('[EncryptionAPI] encryptNodeData - encryption disabled, returning node as-is');
     return node;
   }
   
@@ -54,17 +55,21 @@ const encryptNodeData = async (node) => {
     return node;
   }
   
+  console.log('[EncryptionAPI] encryptNodeData - encrypting node:', node.id, 'name:', node.data?.name);
+  
   const encrypted = { ...node };
   
   if (node.data) {
     encrypted.data = { ...node.data };
     
-    // Encrypt each field
+    // Encrypt each field - NO EXCEPTIONS, encrypt everything including placeholders
     for (const field of NODE_ENCRYPTED_FIELDS) {
-      if (node.data[field] !== null && node.data[field] !== undefined && node.data[field] !== '') {
-        // Convert numbers to strings for encryption
-        const value = String(node.data[field]);
-        encrypted.data[field] = await encryptValueFast(value, key, true);
+      const value = node.data[field];
+      if (value !== null && value !== undefined && value !== '') {
+        const stringValue = String(value);
+        const encryptedValue = await encryptValueFast(stringValue, key, true);
+        console.log(`[EncryptionAPI] Encrypted ${field}: "${stringValue.substring(0, 20)}" → "${encryptedValue.substring(0, 30)}..."`);
+        encrypted.data[field] = encryptedValue;
       }
     }
   }
@@ -86,6 +91,8 @@ const decryptNodeData = async (node) => {
     return node;
   }
   
+  console.log('[EncryptionAPI] decryptNodeData - decrypting node:', node.id);
+  
   const decrypted = { ...node };
   
   if (node.data) {
@@ -94,13 +101,21 @@ const decryptNodeData = async (node) => {
     // Decrypt each field
     for (const field of NODE_ENCRYPTED_FIELDS) {
       if (node.data[field] && typeof node.data[field] === 'string' && node.data[field].startsWith('enc:')) {
-        const decryptedValue = await decryptValueFast(node.data[field], key, true);
-        
-        // Convert back to numbers for latitude/longitude
-        if (field === 'latitude' || field === 'longitude') {
-          decrypted.data[field] = decryptedValue ? parseFloat(decryptedValue) : null;
-        } else {
-          decrypted.data[field] = decryptedValue;
+        try {
+          const decryptedValue = await decryptValueFast(node.data[field], key, true);
+          console.log(`[EncryptionAPI] Decrypted ${field}: "${node.data[field].substring(0, 30)}..." → "${decryptedValue?.substring(0, 20)}"`);
+          
+          // Convert back to numbers for latitude/longitude
+          if (field === 'latitude' || field === 'longitude') {
+            decrypted.data[field] = decryptedValue ? parseFloat(decryptedValue) : null;
+          } else {
+            decrypted.data[field] = decryptedValue;
+          }
+        } catch (error) {
+          console.error(`[EncryptionAPI] Failed to decrypt field "${field}":`, error);
+          console.error(`[EncryptionAPI] Field value:`, node.data[field].substring(0, 50));
+          // Leave the encrypted value as-is if decryption fails
+          decrypted.data[field] = node.data[field];
         }
       }
     }
@@ -142,11 +157,22 @@ const decryptEdgeData = async (edge) => {
   const key = getDerivedKey();
   if (!key) return edge;
   
+  console.log('[EncryptionAPI] decryptEdgeData - decrypting edge:', edge.id);
+  
   const decrypted = { ...edge };
   
   for (const field of EDGE_ENCRYPTED_FIELDS) {
     if (edge[field] && typeof edge[field] === 'string' && edge[field].startsWith('enc:')) {
-      decrypted[field] = await decryptValueFast(edge[field], key, true);
+      try {
+        const decryptedValue = await decryptValueFast(edge[field], key, true);
+        console.log(`[EncryptionAPI] Decrypted edge ${field}: "${edge[field].substring(0, 30)}..." → "${decryptedValue}"`);
+        decrypted[field] = decryptedValue;
+      } catch (error) {
+        console.error(`[EncryptionAPI] Failed to decrypt edge field "${field}":`, error);
+        console.error(`[EncryptionAPI] Edge field value:`, edge[field].substring(0, 50));
+        // Leave the encrypted value as-is if decryption fails
+        decrypted[field] = edge[field];
+      }
     }
   }
   
@@ -188,9 +214,72 @@ const decryptImageData = async (image) => {
   
   const decrypted = { ...image };
   
+  // Decrypt image fields
   for (const field of IMAGE_ENCRYPTED_FIELDS) {
     if (image[field] && typeof image[field] === 'string' && image[field].startsWith('enc:')) {
       decrypted[field] = await decryptValueFast(image[field], key, true);
+    }
+  }
+  
+  // Decrypt person names in the people array (they come from nodes table)
+  if (image.people && Array.isArray(image.people)) {
+    decrypted.people = [];
+    for (const person of image.people) {
+      const decryptedPerson = { ...person };
+      
+      // Decrypt personName and personSurname if they're encrypted
+      if (person.personName && typeof person.personName === 'string' && person.personName.startsWith('enc:')) {
+        decryptedPerson.personName = await decryptValueFast(person.personName, key, true);
+      }
+      if (person.personSurname && typeof person.personSurname === 'string' && person.personSurname.startsWith('enc:')) {
+        decryptedPerson.personSurname = await decryptValueFast(person.personSurname, key, true);
+      }
+      
+      decrypted.people.push(decryptedPerson);
+    }
+  }
+  
+  return decrypted;
+};
+
+/**
+ * Encrypt chat message data before sending
+ */
+const encryptChatMessageData = async (chatMessage) => {
+  if (!isEncryptionEnabled()) {
+    return chatMessage;
+  }
+  
+  const key = getDerivedKey();
+  if (!key) return chatMessage;
+  
+  const encrypted = { ...chatMessage };
+  
+  for (const field of CHAT_MESSAGE_ENCRYPTED_FIELDS) {
+    if (chatMessage[field] !== null && chatMessage[field] !== undefined && chatMessage[field] !== '') {
+      encrypted[field] = await encryptValueFast(String(chatMessage[field]), key, true);
+    }
+  }
+  
+  return encrypted;
+};
+
+/**
+ * Decrypt chat message data after receiving
+ */
+const decryptChatMessageData = async (chatMessage) => {
+  if (!isEncryptionEnabled()) {
+    return chatMessage;
+  }
+  
+  const key = getDerivedKey();
+  if (!key) return chatMessage;
+  
+  const decrypted = { ...chatMessage };
+  
+  for (const field of CHAT_MESSAGE_ENCRYPTED_FIELDS) {
+    if (chatMessage[field] && typeof chatMessage[field] === 'string' && chatMessage[field].startsWith('enc:')) {
+      decrypted[field] = await decryptValueFast(chatMessage[field], key, true);
     }
   }
   
@@ -384,32 +473,170 @@ export const encryptedApi = {
   
   // Image operations with encryption
   async uploadImage(formData) {
-    // Images are uploaded as multipart/form-data
-    // We'll need to encrypt metadata after upload
-    return baseApi.uploadImage(formData);
+    // Upload the image first (multipart/form-data cannot be encrypted)
+    const result = await baseApi.uploadImage(formData);
+    
+    // If encryption is enabled, immediately encrypt the metadata
+    if (isEncryptionEnabled() && result.success && result.image) {
+      const imageId = result.image.id;
+      
+      // Encrypt all metadata fields
+      const metadataToEncrypt = {
+        filename: result.image.filename,
+        originalFilename: result.image.originalFilename,
+        s3Key: result.image.s3Key,
+        s3Url: result.image.s3Url,
+        uploadedBy: result.image.uploadedBy,
+        description: result.image.description,
+        mimeType: result.image.mimeType,
+        uploadDate: result.image.uploadDate
+      };
+      
+      const encryptedMetadata = await encryptImageData(metadataToEncrypt);
+      
+      // Update the image record with encrypted metadata
+      await baseApi.updateImage(imageId, encryptedMetadata);
+      
+      // Return the decrypted result for the UI
+      return {
+        ...result,
+        image: {
+          ...result.image,
+          // Keep the original decrypted values for immediate UI display
+        }
+      };
+    }
+    
+    return result;
+  },
+  
+  async getImage(id) {
+    const image = await baseApi.getImage(id);
+    return await decryptImageData(image);
   },
   
   async updateImage(id, updates) {
     const encryptedUpdates = await encryptImageData(updates);
-    return baseApi.updateImage(id, encryptedUpdates);
+    const result = await baseApi.updateImage(id, encryptedUpdates);
+    return result;
   },
   
+  async updateImageDescription(id, description) {
+    // Validate description length (max 1000 chars)
+    if (description && description.length > 1000) {
+      throw new Error('Description cannot exceed 1000 characters');
+    }
+    
+    const encryptedUpdate = await encryptImageData({ description });
+    const result = await baseApi.updateImageDescription(id, encryptedUpdate.description);
+    return result;
+  },
+
   async deleteImage(id) {
     return baseApi.deleteImage(id);
   },
   
-  // Pass through other image operations
-  tagPersonInImage: baseApi.tagPersonInImage,
-  untagPersonFromImage: baseApi.untagPersonFromImage,
-  getImageTags: baseApi.getImageTags,
-  updatePreferredImage: baseApi.updatePreferredImage,
+  async loadPersonImages(personId) {
+    const images = await baseApi.loadPersonImages(personId);
+    
+    if (!isEncryptionEnabled()) {
+      return images;
+    }
+    
+    // Decrypt all images
+    const decryptedImages = [];
+    for (const image of images) {
+      decryptedImages.push(await decryptImageData(image));
+    }
+    
+    return decryptedImages;
+  },
   
-  // Pass through chat operations (encryption would be applied if needed)
-  sendChatMessage: baseApi.sendChatMessage,
-  getChatMessages: baseApi.getChatMessages,
+  // Image-person tagging operations with encryption
+  async tagPersonInImage(imageId, personId, positionX = null, positionY = null, width = null, height = null) {
+    // Position data is part of IMAGE_PEOPLE_ENCRYPTED_FIELDS if encryption is enabled
+    // For now, pass through as-is since positions are stored separately
+    return baseApi.tagPersonInImage(imageId, personId, positionX, positionY, width, height);
+  },
+  
+  async removePersonFromImage(imageId, personId) {
+    return baseApi.removePersonFromImage(imageId, personId);
+  },
+  
+  async updatePersonPositionInImage(imageId, personId, positionX, positionY, width, height) {
+    return baseApi.updatePersonPositionInImage(imageId, personId, positionX, positionY, width, height);
+  },
+  
+  async getImageTags(imageId) {
+    return baseApi.getImageTags(imageId);
+  },
+  
+  async setPreferredImage(personId, imageId) {
+    return baseApi.setPreferredImage(personId, imageId);
+  },
+  
+  // Chat operations with encryption
+  async getChatMessages(imageId) {
+    const messages = await baseApi.getChatMessages(imageId);
+    
+    const encEnabled = isEncryptionEnabled();
+    const key = getDerivedKey();
+    console.log('[EncryptedAPI] getChatMessages - encryption enabled:', encEnabled, 'has key:', !!key, 'messages count:', messages?.length || 0);
+    
+    if (!encEnabled || !messages || messages.length === 0) {
+      console.log('[EncryptedAPI] Returning messages without decryption - encEnabled:', encEnabled, 'messages:', messages?.length || 0);
+      return messages;
+    }
+    
+    if (!key) {
+      console.warn('[EncryptedAPI] Encryption enabled but no key - returning encrypted messages');
+      return messages;
+    }
+    
+    // Decrypt all chat messages
+    console.log('[EncryptedAPI] Decrypting', messages.length, 'chat messages...');
+    const decryptedMessages = [];
+    for (const message of messages) {
+      const decrypted = await decryptChatMessageData(message);
+      console.log('[EncryptedAPI] Message', message.id, 'decryption - userName:', message.userName?.substring(0, 20), '→', decrypted.userName?.substring(0, 20));
+      decryptedMessages.push(decrypted);
+    }
+    
+    return decryptedMessages;
+  },
+  
+  async postChatMessage(imageId, userName, message) {
+    // Validate message length (max 300 chars)
+    if (message && message.length > 300) {
+      throw new Error('Message cannot exceed 300 characters');
+    }
+    
+    // Encrypt the message data
+    const encryptedData = await encryptChatMessageData({ userName, message });
+    
+    const result = await baseApi.postChatMessage(
+      imageId,
+      encryptedData.userName || userName,
+      encryptedData.message || message
+    );
+    
+    // Decrypt the returned message immediately for display
+    if (result && (result.id || result.message)) {
+      const messageToDecrypt = result.message || result;
+      return {
+        ...result,
+        message: await decryptChatMessageData(messageToDecrypt)
+      };
+    }
+    
+    return result;
+  },
   
   // Pass through cleanup
   cleanup: baseApi.cleanup
 };
 
 export default encryptedApi;
+
+// Export utility functions for use in other components
+export { decryptNodeData, decryptEdgeData };

@@ -19,6 +19,8 @@ import ElkDebugOverlay from './ElkDebugOverlay';
 import { api } from './api';
 import { encryptedApi } from './encryptedApi';
 import { useDebounce } from './hooks/useDebounce';
+import { isEncryptionEnabled, getDerivedKey } from './encryptionSession';
+import { decryptNodeData, decryptEdgeData } from './encryptedApi';
 
 import '@xyflow/react/dist/style.css';
 
@@ -266,37 +268,61 @@ const FamilyTree = ({
     };
 
     // Listen for remote node creation
-    socket.on('node:created', (remoteNode) => {
+    socket.on('node:created', async (remoteNode) => {
       console.log('[SOCKET] Received node:created event for node:', remoteNode.id, 'Current socket ID:', socket.id);
+      
+      // Decrypt the node if encryption is enabled
+      let nodeToAdd = remoteNode;
+      if (isEncryptionEnabled() && getDerivedKey()) {
+        try {
+          nodeToAdd = await decryptNodeData(remoteNode);
+          console.log('[SOCKET] Decrypted node:', nodeToAdd.id);
+        } catch (error) {
+          console.error('[SOCKET] Failed to decrypt node:', error);
+        }
+      }
+      
       setNodes(nds => {
         // Check if node already exists to prevent duplicates
-        if (nds.find(n => n.id === remoteNode.id)) {
-          console.log('[SOCKET] Node already exists, skipping:', remoteNode.id);
+        if (nds.find(n => n.id === nodeToAdd.id)) {
+          console.log('[SOCKET] Node already exists, skipping:', nodeToAdd.id);
           return nds;
         }
-        console.log('[SOCKET] Adding new node:', remoteNode.id);
-        return [...nds, remoteNode];
+        console.log('[SOCKET] Adding new node:', nodeToAdd.id);
+        return [...nds, nodeToAdd];
       });
-      addRecentChangeIndicator(remoteNode.id);
+      addRecentChangeIndicator(nodeToAdd.id);
     });
 
     // Listen for remote node updates
-    socket.on('node:updated', (remoteNode) => {
+    socket.on('node:updated', async (remoteNode) => {
       console.log('Remote node updated:', remoteNode);
+      
+      // Decrypt the node if encryption is enabled
+      let nodeToUpdate = remoteNode;
+      if (isEncryptionEnabled() && getDerivedKey()) {
+        try {
+          nodeToUpdate = await decryptNodeData(remoteNode);
+          console.log('[SOCKET] Decrypted updated node:', nodeToUpdate.id);
+        } catch (error) {
+          console.error('[SOCKET] Failed to decrypt updated node:', error);
+        }
+      }
+      
       setNodes(nds => nds.map(n => 
-        n.id === remoteNode.id 
+        n.id === nodeToUpdate.id 
           ? { 
               ...n, 
-              ...remoteNode, 
+              ...nodeToUpdate, 
               data: { 
                 ...n.data, 
-                ...remoteNode.data, 
+                ...nodeToUpdate.data, 
                 isRecentChange: true 
               } 
             }
           : n
       ));
-      addRecentChangeIndicator(remoteNode.id);
+      addRecentChangeIndicator(nodeToUpdate.id);
     });
 
     // Listen for remote node deletions
@@ -318,25 +344,49 @@ const FamilyTree = ({
     });
 
     // Listen for remote edge creation
-    socket.on('edge:created', (remoteEdge) => {
+    socket.on('edge:created', async (remoteEdge) => {
       console.log('Remote edge created:', remoteEdge);
+      
+      // Decrypt the edge if encryption is enabled
+      let edgeToAdd = remoteEdge;
+      if (isEncryptionEnabled() && getDerivedKey()) {
+        try {
+          edgeToAdd = await decryptEdgeData(remoteEdge);
+          console.log('[SOCKET] Decrypted created edge:', edgeToAdd.id);
+        } catch (error) {
+          console.error('[SOCKET] Failed to decrypt created edge:', error);
+        }
+      }
+      
       setEdges(eds => {
         // Check if edge already exists to prevent duplicates
-        if (eds.find(e => e.id === remoteEdge.id)) {
-          console.log('Edge already exists locally, skipping:', remoteEdge.id);
+        if (eds.find(e => e.id === edgeToAdd.id)) {
+          console.log('Edge already exists locally, skipping:', edgeToAdd.id);
           return eds;
         }
-        console.log('Adding remote edge to local state:', remoteEdge.id);
-        return [...eds, remoteEdge];
+        console.log('Adding remote edge to local state:', edgeToAdd.id);
+        return [...eds, edgeToAdd];
       });
     });
 
     // Listen for remote edge updates
-    socket.on('edge:updated', (remoteEdge) => {
+    socket.on('edge:updated', async (remoteEdge) => {
       console.log('Remote edge updated:', remoteEdge);
+      
+      // Decrypt the edge if encryption is enabled
+      let edgeToUpdate = remoteEdge;
+      if (isEncryptionEnabled() && getDerivedKey()) {
+        try {
+          edgeToUpdate = await decryptEdgeData(remoteEdge);
+          console.log('[SOCKET] Decrypted updated edge:', edgeToUpdate.id);
+        } catch (error) {
+          console.error('[SOCKET] Failed to decrypt updated edge:', error);
+        }
+      }
+      
       setEdges(eds => eds.map(e => 
-        e.id === remoteEdge.id 
-          ? { ...e, ...remoteEdge }
+        e.id === edgeToUpdate.id 
+          ? { ...e, ...edgeToUpdate }
           : e
       ));
     });

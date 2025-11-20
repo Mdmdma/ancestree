@@ -2,6 +2,9 @@ import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
+import { isEncryptionEnabled, getDerivedKey } from './encryptionSession';
+import { decryptValueFast } from './encryptionUtilsOptimized';
+import { CHAT_MESSAGE_ENCRYPTED_FIELDS } from './encryptionFieldDefinitions';
 
 const ChatComponent = ({ imageId, onError, socket }) => {
   const [messages, setMessages] = useState([]);
@@ -93,15 +96,38 @@ const ChatComponent = ({ imageId, onError, socket }) => {
   useEffect(() => {
     if (!socket || !imageId) return;
 
-    const handleNewMessage = (data) => {
+    const handleNewMessage = async (data) => {
       // Only add message if it's for the current image
       if (data.imageId === imageId) {
+        let messageToAdd = data.message;
+        
+        // Decrypt the message if encryption is enabled
+        if (isEncryptionEnabled()) {
+          const key = getDerivedKey();
+          if (key) {
+            const decrypted = { ...messageToAdd };
+            
+            // Decrypt each encrypted field
+            for (const field of CHAT_MESSAGE_ENCRYPTED_FIELDS) {
+              if (messageToAdd[field] && typeof messageToAdd[field] === 'string' && messageToAdd[field].startsWith('enc:')) {
+                try {
+                  decrypted[field] = await decryptValueFast(messageToAdd[field], key, true);
+                } catch (e) {
+                  console.error('Error decrypting chat field:', field, e);
+                }
+              }
+            }
+            
+            messageToAdd = decrypted;
+          }
+        }
+        
         setMessages(prev => {
           // Check if message already exists to avoid duplicates
-          if (prev.some(msg => msg.id === data.message.id)) {
+          if (prev.some(msg => msg.id === messageToAdd.id)) {
             return prev;
           }
-          return [...prev, data.message];
+          return [...prev, messageToAdd];
         });
       }
     };
@@ -125,12 +151,18 @@ const ChatComponent = ({ imageId, onError, socket }) => {
       alert(appConfig.ui.chat.messageRequired);
       return;
     }
+    
+    // Validate message length (max 300 characters)
+    if (message.trim().length > 300) {
+      alert('Message cannot exceed 300 characters');
+      return;
+    }
 
     try {
       setSending(true);
-      const result = await api.postChatMessage(imageId, userName.trim(), message.trim());
+      const result = await encryptedApi.postChatMessage(imageId, userName.trim(), message.trim());
       
-      if (result.success) {
+      if (result.success || result.id) {
         // Don't add the message locally - let Socket.IO broadcast it back
         // This prevents duplicates and ensures all clients see messages in the same order
         setMessage(''); // Clear the input
@@ -390,14 +422,27 @@ const ChatComponent = ({ imageId, onError, socket }) => {
           style={inputStyle}
           required
         />
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleTextareaKeyDown}
-          placeholder={appConfig.ui.chat.messagePlaceholder}
-          style={textareaStyle}
-          required
-        />
+        <div style={{ position: 'relative' }}>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleTextareaKeyDown}
+            placeholder={appConfig.ui.chat.messagePlaceholder}
+            style={textareaStyle}
+            maxLength={300}
+            required
+          />
+          <div style={{
+            position: 'absolute',
+            bottom: '8px',
+            right: '8px',
+            fontSize: '0.75rem',
+            color: message.length > 280 ? '#d32f2f' : '#666',
+            pointerEvents: 'none'
+          }}>
+            {message.length}/300
+          </div>
+        </div>
         <button
           type="submit"
           style={sending ? buttonDisabledStyle : buttonStyle}

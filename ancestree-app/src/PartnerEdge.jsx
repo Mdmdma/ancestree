@@ -5,7 +5,7 @@ import {
   getBezierPath,
   useReactFlow,
 } from "@xyflow/react";
-import { api } from "./api";
+import { encryptedApi } from "./encryptedApi";
 
 export default function PartnerEdge(props) {
   const {
@@ -42,8 +42,8 @@ export default function PartnerEdge(props) {
     const newType = isExpartner ? 'partner' : 'expartner';
     
     try {
-      // Update the edge type in the database
-      await api.updateEdge(id, { type: newType });
+      // Update the edge type in the database using encryptedApi
+      await encryptedApi.updateEdge(id, { type: newType });
       
       // Update the edge type in local state
       setEdges((prevEdges) => 

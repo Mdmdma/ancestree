@@ -222,10 +222,10 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     }
 
     try {
-      const result = await api.tagPersonInImage(selectedImage.id, personId);
+      const result = await encryptedApi.tagPersonInImage(selectedImage.id, personId);
       if (result.success) {
         // Refresh the selected image data
-        const updatedImage = await api.getImage(selectedImage.id);
+        const updatedImage = await encryptedApi.getImage(selectedImage.id);
         setSelectedImage(updatedImage);
         
         // Also refresh the main gallery to update the person count
@@ -271,10 +271,10 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     if (!selectedImage || !personId) return;
 
     try {
-      const result = await api.removePersonFromImage(selectedImage.id, personId);
+      const result = await encryptedApi.removePersonFromImage(selectedImage.id, personId);
       if (result.success) {
         // Refresh the selected image data and the gallery
-        const updatedImage = await api.getImage(selectedImage.id);
+        const updatedImage = await encryptedApi.getImage(selectedImage.id);
         setSelectedImage(updatedImage);
         
         // Also refresh the main gallery to update the person count
@@ -931,25 +931,39 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           
           {editingDescription ? (
             <div>
-              <textarea
-                value={descriptionValue}
-                onChange={handleDescriptionChange}
-                onKeyDown={handleDescriptionKeyDown}
-                placeholder="Enter image description..."
-                className="gallery-description-textarea"
-                style={{
-                  width: '100%',
-                  height: '80px',
-                  padding: '8px',
-                  border: '1px solid #444',
-                  borderRadius: '4px',
-                  backgroundColor: '#2a2a2a',
-                  color: '#ffffff',
-                  fontSize: '14px',
-                  resize: 'vertical',
-                  fontFamily: 'inherit'
-                }}
-              />
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  value={descriptionValue}
+                  onChange={handleDescriptionChange}
+                  onKeyDown={handleDescriptionKeyDown}
+                  placeholder="Enter image description..."
+                  maxLength={1000}
+                  className="gallery-description-textarea"
+                  style={{
+                    width: '100%',
+                    height: '80px',
+                    padding: '8px',
+                    paddingBottom: '24px',
+                    border: '1px solid #444',
+                    borderRadius: '4px',
+                    backgroundColor: '#2a2a2a',
+                    color: '#ffffff',
+                    fontSize: '14px',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  bottom: '8px',
+                  right: '8px',
+                  fontSize: '0.75rem',
+                  color: descriptionValue.length > 950 ? '#d32f2f' : '#888',
+                  pointerEvents: 'none'
+                }}>
+                  {descriptionValue.length}/1000
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                 <button
                   onClick={saveDescription}

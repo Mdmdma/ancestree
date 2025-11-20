@@ -2040,16 +2040,81 @@ app.put('/api/images/:imageId/people/:personId', authenticateToken, (req, res) =
   }
 });
 
-// Update image description
+// Update image (supports all fields for encryption batch operations)
 app.put('/api/images/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
-  const { description } = req.body;
   const familyName = req.user.familyName;
+  
+  // Accept any of these fields for update
+  const {
+    description,
+    filename,
+    originalFilename,
+    s3Key,
+    s3Url,
+    uploadedBy,
+    fileSize,
+    mimeType,
+    uploadDate
+  } = req.body;
 
   try {
     const familyDb = getFamilyDb(familyName);
-    familyDb.run(`UPDATE images SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, 
-    [description, id], function(err) {
+    
+    // Build dynamic UPDATE query based on provided fields
+    const updates = [];
+    const values = [];
+    
+    if (description !== undefined) {
+      updates.push('description = ?');
+      values.push(description);
+    }
+    if (filename !== undefined) {
+      updates.push('filename = ?');
+      values.push(filename);
+    }
+    if (originalFilename !== undefined) {
+      updates.push('original_filename = ?');
+      values.push(originalFilename);
+    }
+    if (s3Key !== undefined) {
+      updates.push('s3_key = ?');
+      values.push(s3Key);
+    }
+    if (s3Url !== undefined) {
+      updates.push('s3_url = ?');
+      values.push(s3Url);
+    }
+    if (uploadedBy !== undefined) {
+      updates.push('uploaded_by = ?');
+      values.push(uploadedBy);
+    }
+    if (fileSize !== undefined) {
+      updates.push('file_size = ?');
+      values.push(fileSize);
+    }
+    if (mimeType !== undefined) {
+      updates.push('mime_type = ?');
+      values.push(mimeType);
+    }
+    if (uploadDate !== undefined) {
+      updates.push('upload_date = ?');
+      values.push(uploadDate);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields provided for update' });
+    }
+    
+    // Always update the updated_at timestamp
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    
+    // Add the id at the end for the WHERE clause
+    values.push(id);
+    
+    const query = `UPDATE images SET ${updates.join(', ')} WHERE id = ?`;
+    
+    familyDb.run(query, values, function(err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -2058,11 +2123,11 @@ app.put('/api/images/:id', authenticateToken, (req, res) => {
         return res.status(404).json({ error: 'Image not found' });
       }
 
-      res.json({ success: true, message: 'Image description updated' });
+      res.json({ success: true, message: 'Image updated successfully' });
     });
   } catch (error) {
-    console.error('Error updating image description:', error);
-    res.status(500).json({ error: 'Failed to update image description' });
+    console.error('Error updating image:', error);
+    res.status(500).json({ error: 'Failed to update image' });
   }
 });
 
@@ -2074,44 +2139,20 @@ app.delete('/api/images/:id', authenticateToken, (req, res) => {
   try {
     const familyDb = getFamilyDb(familyName);
     
-    // First get the image to get S3 key
-    familyDb.get(`SELECT s3_key FROM images WHERE id = ?`, [id], (err, row) => {
+    // Delete from database only (this will cascade delete image_people records)
+    // Note: S3 files are NOT deleted to allow encrypted s3_key/s3_url in database
+    familyDb.run(`DELETE FROM images WHERE id = ?`, [id], function(err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
 
-      if (!row) {
+      if (this.changes === 0) {
         return res.status(404).json({ error: 'Image not found' });
       }
 
-      // Delete from S3
-      const deleteParams = {
-        Bucket: S3_BUCKET_NAME,
-        Key: row.s3_key
-      };
-
-      s3.deleteObject(deleteParams, (s3Err, data) => {
-        if (s3Err) {
-          console.error('S3 deletion error:', s3Err);
-          // Continue with database deletion even if S3 deletion fails
-        }
-
-        // Delete from database (this will cascade delete image_people records)
-        familyDb.run(`DELETE FROM images WHERE id = ?`, [id], function(dbErr) {
-          if (dbErr) {
-            return res.status(500).json({ error: dbErr.message });
-          }
-
-          if (this.changes === 0) {
-          return res.status(404).json({ error: 'Image not found' });
-        }
-
-          res.json({ 
-            success: true, 
-            message: 'Image deleted successfully',
-            s3Deleted: !s3Err
-          });
-        });
+      res.json({ 
+        success: true, 
+        message: 'Image deleted successfully'
       });
     });
   } catch (error) {
@@ -2213,13 +2254,39 @@ app.get('/api/images/:imageId/chat', authenticateToken, (req, res) => {
         return;
       }
 
-      const messages = rows.map(row => ({
-        id: row.id,
-        userName: row.user_name,
-        message: row.message,
-        // Convert SQLite datetime format to ISO format for consistent timezone handling
-        createdAt: row.created_at ? new Date(row.created_at + 'Z').toISOString() : new Date().toISOString()
-      }));
+      const messages = rows.map(row => {
+        let createdAt;
+        
+        // If createdAt is encrypted, return as-is (client will decrypt)
+        if (row.created_at && typeof row.created_at === 'string' && row.created_at.startsWith('enc:')) {
+          createdAt = row.created_at;
+        } else {
+          // Parse unencrypted dates
+          try {
+            // Handle SQLite datetime format (YYYY-MM-DD HH:MM:SS)
+            if (row.created_at) {
+              // If it doesn't already have 'Z' and doesn't include 'T', treat as UTC SQLite format
+              if (!row.created_at.includes('T') && !row.created_at.endsWith('Z')) {
+                createdAt = new Date(row.created_at + 'Z').toISOString();
+              } else {
+                createdAt = new Date(row.created_at).toISOString();
+              }
+            } else {
+              createdAt = new Date().toISOString();
+            }
+          } catch (e) {
+            console.error('Error parsing date:', row.created_at, e);
+            createdAt = new Date().toISOString();
+          }
+        }
+        
+        return {
+          id: row.id,
+          userName: row.user_name,
+          message: row.message,
+          createdAt: createdAt
+        };
+      });
 
       res.json(messages);
     });
@@ -2335,6 +2402,120 @@ app.delete('/api/images/:imageId/chat/:messageId', authenticateToken, (req, res)
   } catch (error) {
     console.error('Error deleting chat message:', error);
     res.status(500).json({ error: 'Failed to delete chat message' });
+  }
+});
+
+// Get ALL chat messages (for batch encryption operations)
+app.get('/api/chat-messages', authenticateToken, (req, res) => {
+  const familyName = req.user.familyName;
+  const familyDb = getFamilyDb(familyName);
+
+  try {
+    const query = `
+      SELECT id, image_id, user_name, message, created_at
+      FROM chat_messages 
+      ORDER BY created_at ASC
+    `;
+
+    familyDb.all(query, [], (err, rows) => {
+      if (err) {
+        console.error('Database error in /api/chat-messages:', err.message);
+        res.status(500).json({ error: err.message });
+        return;
+      }
+
+      const messages = rows.map(row => {
+        let createdAt;
+        
+        // If createdAt is encrypted, return as-is (client will decrypt)
+        if (row.created_at && typeof row.created_at === 'string' && row.created_at.startsWith('enc:')) {
+          createdAt = row.created_at;
+        } else {
+          // Parse unencrypted dates
+          try {
+            // Handle SQLite datetime format (YYYY-MM-DD HH:MM:SS)
+            if (row.created_at) {
+              // If it doesn't already have 'Z' and doesn't include 'T', treat as UTC SQLite format
+              if (!row.created_at.includes('T') && !row.created_at.endsWith('Z')) {
+                createdAt = new Date(row.created_at + 'Z').toISOString();
+              } else {
+                createdAt = new Date(row.created_at).toISOString();
+              }
+            } else {
+              createdAt = new Date().toISOString();
+            }
+          } catch (e) {
+            console.error('Error parsing date:', row.created_at, e);
+            createdAt = new Date().toISOString();
+          }
+        }
+        
+        return {
+          id: row.id,
+          imageId: row.image_id,
+          userName: row.user_name,
+          message: row.message,
+          createdAt: createdAt
+        };
+      });
+
+      res.json(messages);
+    });
+  } catch (error) {
+    console.error('Error fetching all chat messages:', error);
+    res.status(500).json({ error: 'Failed to fetch chat messages' });
+  }
+});
+
+// Update chat message (for batch encryption operations)
+app.put('/api/chat-messages/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const familyName = req.user.familyName;
+  const { userName, message, createdAt } = req.body;
+
+  try {
+    const familyDb = getFamilyDb(familyName);
+    
+    // Build dynamic UPDATE query based on provided fields
+    const updates = [];
+    const values = [];
+    
+    if (userName !== undefined) {
+      updates.push('user_name = ?');
+      values.push(userName);
+    }
+    if (message !== undefined) {
+      updates.push('message = ?');
+      values.push(message);
+    }
+    if (createdAt !== undefined) {
+      updates.push('created_at = ?');
+      values.push(createdAt);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields provided for update' });
+    }
+    
+    // Add the id at the end for the WHERE clause
+    values.push(id);
+    
+    const query = `UPDATE chat_messages SET ${updates.join(', ')} WHERE id = ?`;
+    
+    familyDb.run(query, values, function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Chat message not found' });
+      }
+
+      res.json({ success: true, message: 'Chat message updated successfully' });
+    });
+  } catch (error) {
+    console.error('Error updating chat message:', error);
+    res.status(500).json({ error: 'Failed to update chat message' });
   }
 });
 

@@ -651,6 +651,19 @@ export const api = {
     
     return response.json();
   },
+  
+  async loadChatMessages() {
+    const response = await fetch(`${API_BASE_URL}/chat-messages`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to load all chat messages');
+    }
+    
+    return response.json();
+  },
 
   async postChatMessage(imageId, userName, message) {
     const response = await fetch(`${API_BASE_URL}/images/${imageId}/chat`, {
@@ -662,6 +675,21 @@ export const api = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to post chat message');
+    }
+    
+    return response.json();
+  },
+  
+  async updateChatMessage(id, updates) {
+    const response = await fetch(`${API_BASE_URL}/chat-messages/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update chat message');
     }
     
     return response.json();
