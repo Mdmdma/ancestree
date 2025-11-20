@@ -3,7 +3,7 @@ import { api } from './api';
 import { appConfig } from './config';
 import { runEncryptionPerformanceTest, formatTestResults, getDatabaseFieldEstimates } from './encryptionPerformanceTest';
 import { enableEncryption, disableEncryption } from './encryptionBatchOperations';
-import { updateEncryptionStatus, updateSkipGeocoding as updateSessionSkipGeocoding, getFamilyPassword } from './encryptionSession';
+import { updateEncryptionStatus, updateSkipGeocoding as updateSessionSkipGeocoding, getFamilyPassword, updatePassword } from './encryptionSession';
 
 const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName, onDataReload }) => {
   const [adminPassword, setAdminPassword] = useState('');
@@ -109,28 +109,56 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     }
 
     try {
-      // If encryption is enabled, re-encrypt data with new password on client
+      // If encryption is enabled, automatically handle re-encryption
       if (encryptionEnabled) {
         if (!currentFamilyPassword) {
           setError(appConfig.ui.adminPanel.errors.currentPasswordRequired);
           setLoading(false);
           return;
         }
+        
+        // Use the new streamlined password change with automatic re-encryption
         const { encryptedApi } = await import('./encryptedApi');
-        await encryptedApi.reEncryptWithNewPassword(currentFamilyPassword, newFamilyPassword, (progress) => {
-          setEncryptionProgress(progress);
-        });
+        
+        const result = await encryptedApi.changePasswordWithReEncryption(
+          currentFamilyPassword, 
+          newFamilyPassword, 
+          (progress) => {
+            setEncryptionProgress(progress);
+          }
+        );
+        
+        // Update the password and encryption salt in session
+        if (result.salt) {
+          setEncryptionSalt(result.salt);
+          await updatePassword(newFamilyPassword, result.salt);
+        } else {
+          await updatePassword(newFamilyPassword);
+        }
+        
         setEncryptionProgress(null);
+        setSuccess('Password changed and data re-encrypted successfully!');
+        
+        // Reload all data so UI shows decrypted values with new password
+        if (onDataReload) {
+          console.log('[AdminPanel] Reloading data after password change...');
+          await onDataReload();
+        }
+      } else {
+        // If encryption is not enabled, just change the password normally
+        await api.changeFamilyPassword(newFamilyPassword);
+        // Still update the password in session for future use
+        await updatePassword(newFamilyPassword);
+        setSuccess(appConfig.ui.adminPanel.success.familyPasswordUpdated);
       }
-
-      await api.changeFamilyPassword(newFamilyPassword);
-      setSuccess(appConfig.ui.adminPanel.success.familyPasswordUpdated);
+      
       setNewFamilyPassword('');
       setConfirmFamilyPassword('');
       setCurrentFamilyPassword('');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.message);
+      setEncryptionProgress(null);
     } finally {
       setLoading(false);
     }

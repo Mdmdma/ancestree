@@ -20,7 +20,7 @@ import {
   IMAGE_PEOPLE_ENCRYPTED_FIELDS,
   CHAT_MESSAGE_ENCRYPTED_FIELDS
 } from './encryptionFieldDefinitions';
-import { getDerivedKey, getFamilyPassword, getEncryptionSalt } from './encryptionSession';
+import { getDerivedKey, getFamilyPassword, getEncryptionSalt, startBatchOperation, endBatchOperation } from './encryptionSession';
 
 /**
  * Enable encryption - encrypt all data in all tables
@@ -31,21 +31,24 @@ import { getDerivedKey, getFamilyPassword, getEncryptionSalt } from './encryptio
 export const enableEncryption = async (onProgress = null, onCancel = null) => {
   console.log('[BatchEncryption] Starting encryption enable process...');
   
-  const familyPassword = getFamilyPassword();
-  if (!familyPassword) {
-    throw new Error('Family password not available. Please log in again.');
-  }
-  
-  // Generate new encryption salt
-  const salt = generateSalt();
-  console.log('[BatchEncryption] Generated encryption salt');
-  
-  // Derive encryption key
-  if (onProgress) onProgress({ phase: 'deriving_key', percent: 0, message: 'Deriving encryption key...' });
-  const cryptoKey = await getCachedKey(familyPassword, salt);
-  console.log('[BatchEncryption] Encryption key derived');
+  // Start batch operation mode - pauses geocoding and signals UI to pause renders
+  startBatchOperation();
   
   try {
+    const familyPassword = getFamilyPassword();
+    if (!familyPassword) {
+      throw new Error('Family password not available. Please log in again.');
+    }
+    
+    // Generate new encryption salt
+    const salt = generateSalt();
+    console.log('[BatchEncryption] Generated encryption salt');
+    
+    // Derive encryption key
+    if (onProgress) onProgress({ phase: 'deriving_key', percent: 0, message: 'Deriving encryption key...' });
+    const cryptoKey = await getCachedKey(familyPassword, salt);
+    console.log('[BatchEncryption] Encryption key derived');
+    
     // Fetch all data
     if (onProgress) onProgress({ phase: 'loading', percent: 5, message: 'Loading data from database...' });
     
@@ -202,6 +205,9 @@ export const enableEncryption = async (onProgress = null, onCancel = null) => {
     // Note: Full rollback would require re-saving original data
     // For now, we throw the error and let the user handle it
     throw error;
+  } finally {
+    // Always end batch operation mode to restore normal operation
+    endBatchOperation();
   }
 };
 
@@ -214,12 +220,15 @@ export const enableEncryption = async (onProgress = null, onCancel = null) => {
 export const disableEncryption = async (onProgress = null, onCancel = null) => {
   console.log('[BatchEncryption] Starting encryption disable process...');
   
-  const cryptoKey = getDerivedKey();
-  if (!cryptoKey) {
-    throw new Error('Encryption key not available. Cannot decrypt data.');
-  }
+  // Start batch operation mode - pauses geocoding and signals UI to pause renders
+  startBatchOperation();
   
   try {
+    const cryptoKey = getDerivedKey();
+    if (!cryptoKey) {
+      throw new Error('Encryption key not available. Cannot decrypt data.');
+    }
+    
     // Fetch all data (encrypted)
     if (onProgress) onProgress({ phase: 'loading', percent: 5, message: 'Loading encrypted data...' });
     
@@ -356,5 +365,8 @@ export const disableEncryption = async (onProgress = null, onCancel = null) => {
   } catch (error) {
     console.error('[BatchEncryption] Error during decryption:', error);
     throw error;
+  } finally {
+    // Always end batch operation mode to restore normal operation
+    endBatchOperation();
   }
 };

@@ -19,7 +19,7 @@ import ElkDebugOverlay from './ElkDebugOverlay';
 import { api } from './api';
 import { encryptedApi } from './encryptedApi';
 import { useDebounce } from './hooks/useDebounce';
-import { isEncryptionEnabled, getDerivedKey } from './encryptionSession';
+import { isEncryptionEnabled, getDerivedKey, isBatchOperationInProgress } from './encryptionSession';
 import { decryptNodeData, decryptEdgeData } from './encryptedApi';
 
 import '@xyflow/react/dist/style.css';
@@ -204,6 +204,7 @@ const FamilyTree = ({
   const { screenToFlowPosition, fitView } = useReactFlow();
   const [initialFitDone, setInitialFitDone] = useState(false);
   const [reactFlowReady, setReactFlowReady] = useState(false);
+  const [batchOperationActive, setBatchOperationActive] = useState(false);
 
   // Real-time collaboration setup - use provided socket data
   const { socket, isConnected, userCount, isCollaborating } = socketData || {};
@@ -221,6 +222,23 @@ const FamilyTree = ({
       socket.emit('node:position', { nodeId, position });
     }
   }, 300);
+
+  // Monitor batch operation status to pause renders during encryption operations
+  useEffect(() => {
+    const checkBatchOperation = setInterval(() => {
+      const isBatchActive = isBatchOperationInProgress();
+      if (isBatchActive !== batchOperationActive) {
+        setBatchOperationActive(isBatchActive);
+        if (isBatchActive) {
+          console.log('[FamilyTree] Batch operation started - pausing renders and interactions');
+        } else {
+          console.log('[FamilyTree] Batch operation ended - resuming normal operation');
+        }
+      }
+    }, 500); // Check every 500ms
+    
+    return () => clearInterval(checkBatchOperation);
+  }, [batchOperationActive]);
 
   // Update edges and nodes with debug mode information when showDebug changes
   useEffect(() => {
@@ -2055,6 +2073,33 @@ const FamilyTree = ({
 
   if (loading) {
     return <div>{appConfig.ui.loading.familyTree}</div>;
+  }
+
+  // Show a blocking overlay during batch operations (encryption/decryption/password change)
+  if (batchOperationActive) {
+    return (
+      <div style={{ 
+        width: '100%', 
+        height: '100%', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        color: '#4CAF50',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        textAlign: 'center',
+        padding: '20px'
+      }}>
+        <div>
+          <div style={{ marginBottom: '20px', fontSize: '24px' }}>⚡ Processing...</div>
+          <div>Encryption operation in progress</div>
+          <div style={{ fontSize: '14px', marginTop: '10px', opacity: 0.7 }}>
+            Please wait while we secure your data
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

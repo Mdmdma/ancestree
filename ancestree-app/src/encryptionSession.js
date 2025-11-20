@@ -12,7 +12,9 @@ let sessionState = {
   encryptionSalt: null,
   derivedKey: null,
   skipGeocoding: false,
-  familyName: null
+  familyName: null,
+  isBatchOperationInProgress: false, // Flag to indicate when batch encryption/decryption is happening
+  originalSkipGeocoding: false // Store original setting to restore after batch operation
 };
 
 /**
@@ -74,6 +76,33 @@ export const updateEncryptionStatus = async (enabled, salt = null) => {
     sessionState.derivedKey = null;
     clearCachedKey();
     console.log('[EncryptionSession] Encryption disabled, key cleared');
+  }
+  
+  return getSessionState();
+};
+
+/**
+ * Update password and re-derive encryption key
+ * Used after password changes to update session with new password
+ * @param {string} newPassword - The new family password
+ * @param {string} newSalt - The new encryption salt (optional, uses existing if not provided)
+ * @returns {Promise<Object>} Updated session state
+ */
+export const updatePassword = async (newPassword, newSalt = null) => {
+  console.log('[EncryptionSession] Updating password in session');
+  
+  sessionState.familyPassword = newPassword;
+  
+  // If we have a new salt, update it
+  if (newSalt) {
+    sessionState.encryptionSalt = newSalt;
+  }
+  
+  // If encryption is enabled, re-derive the key with new password
+  if (sessionState.encryptionEnabled && sessionState.encryptionSalt) {
+    console.log('[EncryptionSession] Re-deriving key with new password');
+    sessionState.derivedKey = await getCachedKey(newPassword, sessionState.encryptionSalt);
+    console.log('[EncryptionSession] Key re-derived successfully');
   }
   
   return getSessionState();
@@ -148,7 +177,38 @@ export const isEncryptionEnabled = () => {
  * @returns {boolean} Whether to skip geocoding
  */
 export const shouldSkipGeocoding = () => {
+  // Always skip geocoding during batch operations
+  if (sessionState.isBatchOperationInProgress) {
+    return true;
+  }
   return sessionState.skipGeocoding;
+};
+
+/**
+ * Start a batch operation (enables temporary geocoding skip)
+ */
+export const startBatchOperation = () => {
+  console.log('[EncryptionSession] Starting batch operation - pausing geocoding and UI renders');
+  sessionState.originalSkipGeocoding = sessionState.skipGeocoding;
+  sessionState.isBatchOperationInProgress = true;
+  sessionState.skipGeocoding = true; // Force skip geocoding during batch operations
+};
+
+/**
+ * End a batch operation (restores original geocoding setting)
+ */
+export const endBatchOperation = () => {
+  console.log('[EncryptionSession] Ending batch operation - restoring normal operation');
+  sessionState.isBatchOperationInProgress = false;
+  sessionState.skipGeocoding = sessionState.originalSkipGeocoding;
+};
+
+/**
+ * Check if a batch operation is in progress
+ * @returns {boolean} Whether a batch operation is in progress
+ */
+export const isBatchOperationInProgress = () => {
+  return sessionState.isBatchOperationInProgress;
 };
 
 /**
@@ -257,6 +317,7 @@ if (import.meta.env.DEV) {
 export default {
   initializeSession,
   updateEncryptionStatus,
+  updatePassword,
   updateSkipGeocoding,
   getSessionState,
   getDerivedKey,
@@ -264,6 +325,9 @@ export default {
   getEncryptionSalt,
   isEncryptionEnabled,
   shouldSkipGeocoding,
+  startBatchOperation,
+  endBatchOperation,
+  isBatchOperationInProgress,
   isSessionReady,
   reDeriveKey,
   clearSession,

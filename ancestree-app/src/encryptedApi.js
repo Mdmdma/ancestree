@@ -633,7 +633,238 @@ export const encryptedApi = {
   },
   
   // Pass through cleanup
-  cleanup: baseApi.cleanup
+  cleanup: baseApi.cleanup,
+
+  /**
+   * Change password with automatic re-encryption
+   * This is equivalent to: disable encryption → change password → enable encryption
+   * @param {string} oldPassword - Current family password
+   * @param {string} newPassword - New family password
+   * @param {Function} onProgress - Progress callback
+   * @returns {Promise<{success: boolean, salt: string}>}
+   */
+  async changePasswordWithReEncryption(oldPassword, newPassword, onProgress = null) {
+    console.log('[EncryptedAPI] Starting password change with re-encryption...');
+    
+    // Import encryption utilities and session management
+    const { getCachedKey, generateSalt } = await import('./encryptionUtilsOptimized');
+    const { getEncryptionSalt, startBatchOperation, endBatchOperation } = await import('./encryptionSession');
+    
+    // Start batch operation mode - pauses geocoding and signals UI to pause renders
+    startBatchOperation();
+    
+    try {
+      // Get current encryption salt
+      const currentSalt = getEncryptionSalt();
+      if (!currentSalt) {
+        throw new Error('Encryption is not enabled. Cannot change password.');
+      }
+    
+    // Verify old password by deriving key
+    if (onProgress) onProgress({ phase: 'verifying', percent: 0, message: 'Verifying current password...' });
+    const oldKey = await getCachedKey(oldPassword, currentSalt);
+    if (!oldKey) {
+      throw new Error('Failed to verify current password');
+    }
+    
+    // Step 1: Load all data
+    if (onProgress) onProgress({ phase: 'loading', percent: 5, message: 'Loading encrypted data...' });
+    const [nodes, edges, images, chatMessages] = await Promise.all([
+      baseApi.loadNodes(),
+      baseApi.loadEdges(),
+      baseApi.loadImages(),
+      baseApi.loadChatMessages ? baseApi.loadChatMessages() : Promise.resolve([])
+    ]);
+    
+    console.log(`[EncryptedAPI] Loaded: ${nodes.length} nodes, ${edges.length} edges, ${images.length} images, ${chatMessages.length} messages`);
+    
+    const totalItems = nodes.length + edges.length + images.length + chatMessages.length;
+    let processedItems = 0;
+    
+    if (totalItems === 0) {
+      // No data to re-encrypt, just change password
+      await baseApi.changeFamilyPassword(newPassword);
+      if (onProgress) onProgress({ phase: 'complete', percent: 100, message: 'Password changed (no data to re-encrypt)' });
+      return { success: true, salt: currentSalt };
+    }
+    
+    const updateProgress = (phase, message) => {
+      const percent = 10 + Math.round((processedItems / totalItems) * 80);
+      if (onProgress) {
+        onProgress({ phase, percent, message, current: processedItems, total: totalItems });
+      }
+    };
+    
+    // Step 2: Decrypt all data with old password
+    if (onProgress) onProgress({ phase: 'decrypting', percent: 10, message: 'Decrypting with old password...' });
+    console.log('[EncryptedAPI] Decrypting data with old password...');
+    
+    const decryptedNodes = [];
+    for (const node of nodes) {
+      const decryptedData = { ...node.data };
+      
+      for (const field of NODE_ENCRYPTED_FIELDS) {
+        if (node.data && node.data[field] && typeof node.data[field] === 'string' && node.data[field].startsWith('enc:')) {
+          try {
+            decryptedData[field] = await decryptValueFast(node.data[field], oldKey, true);
+          } catch (error) {
+            console.error(`[EncryptedAPI] Failed to decrypt node ${node.id} field ${field}:`, error);
+            throw new Error(`Failed to decrypt data. Please verify your current password is correct.`);
+          }
+        }
+      }
+      
+      decryptedNodes.push({ ...node, data: decryptedData });
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('decrypting', `Decrypting nodes... (${processedItems}/${totalItems})`);
+    }
+    
+    const decryptedEdges = [];
+    for (const edge of edges) {
+      const decryptedEdge = { ...edge };
+      
+      for (const field of EDGE_ENCRYPTED_FIELDS) {
+        if (edge[field] && typeof edge[field] === 'string' && edge[field].startsWith('enc:')) {
+          try {
+            decryptedEdge[field] = await decryptValueFast(edge[field], oldKey, true);
+          } catch (error) {
+            console.error(`[EncryptedAPI] Failed to decrypt edge ${edge.id} field ${field}:`, error);
+            throw new Error(`Failed to decrypt data. Please verify your current password is correct.`);
+          }
+        }
+      }
+      
+      decryptedEdges.push(decryptedEdge);
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('decrypting', `Decrypting edges... (${processedItems}/${totalItems})`);
+    }
+    
+    const decryptedImages = [];
+    for (const image of images) {
+      const decryptedImage = { ...image };
+      
+      for (const field of IMAGE_ENCRYPTED_FIELDS) {
+        if (image[field] && typeof image[field] === 'string' && image[field].startsWith('enc:')) {
+          try {
+            decryptedImage[field] = await decryptValueFast(image[field], oldKey, true);
+          } catch (error) {
+            console.error(`[EncryptedAPI] Failed to decrypt image ${image.id} field ${field}:`, error);
+            throw new Error(`Failed to decrypt data. Please verify your current password is correct.`);
+          }
+        }
+      }
+      
+      decryptedImages.push(decryptedImage);
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('decrypting', `Decrypting images... (${processedItems}/${totalItems})`);
+    }
+    
+    const decryptedMessages = [];
+    for (const message of chatMessages) {
+      const decryptedMessage = { ...message };
+      
+      for (const field of CHAT_MESSAGE_ENCRYPTED_FIELDS) {
+        if (message[field] && typeof message[field] === 'string' && message[field].startsWith('enc:')) {
+          try {
+            decryptedMessage[field] = await decryptValueFast(message[field], oldKey, true);
+          } catch (error) {
+            console.error(`[EncryptedAPI] Failed to decrypt message ${message.id} field ${field}:`, error);
+            throw new Error(`Failed to decrypt data. Please verify your current password is correct.`);
+          }
+        }
+      }
+      
+      decryptedMessages.push(decryptedMessage);
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('decrypting', `Decrypting messages... (${processedItems}/${totalItems})`);
+    }
+    
+    // Step 3: Generate new salt and derive new key
+    if (onProgress) onProgress({ phase: 'deriving_key', percent: 45, message: 'Generating new encryption key...' });
+    const newSalt = generateSalt();
+    const newKey = await getCachedKey(newPassword, newSalt);
+    console.log('[EncryptedAPI] Generated new salt and derived new key');
+    
+    // Step 4: Re-encrypt all data with new password
+    if (onProgress) onProgress({ phase: 'encrypting', percent: 50, message: 'Encrypting with new password...' });
+    console.log('[EncryptedAPI] Re-encrypting data with new password...');
+    
+    processedItems = 0;
+    
+    for (const node of decryptedNodes) {
+      const encryptedData = { ...node.data };
+      
+      for (const field of NODE_ENCRYPTED_FIELDS) {
+        if (node.data && node.data[field] !== null && node.data[field] !== undefined && node.data[field] !== '') {
+          encryptedData[field] = await encryptValueFast(String(node.data[field]), newKey, true);
+        }
+      }
+      
+      await baseApi.updateNode(node.id, { position: node.position, data: encryptedData });
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('encrypting', `Encrypting nodes... (${processedItems}/${totalItems})`);
+    }
+    
+    for (const edge of decryptedEdges) {
+      const encryptedEdge = { ...edge };
+      
+      for (const field of EDGE_ENCRYPTED_FIELDS) {
+        if (edge[field] !== null && edge[field] !== undefined && edge[field] !== '') {
+          encryptedEdge[field] = await encryptValueFast(String(edge[field]), newKey, true);
+        }
+      }
+      
+      await baseApi.updateEdge(edge.id, encryptedEdge);
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('encrypting', `Encrypting edges... (${processedItems}/${totalItems})`);
+    }
+    
+    for (const image of decryptedImages) {
+      const encryptedImage = { ...image };
+      
+      for (const field of IMAGE_ENCRYPTED_FIELDS) {
+        if (image[field] !== null && image[field] !== undefined && image[field] !== '') {
+          encryptedImage[field] = await encryptValueFast(String(image[field]), newKey, true);
+        }
+      }
+      
+      await baseApi.updateImage(image.id, encryptedImage);
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('encrypting', `Encrypting images... (${processedItems}/${totalItems})`);
+    }
+    
+    for (const message of decryptedMessages) {
+      const encryptedMessage = { ...message };
+      
+      for (const field of CHAT_MESSAGE_ENCRYPTED_FIELDS) {
+        if (message[field] !== null && message[field] !== undefined && message[field] !== '') {
+          encryptedMessage[field] = await encryptValueFast(String(message[field]), newKey, true);
+        }
+      }
+      
+      await baseApi.updateChatMessage(message.id, encryptedMessage);
+      processedItems++;
+      if (processedItems % 5 === 0) updateProgress('encrypting', `Encrypting messages... (${processedItems}/${totalItems})`);
+    }
+    
+    // Step 5: Update encryption settings with new salt and change password
+    if (onProgress) onProgress({ phase: 'saving_settings', percent: 95, message: 'Updating password and encryption settings...' });
+    await baseApi.setEncryption(true, newSalt);
+    await baseApi.changeFamilyPassword(newPassword);
+    
+    console.log('[EncryptedAPI] Password changed and data re-encrypted successfully');
+    if (onProgress) onProgress({ phase: 'complete', percent: 100, message: 'Password changed and data re-encrypted successfully!' });
+    
+    return { success: true, salt: newSalt };
+    
+    } catch (error) {
+      console.error('[EncryptedAPI] Error during password change:', error);
+      throw error;
+    } finally {
+      // Always end batch operation mode to restore normal operation
+      endBatchOperation();
+    }
+  }
 };
 
 export default encryptedApi;
