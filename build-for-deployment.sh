@@ -45,14 +45,6 @@ cp -r ancestree-backend/* ancestree-deploy/
 # Copy built frontend
 cp -r ancestree-app/dist ancestree-deploy/
 
-# Copy deployment checker script
-cp check-deployment.sh ancestree-deploy/
-chmod +x ancestree-deploy/check-deployment.sh
-
-# Copy diagnostic script
-cp diagnose.sh ancestree-deploy/
-chmod +x ancestree-deploy/diagnose.sh
-
 # Create a comprehensive .env.example file
 echo "📝 Creating .env.example with all required configuration..."
 cat > ancestree-deploy/.env.example << 'EOF'
@@ -132,7 +124,6 @@ echo "   ssh ubuntu@YOUR_SERVER_IP"
 echo "   cd ancestree-deploy"
 echo "   cp .env.example .env"
 echo "   nano .env  # Edit and fill in ALL required values"
-echo "   ./check-deployment.sh  # Verify configuration"
 echo ""
 echo "3. 📦 Install dependencies:"
 echo "   npm install"

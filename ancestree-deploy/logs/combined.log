@@ -1008,3 +1008,107 @@
 2025-08-27 23:01 +00:00: Error: ENOENT: no such file or directory, stat '/home/ubuntu/ancestree/ancestree-app/dist/index.html'
 2025-08-27 23:01 +00:00: User connected: bg4fFpXhA1d3LjhIAAAF
 2025-08-27 23:01 +00:00: User bg4fFpXhA1d3LjhIAAAF authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:01 +00:00: User disconnected: bg4fFpXhA1d3LjhIAAAF
+2025-08-27 23:01 +00:00: User bg4fFpXhA1d3LjhIAAAF left family room family-5. Total users: 0
+2025-08-27 23:01 +00:00: User connected: vRw1CMBBRaAJmMtlAAAH
+2025-08-27 23:01 +00:00: User vRw1CMBBRaAJmMtlAAAH authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:13 +00:00: Server running on http://localhost:3001
+2025-08-27 23:13 +00:00: Server also available on local network at http://[your-ip]:3001
+2025-08-27 23:13 +00:00: Socket.IO enabled for real-time collaboration
+2025-08-27 23:13 +00:00: Environment: production
+2025-08-27 23:13 +00:00: (node:2132) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+2025-08-27 23:13 +00:00:  SDK releases are limited to address critical bug fixes and security issues only.
+2025-08-27 23:13 +00:00: 
+2025-08-27 23:13 +00:00: Please migrate your code to use AWS SDK for JavaScript (v3).
+2025-08-27 23:13 +00:00: For more information, check the blog post at https://a.co/cUPnyil
+2025-08-27 23:13 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2025-08-27 23:13 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-08-27 23:13 +00:00: Cleaning up orphaned image references...
+2025-08-27 23:13 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-08-27 23:13 +00:00: No duplicate edges found
+2025-08-27 23:18 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-08-27 23:18 +00:00: Cleaning up orphaned image references...
+2025-08-27 23:18 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-08-27 23:18 +00:00: No duplicate edges found
+2025-08-27 23:19 +00:00: User connected: 81FyCndeTOr-0MNIAAAB
+2025-08-27 23:19 +00:00: User 81FyCndeTOr-0MNIAAAB authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:20 +00:00: User disconnected: 81FyCndeTOr-0MNIAAAB
+2025-08-27 23:20 +00:00: User 81FyCndeTOr-0MNIAAAB left family room family-5. Total users: 0
+2025-08-27 23:20 +00:00: User connected: Q6VadqleO-uG3CGxAAAD
+2025-08-27 23:20 +00:00: User Q6VadqleO-uG3CGxAAAD authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:20 +00:00: User disconnected: Q6VadqleO-uG3CGxAAAD
+2025-08-27 23:20 +00:00: User Q6VadqleO-uG3CGxAAAD left family room family-5. Total users: 0
+2025-08-27 23:20 +00:00: User connected: b9avrUISCgnQwMKLAAAF
+2025-08-27 23:20 +00:00: User b9avrUISCgnQwMKLAAAF authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:23 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-08-27 23:23 +00:00: Cleaning up orphaned image references...
+2025-08-27 23:23 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-08-27 23:23 +00:00: No duplicate edges found
+2025-08-27 23:25 +00:00: User connected: J3eZbnrl-6OhU_27AAAH
+2025-08-27 23:25 +00:00: User J3eZbnrl-6OhU_27AAAH authenticated and joined family room family-5. Total users: 2
+2025-08-27 23:25 +00:00: User disconnected: J3eZbnrl-6OhU_27AAAH
+2025-08-27 23:25 +00:00: User J3eZbnrl-6OhU_27AAAH left family room family-5. Total users: 1
+2025-08-27 23:26 +00:00: User connected: q6zVQia3xKA-KGTWAAAJ
+2025-08-27 23:26 +00:00: User q6zVQia3xKA-KGTWAAAJ authenticated and joined family room family-5. Total users: 2
+2025-08-27 23:28 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-08-27 23:28 +00:00: Cleaning up orphaned image references...
+2025-08-27 23:28 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-08-27 23:28 +00:00: No duplicate edges found
+2025-08-27 23:28 +00:00: User disconnected: q6zVQia3xKA-KGTWAAAJ
+2025-08-27 23:28 +00:00: User q6zVQia3xKA-KGTWAAAJ left family room family-5. Total users: 1
+2025-08-27 23:30 +00:00: User disconnected: b9avrUISCgnQwMKLAAAF
+2025-08-27 23:30 +00:00: User b9avrUISCgnQwMKLAAAF left family room family-5. Total users: 0
+2025-08-27 23:30 +00:00: User connected: 79MliKngABH2VAtaAAAL
+2025-08-27 23:30 +00:00: User 79MliKngABH2VAtaAAAL authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:30 +00:00: User connected: QtH6WdzoViuxEKS_AAAN
+2025-08-27 23:30 +00:00: User QtH6WdzoViuxEKS_AAAN authenticated and joined family room family-5. Total users: 2
+2025-08-27 23:31 +00:00: User disconnected: QtH6WdzoViuxEKS_AAAN
+2025-08-27 23:31 +00:00: User QtH6WdzoViuxEKS_AAAN left family room family-5. Total users: 1
+2025-08-27 23:31 +00:00: User connected: c6X-wH7xEoqdxNm8AAAP
+2025-08-27 23:31 +00:00: User c6X-wH7xEoqdxNm8AAAP authenticated and joined family room family-5. Total users: 2
+2025-08-27 23:32 +00:00: User disconnected: c6X-wH7xEoqdxNm8AAAP
+2025-08-27 23:32 +00:00: User c6X-wH7xEoqdxNm8AAAP left family room family-5. Total users: 1
+2025-08-27 23:33 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-08-27 23:33 +00:00: Cleaning up orphaned image references...
+2025-08-27 23:33 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-08-27 23:33 +00:00: No duplicate edges found
+2025-08-27 23:36 +00:00: User disconnected: 79MliKngABH2VAtaAAAL
+2025-08-27 23:36 +00:00: User 79MliKngABH2VAtaAAAL left family room family-5. Total users: 0
+2025-08-27 23:38 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-08-27 23:38 +00:00: Cleaning up orphaned image references...
+2025-08-27 23:38 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-08-27 23:38 +00:00: No duplicate edges found
+2025-08-27 23:39 +00:00: User connected: -puP49rVEKTb6YE5AAAR
+2025-08-27 23:39 +00:00: User -puP49rVEKTb6YE5AAAR authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:43 +00:00: User disconnected: -puP49rVEKTb6YE5AAAR
+2025-08-27 23:43 +00:00: User -puP49rVEKTb6YE5AAAR left family room family-5. Total users: 0
+2025-08-27 23:43 +00:00: User connected: OZUk81AaumTsI4ukAAAT
+2025-08-27 23:43 +00:00: User OZUk81AaumTsI4ukAAAT authenticated and joined family room family-5. Total users: 1
+2025-08-27 23:43 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-08-27 23:43 +00:00: Cleaning up orphaned image references...
+2025-08-27 23:43 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-08-27 23:43 +00:00: No duplicate edges found
+2025-08-27 23:44 +00:00: User connected: wc_DeDXgZJJOlUrPAAAV
+2025-08-27 23:44 +00:00: User wc_DeDXgZJJOlUrPAAAV authenticated and joined family room family-5. Total users: 2
+2025-08-27 23:44 +00:00: User disconnected: wc_DeDXgZJJOlUrPAAAV
+2025-08-27 23:44 +00:00: User wc_DeDXgZJJOlUrPAAAV left family room family-5. Total users: 1
+2025-08-27 23:45 +00:00: User connected: exFmyml21fG_btPbAAAX
+2025-08-27 23:45 +00:00: User exFmyml21fG_btPbAAAX authenticated and joined family room family-5. Total users: 2
+2025-08-27 23:46 +00:00: User disconnected: exFmyml21fG_btPbAAAX
+2025-08-27 23:46 +00:00: User exFmyml21fG_btPbAAAX left family room family-5. Total users: 1
+2025-09-02 14:49 +00:00: Server running on http://localhost:3001
+2025-09-02 14:49 +00:00: Server also available on local network at http://[your-ip]:3001
+2025-09-02 14:49 +00:00: Socket.IO enabled for real-time collaboration
+2025-09-02 14:49 +00:00: Environment: production
+2025-09-02 14:49 +00:00: (node:58669) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+2025-09-02 14:49 +00:00:  SDK releases are limited to address critical bug fixes and security issues only.
+2025-09-02 14:49 +00:00: 
+2025-09-02 14:49 +00:00: Please migrate your code to use AWS SDK for JavaScript (v3).
+2025-09-02 14:49 +00:00: For more information, check the blog post at https://a.co/cUPnyil
+2025-09-02 14:49 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2025-09-02 14:49 +00:00: Running cleanup routine for null keys and duplicate edges...
+2025-09-02 14:49 +00:00: Cleaning up orphaned image references...
+2025-09-02 14:49 +00:00: Cleaning up duplicate edges with same endpoints and type...
+2025-09-02 14:49 +00:00: No duplicate edges found
+2025-09-02 14:49 +00:00: User connected: MccTZx431quqdANrAAAB
+2025-09-02 14:49 +00:00: User MccTZx431quqdANrAAAB authenticated and joined family room family-5. Total users: 1
