@@ -45,7 +45,7 @@ export default function BloodlineEdgeFake(props) {
                   transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
                   pointerEvents: "all",
                   backgroundColor: "transparent",
-                  color: "red",
+                  color: "var(--edge-bloodline)",
                   border: "none",
                   width: "12px",
                   height: "12px",

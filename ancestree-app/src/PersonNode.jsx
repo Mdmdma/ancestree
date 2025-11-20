@@ -55,7 +55,7 @@ export default function PersonNode({ data }) {
           alignItems: "center",
           justifyContent: "center",
           borderRadius: "8px",
-          backgroundColor: "#e2e8f0",
+          backgroundColor: "var(--node-person-bg)",
           border: "2px solid #bbbdbf",
           padding: "8px 12px",
           width: "120px",
@@ -67,7 +67,7 @@ export default function PersonNode({ data }) {
           <div style={{ 
             fontWeight: "bold", 
             fontSize: "1.2rem", 
-            color: "#374151",
+            color: "var(--node-person-border)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap"
@@ -89,7 +89,7 @@ export default function PersonNode({ data }) {
         flexDirection: "column",
         alignItems: "flex-start",
         borderRadius: "8px",
-        backgroundColor: "#d4edda",
+        backgroundColor: "var(--node-person-bg-selected)",
         border: "3px solid #09380dff",
         padding: "12px",
         gap: "8px",
@@ -99,16 +99,16 @@ export default function PersonNode({ data }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
         <div style={{ flex: "1" }}>
-          <div style={{ fontWeight: "bold", fontSize: "1rem", color: "#222" }}>
+          <div style={{ fontWeight: "bold", fontSize: "1rem", color: "var(--node-person-text-primary)" }}>
             {name} {surname}
           </div>
           {birthDate && (
-            <div style={{ fontSize: "0.75rem", color: "#333" }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-secondary)" }}>
               * {birthDate}
             </div>
           )}
           {deathDate && (
-            <div style={{ fontSize: "0.75rem", color: "#333" }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-secondary)" }}>
               † {deathDate}
             </div>
           )}
@@ -117,7 +117,7 @@ export default function PersonNode({ data }) {
       
       {address && (
         <div style={{ width: "100%" }}>
-          <div style={{ fontSize: "0.75rem", color: "#444" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-tertiary)" }}>
             📍 {address}
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function PersonNode({ data }) {
       
       {phone && (
         <div style={{ width: "100%" }}>
-          <div style={{ fontSize: "0.75rem", color: "#444" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-tertiary)" }}>
             📞 {phone}
           </div>
         </div>
@@ -133,7 +133,7 @@ export default function PersonNode({ data }) {
       
       {email && (
         <div style={{ width: "100%" }}>
-          <div style={{ fontSize: "0.75rem", color: "#444" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-tertiary)" }}>
             ✉️ {email}
           </div>
         </div>
@@ -141,7 +141,7 @@ export default function PersonNode({ data }) {
       
       {isDebugMode && (latitude !== null && longitude !== null) && (
         <div style={{ width: "100%" }}>
-          <div style={{ fontSize: "0.75rem", color: "#666", fontFamily: "monospace" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-debug)", fontFamily: "monospace" }}>
             🌍 {latitude?.toFixed(6)}, {longitude?.toFixed(6)}
           </div>
         </div>

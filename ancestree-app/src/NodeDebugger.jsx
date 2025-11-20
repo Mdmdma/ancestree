@@ -110,7 +110,7 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
     margin: '2px 0',
     borderRadius: '3px',
     border: '1px solid #555',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: 'var(--debug-bg)',
     color: 'white',
     fontSize: '0.8rem',
     height: '30px',
@@ -119,7 +119,7 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
 
   const labelStyle = {
     display: 'block',
-    color: '#ccc',
+    color: 'var(--debug-text-muted)',
     fontSize: '0.75rem',
     marginBottom: '2px',
     marginTop: '8px'
@@ -137,7 +137,7 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
 
   return (
     <div style={{
-      backgroundColor: '#1e1e1e',
+      backgroundColor: 'var(--debug-panel-bg)',
       padding: '15px',
       borderRadius: '5px',
       marginBottom: '20px',
@@ -146,7 +146,7 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
       overflowY: 'auto',
       border: '1px solid #444'
     }}>
-      <h4 style={{ margin: '0 0 15px 0', color: '#FFF' }}>🔧 Node Debugger</h4>
+      <h4 style={{ margin: '0 0 15px 0', color: 'var(--debug-text)' }}>🔧 Node Debugger</h4>
       
       {/* Node Selection */}
       <div style={{ marginBottom: '15px' }}>
@@ -171,15 +171,15 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
       {editingNode && (
         <div>
           {/* Basic Info */}
-          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#333', borderRadius: '5px' }}>
-            <h5 style={{ margin: '0 0 10px 0', color: '#4CAF50' }}>Basic Information</h5>
+          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
+            <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-basic)' }}>Basic Information</h5>
             
             <label style={labelStyle}>ID (Read-only):</label>
             <input
               type="text"
               value={formData.id}
               readOnly
-              style={{...inputStyle, backgroundColor: '#444', cursor: 'not-allowed'}}
+              style={{...inputStyle, backgroundColor: 'var(--debug-input-bg)', cursor: 'not-allowed'}}
             />
 
             <label style={labelStyle}>First Name:</label>
@@ -219,8 +219,8 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           </div>
 
           {/* Dates */}
-          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#333', borderRadius: '5px' }}>
-            <h5 style={{ margin: '0 0 10px 0', color: '#2196F3' }}>Dates</h5>
+          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
+            <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-dates)' }}>Dates</h5>
             
             <label style={labelStyle}>Birth Date:</label>
             <input
@@ -245,7 +245,7 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
                     padding: '6px 8px',
                     border: '1px solid #555',
                     borderRadius: '3px',
-                    backgroundColor: '#f44336',
+                    backgroundColor: 'var(--button-danger-bg)',
                     color: 'white',
                     cursor: 'pointer',
                     fontSize: '0.8rem',
@@ -253,8 +253,8 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
                     height: '30px',
                     minWidth: '30px'
                   }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = '#da190b'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = '#f44336'}
+                  onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-danger-hover)'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-danger-bg)'}
                   title="Clear death date"
                 >
                   ✕
@@ -264,8 +264,8 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           </div>
 
           {/* Address */}
-          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#333', borderRadius: '5px' }}>
-            <h5 style={{ margin: '0 0 10px 0', color: '#FF9800' }}>Address</h5>
+          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
+            <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-address)' }}>Address</h5>
             
             <label style={labelStyle}>Street:</label>
             <input
@@ -309,8 +309,8 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           </div>
 
           {/* Position */}
-          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#333', borderRadius: '5px' }}>
-            <h5 style={{ margin: '0 0 10px 0', color: '#9C27B0' }}>Position</h5>
+          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
+            <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-position)' }}>Position</h5>
             
             <label style={labelStyle}>X Position:</label>
             <input
@@ -331,9 +331,9 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
             />
           </div>
 
-          {/* Connections Info */}
-          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#333', borderRadius: '5px' }}>
-            <h5 style={{ margin: '0 0 10px 0', color: '#FF5722' }}>Connections</h5>
+          {/* Connections */}
+          <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
+            <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-connections)' }}>Connections</h5>
             {(() => {
               const connections = getNodeConnections(editingNode.id);
               return (
@@ -372,13 +372,13 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
               onClick={handleSave}
               style={{
                 ...buttonStyle,
-                backgroundColor: '#4CAF50',
+                backgroundColor: 'var(--button-primary-bg)',
                 color: 'white',
                 flex: 1,
                 marginRight: '5px'
               }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#4CAF50'}
+              onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-primary-hover)'}
+              onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-primary-bg)'}
             >
               💾 Save Changes
             </button>
@@ -387,13 +387,13 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
               onClick={handleDelete}
               style={{
                 ...buttonStyle,
-                backgroundColor: '#f44336',
+                backgroundColor: 'var(--button-danger-bg)',
                 color: 'white',
                 flex: 1,
                 marginLeft: '5px'
               }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#da190b'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#f44336'}
+              onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-danger-hover)'}
+              onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-danger-bg)'}
             >
               🗑️ Delete Node
             </button>

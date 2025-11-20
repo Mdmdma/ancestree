@@ -19,8 +19,8 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
             position: 'absolute',
             top: '10px',
             right: '10px',
-            backgroundColor: '#e74c3c',
-            color: 'white',
+            backgroundColor: 'var(--header-bg)',
+            color: 'var(--header-text)',
             border: 'none',
             padding: '6px 12px',
             borderRadius: '4px',
@@ -46,12 +46,12 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
             top: '10px',
             left: '10px',
             fontSize: '14px',
-            color: '#333',
+            color: 'var(--header-user-text)',
             fontWeight: '600',
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backgroundColor: 'var(--header-user-bg)',
             padding: '6px 12px',
             borderRadius: '6px',
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
@@ -66,7 +66,7 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
             e.target.style.transform = 'translateY(-1px)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            e.target.style.backgroundColor = 'var(--header-user-bg)';
             e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
             e.target.style.transform = 'translateY(0)';
           }}

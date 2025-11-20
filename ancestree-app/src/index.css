@@ -21,7 +21,84 @@
   --search-dropdown-bg: #2d2d2d;
   --search-selected-bg: #3d5afe;
   --search-header-bg: #1a1a1a;
+
+  /* Node colors */
+  --node-person-bg: #e2e8f0;
+  --node-person-bg-selected: #d4edda;
+  --node-person-text-primary: #222;
+  --node-person-text-secondary: #333;
+  --node-person-text-tertiary: #444;
+  --node-person-text-debug: #666;
+  --node-person-border: #374151;
+  --node-family-bg: #f3f4f6;
+  --node-family-border: #374151;
+
+  /* Edge/Handle colors */
+  --handle-parent: #ff6b6b;
+  --handle-child: #dd7f13ff;
+  --handle-partner: #45b7d1;
+  --handle-parent-connection: #8b5cf6;
+  --handle-children-connection: #10b981;
+  --handle-children-port: #059669;
+  --edge-partner: #4ecdc4;
+  --edge-expartner: #999999;
+  --edge-bloodline: red;
+
+  /* Button colors */
+  --button-primary-bg: #4CAF50;
+  --button-primary-hover: #45a049;
+  --button-secondary-bg: #2196F3;
+  --button-secondary-hover: #1976D2;
+  --button-danger-bg: #f44336;
+  --button-danger-hover: #da190b;
+  --button-debug-off: #9C27B0;
+  --button-debug-off-hover: #7B1FA2;
+  --button-debug-on: #FF5722;
+  --button-debug-on-hover: #E64A19;
+
+  /* Sidebar colors */
+  --sidebar-bg: #0a4b11ff;
+  --sidebar-tab-bg: #09380dff;
+  --sidebar-tab-active-bg: #09380dff;
+  --sidebar-text: white;
+
+  /* Login/Admin panel colors */
+  --login-bg: #2c3e50;
+  --login-panel-bg: #34495e;
+  --login-text-primary: #ecf0f1;
+  --login-text-secondary: #bdc3c7;
+  --login-text-muted: #95a5a6;
+  --login-input-border: #5a6c7d;
+  --login-input-bg: #ffffff;
+  --login-input-text: #2c3e50;
+  --login-button-success: #27ae60;
+  --login-button-info: #3498db;
+  --login-error-bg: #e74c3c;
+  --login-border: #5a6c7d;
+
+  /* Debug panel colors */
+  --debug-bg: #2a2a2a;
+  --debug-text: white;
+  --debug-text-muted: #ccc;
+  --debug-section-bg: #333;
+  --debug-input-bg: #444;
+  --debug-section-basic: #4CAF50;
+  --debug-section-dates: #2196F3;
+  --debug-section-address: #FF9800;
+  --debug-section-position: #9C27B0;
+  --debug-section-connections: #FF5722;
+  --debug-panel-bg: #1e1e1e;
+
+  /* AppHeader colors */
+  --header-bg: #e74c3c;
+  --header-text: white;
+  --header-user-text: #333;
+  --header-user-bg: rgba(255, 255, 255, 0.9);
+
+  /* App colors */
+  --app-loading-text: #666;
 }
+
 
 a {
   font-weight: 500;

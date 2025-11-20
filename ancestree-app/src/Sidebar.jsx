@@ -42,7 +42,7 @@ const Sidebar = ({
       style={{ 
       width: '20vw', 
       borderLeft: '1px solid #ccc', 
-      backgroundColor: '#09380dff',
+      backgroundColor: 'var(--sidebar-bg)',
       padding: '0',
       display: 'flex',
       flexDirection: 'column',
@@ -54,8 +54,8 @@ const Sidebar = ({
       {/* Search Section - Always visible at top */}
       <div className="mobile-hide-search" style={{ 
         padding: '16px',
-        borderBottom: '1px solid #0a4b11ff',
-        backgroundColor: '#09380dff'
+        borderBottom: '1px solid var(--sidebar-bg)',
+        backgroundColor: 'var(--sidebar-tab-bg)'
       }}>
         <NodeSearch 
           nodes={nodes}
@@ -76,17 +76,17 @@ const Sidebar = ({
       <div style={{ 
         display: 'flex', 
         borderBottom: '1px solid #ccc',
-        backgroundColor: '#0a4b11ff'
+        backgroundColor: 'var(--sidebar-bg)'
       }}>
         <button
           onClick={() => setActiveTab('editor')}
           style={{
             flex: 1,
             padding: '12px',
-            backgroundColor: activeTab === 'editor' ? '#09380dff' : 'transparent',
-            color: 'white',
+            backgroundColor: activeTab === 'editor' ? 'var(--sidebar-tab-active-bg)' : 'transparent',
+            color: 'var(--sidebar-text)',
             border: 'none',
-            borderBottom: activeTab === 'editor' ? '2px solid #4CAF50' : '2px solid transparent',
+            borderBottom: activeTab === 'editor' ? '2px solid var(--button-primary-bg)' : '2px solid transparent',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: activeTab === 'editor' ? 'bold' : 'normal'
@@ -99,10 +99,10 @@ const Sidebar = ({
           style={{
             flex: 1,
             padding: '10px',
-            backgroundColor: activeTab === 'images' ? '#09380dff' : 'transparent',
-            color: 'white',
+            backgroundColor: activeTab === 'images' ? 'var(--sidebar-tab-active-bg)' : 'transparent',
+            color: 'var(--sidebar-text)',
             border: 'none',
-            borderBottom: activeTab === 'images' ? '2px solid #4CAF50' : '2px solid transparent',
+            borderBottom: activeTab === 'images' ? '2px solid var(--button-primary-bg)' : '2px solid transparent',
             cursor: 'pointer',
             fontSize: '16px',
             fontWeight: activeTab === 'images' ? 'bold' : 'normal'
@@ -115,10 +115,10 @@ const Sidebar = ({
           style={{
             flex: 1,
             padding: '10px',
-            backgroundColor: activeTab === 'map' ? '#09380dff' : 'transparent',
-            color: 'white',
+            backgroundColor: activeTab === 'map' ? 'var(--sidebar-tab-active-bg)' : 'transparent',
+            color: 'var(--sidebar-text)',
             border: 'none',
-            borderBottom: activeTab === 'map' ? '2px solid #4CAF50' : '2px solid transparent',
+            borderBottom: activeTab === 'map' ? '2px solid var(--button-primary-bg)' : '2px solid transparent',
             cursor: 'pointer',
             fontSize: '16px',
             fontWeight: activeTab === 'map' ? 'bold' : 'normal'
@@ -150,7 +150,7 @@ const Sidebar = ({
                 socket={socket}
               />
             ) : (
-              <div style={{ color: 'white' }}>
+              <div style={{ color: 'var(--sidebar-text)' }}>
                 <h3 className="mobile-hide-tab-title">{appConfig.ui.editor.selectPersonTitle}</h3>
                 <p className="mobile-hide-instructions">{appConfig.ui.editor.selectPersonDescription}</p>
                 <p className="mobile-hide-instructions">{appConfig.ui.editor.addPersonDescription}</p>
@@ -161,7 +161,7 @@ const Sidebar = ({
                     style={{
                       width: '100%',
                       padding: '12px',
-                      backgroundColor: '#4CAF50',
+                      backgroundColor: 'var(--button-primary-bg)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '5px',
@@ -169,8 +169,8 @@ const Sidebar = ({
                       cursor: 'pointer',
                       marginBottom: '10px'
                     }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = '#4CAF50'}
+                    onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-primary-hover)'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-primary-bg)'}
                   >
                     {appConfig.ui.editor.buttons.autoLayout}
                   </button>
@@ -180,7 +180,7 @@ const Sidebar = ({
                     style={{
                       width: '100%',
                       padding: '12px',
-                      backgroundColor: '#2196F3',
+                      backgroundColor: 'var(--button-secondary-bg)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '5px',
@@ -188,8 +188,8 @@ const Sidebar = ({
                       cursor: 'pointer',
                       marginBottom: '10px'
                     }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#1976D2'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = '#2196F3'}
+                    onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-secondary-hover)'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-secondary-bg)'}
                   >
                     {appConfig.ui.editor.buttons.fitToView}
                   </button>

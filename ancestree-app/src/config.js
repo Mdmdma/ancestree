@@ -263,42 +263,113 @@ export const appConfig = {
       close: "Schließen"
     },
 
-    // Admin Panel texts
+    // Admin Panel texts (German for UI elements)
     adminPanel: {
-      title: "⚙️ Admin Panel",
-      authPrompt: "Enter the admin password to access panel settings.",
-      defaultAdminNote: "Default password: adminn",
+      title: "Admin Panel",
+      authPrompt: "Gib das Admin-Passwort ein, um auf die Einstellungen zuzugreifen.",
+      defaultAdminNote: "Standard-Passwort: adminn",
       menu: {
-        familyParameters: "Family Parameters",
-        passwords: "Passwords",
-        security: "Security"
+        familyParameters: "Familienparameter",
+        passwords: "Passwörter",
+        security: "Sicherheit"
       },
       familyParameters: {
-        title: "Family Parameters",
-        displayNameLabel: "Display Name",
-        purposeLabel: "Purpose / Description",
-        saveButton: "Save Family Parameters"
+        title: "Familienparameter",
+        displayNameLabel: "Anzeigename",
+        purposeLabel: "Zweck / Beschreibung",
+        saveButton: "Familienparameter speichern"
       },
       passwords: {
-        title: "Passwords",
-        familyPasswordLabel: "Family Password",
-        adminPasswordLabel: "Admin Password",
-        saveButton: "Update Password"
+        title: "Passwörter",
+        familyPasswordLabel: "Familienpasswort",
+        adminPasswordLabel: "Admin-Passwort",
+        newPasswordLabel: "Neues Passwort",
+        confirmPasswordLabel: "Passwort bestätigen",
+        saveButton: "Passwort aktualisieren"
       },
       security: {
-        title: "Security",
-        encryptionLabel: "Enable client-side encryption",
-        encryptionHint: "When enabled, all stored data will be encrypted client-side using the family password."
+        title: "Sicherheit",
+        encryptionLabel: "Client-seitige Verschlüsselung aktivieren",
+        encryptionHint: "Wenn aktiviert, werden alle gespeicherten Daten client-seitig mit dem Familienpasswort verschlüsselt.",
+        skipGeocodingLabel: "Geocoding überspringen",
+        skipGeocodingHint: "Wenn aktiviert, werden Adressen nicht automatisch geokodiert."
+      },
+      errors: {
+        passwordsDoNotMatch: "Passwörter stimmen nicht überein",
+        passwordTooShort: "Passwort muss mindestens 6 Zeichen lang sein",
+        currentPasswordRequired: "Aktuelles Familienpasswort ist erforderlich, um Daten neu zu verschlüsseln",
+        testFailed: "Test fehlgeschlagen: "
+      },
+      success: {
+        familyPasswordUpdated: "Familienpasswort erfolgreich aktualisiert!",
+        adminPasswordUpdated: "Admin-Passwort erfolgreich aktualisiert!",
+        settingsUpdated: "Einstellungen erfolgreich aktualisiert!",
+        encryptionEnabled: "Verschlüsselung erfolgreich aktiviert!",
+        encryptionDisabled: "Verschlüsselung erfolgreich deaktiviert!"
+      },
+      encryption: {
+        confirmEnable: "Möchtest du die Verschlüsselung wirklich aktivieren? Dies wird alle Daten neu verschlüsseln.",
+        confirmDisable: "Möchtest du die Verschlüsselung wirklich deaktivieren? Dies wird alle Daten entschlüsseln.",
+        enterPassword: "Familienpasswort eingeben:",
+        confirmButton: "Bestätigen",
+        cancelButton: "Abbrechen",
+        progress: {
+          encrypting: "Verschlüssele Daten...",
+          decrypting: "Entschlüssele Daten...",
+          complete: "Abgeschlossen!"
+        }
       }
     },
 
     // Admin panel small labels and actions
     adminPanelCommon: {
-      authenticateButton: 'Authenticate',
-      authenticating: 'Authenticating...',
-      updateButton: 'Update',
-      currentFamilyPasswordLabel: 'Current Family Password (required to re-encrypt):',
-      noDescription: 'No description set.'
+      authenticateButton: 'Authentifizieren',
+      authenticating: 'Wird authentifiziert...',
+      updateButton: 'Aktualisieren',
+      saveButton: 'Speichern',
+      cancelButton: 'Abbrechen',
+      closeButton: '×',
+      currentFamilyPasswordLabel: 'Aktuelles Familienpasswort (erforderlich für Neuverschlüsselung):',
+      noDescription: 'Keine Beschreibung festgelegt.'
+    },
+
+    // Login component
+    login: {
+      welcome: {
+        titleRegister: 'Richte deinen Familienstammbaum ein',
+        titleLogin: 'Willkommen bei AncesTree',
+        setupDescription: 'Erstelle sichere Zugangsdaten für deine Familie',
+        registerDescription: 'Richte einen neuen Familienstammbaum ein',
+        loginDescription: 'Melde dich an, um auf deinen Familienstammbaum zuzugreifen'
+      },
+      form: {
+        familyNameLabel: 'Familienname:',
+        familyIdLabel: 'Eindeutiger Familienbezeichner:',
+        familyNamePlaceholder: 'Gib deinen Familiennamen ein',
+        familyIdPlaceholder: 'z.B. mueller-familie-2024',
+        familyIdHint: 'Wird für Login verwendet (kann später nicht geändert werden)',
+        displayNameLabel: 'Anzeigename:',
+        displayNamePlaceholder: 'z.B. Die Familie Müller',
+        displayNameHint: 'Wird in der App angezeigt (kann später geändert werden)',
+        passwordLabel: 'Passwort:',
+        createPasswordLabel: 'Passwort erstellen:',
+        passwordPlaceholder: 'Gib dein Passwort ein',
+        createPasswordPlaceholder: 'Erstelle ein sicheres Passwort',
+        adminPasswordLabel: 'Admin-Passwort:',
+        adminPasswordPlaceholder: 'Erstelle Admin-Passwort (mind. 6 Zeichen)',
+        adminPasswordHint: 'Erforderlich für Zugriff auf Admin-Panel und Einstellungen'
+      },
+      buttons: {
+        register: 'Familienzugang erstellen',
+        login: 'Auf Familienstammbaum zugreifen',
+        pleaseWait: 'Bitte warten...',
+        switchToLogin: 'Bereits Zugang? Anmelden',
+        switchToRegister: 'Erstes Mal? Familienzugang einrichten'
+      },
+      security: {
+        privateNotice: '🔒 Dein Familienstammbaum ist privat und sicher',
+        authorizedOnly: 'Nur autorisierte Familienmitglieder haben Zugriff'
+      }
     },
 
     // Map View component

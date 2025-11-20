@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api.js';
 import { initializeSession } from './encryptionSession';
+import { appConfig } from './config.js';
 
 export default function Login({ onLoginSuccess }) {
   const [familyName, setFamilyName] = useState('');
@@ -78,7 +79,7 @@ export default function Login({ onLoginSuccess }) {
       left: '0',
       width: '100vw',
       height: '100vh',
-      backgroundColor: '#2c3e50',
+      backgroundColor: 'var(--login-bg)',
       color: 'white',
       overflow: 'hidden',
       zIndex: 1000,
@@ -89,7 +90,7 @@ export default function Login({ onLoginSuccess }) {
     }}>
       {/* Main Login Container */}
       <div style={{
-        backgroundColor: '#34495e',
+        backgroundColor: 'var(--login-panel-bg)',
         borderRadius: '12px',
         padding: '40px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
@@ -105,19 +106,19 @@ export default function Login({ onLoginSuccess }) {
           <h2 style={{
             margin: '0 0 10px 0',
             fontSize: '24px',
-            color: '#ecf0f1'
+            color: 'var(--login-text-primary)'
           }}>
-            {isRegistering ? 'Setup Your Family Tree' : 'Welcome to AncesTree'}
+            {isRegistering ? appConfig.ui.login.welcome.titleRegister : appConfig.ui.login.welcome.titleLogin}
           </h2>
           <p style={{
             fontSize: '14px',
-            color: '#bdc3c7',
+            color: 'var(--login-text-secondary)',
             margin: '0',
             lineHeight: '1.4'
           }}>
             {authStatus?.requiresSetup ? 
-              'Create your family\'s secure access credentials' : 
-              (isRegistering ? 'Set up a new family tree' : 'Sign in to access your family tree')
+              appConfig.ui.login.welcome.setupDescription : 
+              (isRegistering ? appConfig.ui.login.welcome.registerDescription : appConfig.ui.login.welcome.loginDescription)
             }
           </p>
         </div>
@@ -125,7 +126,7 @@ export default function Login({ onLoginSuccess }) {
         {/* Error Message */}
         {error && (
           <div style={{
-            backgroundColor: '#e74c3c',
+            backgroundColor: 'var(--login-error-bg)',
             padding: '12px',
             borderRadius: '6px',
             marginBottom: '20px',
@@ -149,23 +150,23 @@ export default function Login({ onLoginSuccess }) {
               marginBottom: '5px',
               fontSize: '14px',
               fontWeight: 'bold',
-              color: '#ecf0f1'
+              color: 'var(--login-text-primary)'
             }}>
-              {isRegistering ? 'Unique Family Identifier:' : 'Family Name:'}
+              {isRegistering ? appConfig.ui.login.form.familyIdLabel : appConfig.ui.login.form.familyNameLabel}
             </label>
             <input
               type="text"
               value={familyName}
               onChange={(e) => setFamilyName(e.target.value)}
-              placeholder={isRegistering ? "e.g., smith-family-2024" : "Enter your family name"}
+              placeholder={isRegistering ? appConfig.ui.login.form.familyIdPlaceholder : appConfig.ui.login.form.familyNamePlaceholder}
               required
               style={{
                 width: '100%',
                 padding: '12px',
                 borderRadius: '6px',
-                border: '2px solid #5a6c7d',
-                backgroundColor: '#ffffff',
-                color: '#2c3e50',
+                border: '2px solid var(--login-input-border)',
+                backgroundColor: 'var(--login-input-bg)',
+                color: 'var(--login-input-text)',
                 fontSize: '14px',
                 boxSizing: 'border-box'
               }}
@@ -175,9 +176,9 @@ export default function Login({ onLoginSuccess }) {
                 display: 'block',
                 marginTop: '5px',
                 fontSize: '12px',
-                color: '#bdc3c7'
+                color: 'var(--login-text-secondary)'
               }}>
-                This is used for login (cannot be changed later)
+                {appConfig.ui.login.form.familyIdHint}
               </small>
             )}
           </div>
@@ -189,24 +190,24 @@ export default function Login({ onLoginSuccess }) {
                 marginBottom: '5px',
                 fontSize: '14px',
                 fontWeight: 'bold',
-                color: '#ecf0f1'
+                color: 'var(--login-text-primary)'
               }}>
-                Admin Password:
+                {appConfig.ui.login.form.adminPasswordLabel}
               </label>
               <input
                 type="password"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Create admin password (min 6 chars)"
+                placeholder={appConfig.ui.login.form.adminPasswordPlaceholder}
                 required
                 minLength={6}
                 style={{
                   width: '100%',
                   padding: '12px',
                   borderRadius: '6px',
-                  border: '2px solid #5a6c7d',
-                  backgroundColor: '#ffffff',
-                  color: '#2c3e50',
+                  border: '2px solid var(--login-input-border)',
+                  backgroundColor: 'var(--login-input-bg)',
+                  color: 'var(--login-input-text)',
                   fontSize: '14px',
                   boxSizing: 'border-box'
                 }}
@@ -215,9 +216,9 @@ export default function Login({ onLoginSuccess }) {
                 display: 'block',
                 marginTop: '5px',
                 fontSize: '12px',
-                color: '#bdc3c7'
+                color: 'var(--login-text-secondary)'
               }}>
-                Required to access admin panel and settings
+                {appConfig.ui.login.form.adminPasswordHint}
               </small>
             </div>
           )}
@@ -229,23 +230,23 @@ export default function Login({ onLoginSuccess }) {
                 marginBottom: '5px',
                 fontSize: '14px',
                 fontWeight: 'bold',
-                color: '#ecf0f1'
+                color: 'var(--login-text-primary)'
               }}>
-                Display Name:
+                {appConfig.ui.login.form.displayNameLabel}
               </label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="e.g., The Smith Family"
+                placeholder={appConfig.ui.login.form.displayNamePlaceholder}
                 required
                 style={{
                   width: '100%',
                   padding: '12px',
                   borderRadius: '6px',
-                  border: '2px solid #5a6c7d',
-                  backgroundColor: '#ffffff',
-                  color: '#2c3e50',
+                  border: '2px solid var(--login-input-border)',
+                  backgroundColor: 'var(--login-input-bg)',
+                  color: 'var(--login-input-text)',
                   fontSize: '14px',
                   boxSizing: 'border-box'
                 }}
@@ -254,9 +255,9 @@ export default function Login({ onLoginSuccess }) {
                 display: 'block',
                 marginTop: '5px',
                 fontSize: '12px',
-                color: '#bdc3c7'
+                color: 'var(--login-text-secondary)'
               }}>
-                This is shown in the app (can be changed later)
+                {appConfig.ui.login.form.displayNameHint}
               </small>
             </div>
           )}
@@ -267,23 +268,23 @@ export default function Login({ onLoginSuccess }) {
               marginBottom: '5px',
               fontSize: '14px',
               fontWeight: 'bold',
-              color: '#ecf0f1'
+              color: 'var(--login-text-primary)'
             }}>
-              {isRegistering ? 'Create Password:' : 'Password:'}
+              {isRegistering ? appConfig.ui.login.form.createPasswordLabel : appConfig.ui.login.form.passwordLabel}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={isRegistering ? "Create a secure password" : "Enter your password"}
+              placeholder={isRegistering ? appConfig.ui.login.form.createPasswordPlaceholder : appConfig.ui.login.form.passwordPlaceholder}
               required
               style={{
                 width: '100%',
                 padding: '12px',
                 borderRadius: '6px',
-                border: '2px solid #5a6c7d',
-                backgroundColor: '#ffffff',
-                color: '#2c3e50',
+                border: '2px solid var(--login-input-border)',
+                backgroundColor: 'var(--login-input-bg)',
+                color: 'var(--login-input-text)',
                 fontSize: '14px',
                 boxSizing: 'border-box'
               }}
@@ -294,7 +295,7 @@ export default function Login({ onLoginSuccess }) {
             type="submit"
             disabled={loading}
             style={{
-              backgroundColor: '#27ae60',
+              backgroundColor: 'var(--login-button-success)',
               color: 'white',
               border: 'none',
               padding: '14px',
@@ -306,7 +307,7 @@ export default function Login({ onLoginSuccess }) {
               marginTop: '10px'
             }}
           >
-            {loading ? 'Please wait...' : (isRegistering ? 'Create Family Access' : 'Access Family Tree')}
+            {loading ? appConfig.ui.login.buttons.pleaseWait : (isRegistering ? appConfig.ui.login.buttons.register : appConfig.ui.login.buttons.login)}
           </button>
 
           {!authStatus?.requiresSetup && (
@@ -315,8 +316,8 @@ export default function Login({ onLoginSuccess }) {
               onClick={toggleMode}
               style={{
                 backgroundColor: 'transparent',
-                color: '#3498db',
-                border: '2px solid #3498db',
+                color: 'var(--login-button-info)',
+                border: '2px solid var(--login-button-info)',
                 padding: '10px',
                 borderRadius: '6px',
                 fontSize: '14px',
@@ -324,7 +325,7 @@ export default function Login({ onLoginSuccess }) {
                 marginTop: '10px'
               }}
             >
-              {isRegistering ? 'Already have access? Sign in' : 'First time? Setup family access'}
+              {isRegistering ? appConfig.ui.login.buttons.switchToLogin : appConfig.ui.login.buttons.switchToRegister}
             </button>
           )}
         </form>
@@ -333,14 +334,14 @@ export default function Login({ onLoginSuccess }) {
         <div style={{
           marginTop: '30px',
           paddingTop: '20px',
-          borderTop: '1px solid #5a6c7d',
+          borderTop: '1px solid var(--login-border)',
           fontSize: '12px',
-          color: '#95a5a6',
+          color: 'var(--login-text-muted)',
           textAlign: 'center',
           lineHeight: '1.4'
         }}>
-          <p style={{ margin: '5px 0' }}>🔒 Your family tree is private and secure</p>
-          <p style={{ margin: '5px 0' }}>Only authorized family members can access</p>
+          <p style={{ margin: '5px 0' }}>{appConfig.ui.login.security.privateNotice}</p>
+          <p style={{ margin: '5px 0' }}>{appConfig.ui.login.security.authorizedOnly}</p>
         </div>
       </div>
     </div>

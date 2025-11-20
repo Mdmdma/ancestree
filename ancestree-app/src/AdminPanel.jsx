@@ -97,13 +97,13 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     setSuccess('');
 
     if (newFamilyPassword !== confirmFamilyPassword) {
-      setError('Passwords do not match');
+      setError(appConfig.ui.adminPanel.errors.passwordsDoNotMatch);
       setLoading(false);
       return;
     }
 
     if (newFamilyPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError(appConfig.ui.adminPanel.errors.passwordTooShort);
       setLoading(false);
       return;
     }
@@ -112,7 +112,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
       // If encryption is enabled, re-encrypt data with new password on client
       if (encryptionEnabled) {
         if (!currentFamilyPassword) {
-          setError('Current family password is required to re-encrypt data');
+          setError(appConfig.ui.adminPanel.errors.currentPasswordRequired);
           setLoading(false);
           return;
         }
@@ -124,7 +124,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
       }
 
       await api.changeFamilyPassword(newFamilyPassword);
-      setSuccess('Family password updated successfully!');
+      setSuccess(appConfig.ui.adminPanel.success.familyPasswordUpdated);
       setNewFamilyPassword('');
       setConfirmFamilyPassword('');
       setCurrentFamilyPassword('');
@@ -143,20 +143,20 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     setSuccess('');
 
     if (newAdminPassword !== confirmAdminPassword) {
-      setError('Passwords do not match');
+      setError(appConfig.ui.adminPanel.errors.passwordsDoNotMatch);
       setLoading(false);
       return;
     }
 
     if (newAdminPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError(appConfig.ui.adminPanel.errors.passwordTooShort);
       setLoading(false);
       return;
     }
 
     try {
       await api.changeAdminPassword(newAdminPassword);
-      setSuccess('Admin password updated successfully!');
+      setSuccess(appConfig.ui.adminPanel.success.adminPasswordUpdated);
       setNewAdminPassword('');
       setConfirmAdminPassword('');
       setTimeout(() => setSuccess(''), 3000);
@@ -186,7 +186,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
       setTestResults(results);
       setTestProgress({ phase: 'complete', percent: 100, message: 'Test complete!' });
     } catch (err) {
-      setError('Test failed: ' + err.message);
+      setError(appConfig.ui.adminPanel.errors.testFailed + err.message);
       console.error('Performance test error:', err);
     } finally {
       setTestRunning(false);
@@ -212,7 +212,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     >
       <div
         style={{
-          backgroundColor: '#2c3e50',
+          backgroundColor: 'var(--login-bg)',
           borderRadius: '12px',
           padding: '30px',
           maxWidth: '500px',
@@ -230,7 +230,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '25px',
-          borderBottom: '2px solid #34495e',
+          borderBottom: '2px solid var(--login-panel-bg)',
           paddingBottom: '15px'
         }}>
           <h2 style={{ margin: 0, fontSize: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -241,20 +241,20 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
             style={{
               background: 'none',
               border: 'none',
-              color: '#ecf0f1',
+              color: 'var(--login-text-primary)',
               fontSize: '28px',
               cursor: 'pointer',
               padding: '0',
               lineHeight: '1'
             }}
           >
-            ×
+            {appConfig.ui.adminPanelCommon.closeButton}
           </button>
         </div>
         {/* Authentication / Preview Section */}
         <div style={{ marginBottom: '20px' }}>
           <div style={{
-            backgroundColor: '#34495e',
+            backgroundColor: 'var(--login-panel-bg)',
             padding: '16px',
             borderRadius: '8px',
             marginBottom: '12px'
@@ -262,7 +262,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
             <h3 style={{ marginTop: 0, fontSize: '16px', marginBottom: '8px' }}>
               {appConfig.ui.adminPanel.familyParameters.title}
             </h3>
-            <p style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>
+            <p style={{ fontSize: '13px', color: 'var(--login-text-secondary)', marginBottom: '8px' }}>
               {purposePreview || appConfig.ui.adminPanelCommon.noDescription}
             </p>
           </div>
@@ -270,17 +270,17 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
           {!isAuthenticated ? (
             <form onSubmit={handleAdminLogin}>
               <div style={{
-                backgroundColor: '#34495e',
+                backgroundColor: 'var(--login-panel-bg)',
                 padding: '18px',
                 borderRadius: '8px'
               }}>
                 <h3 style={{ marginTop: 0, fontSize: '18px', marginBottom: '10px' }}>
                   🔐 {appConfig.ui.adminPanel.title}
                 </h3>
-                <p style={{ fontSize: '14px', color: '#bdc3c7', marginBottom: '10px' }}>
+                <p style={{ fontSize: '14px', color: 'var(--login-text-secondary)', marginBottom: '10px' }}>
                   {appConfig.ui.adminPanel.authPrompt}
                   <br />
-                  <small style={{ color: '#95a5a6' }}>{appConfig.ui.adminPanel.defaultAdminNote}</small>
+                  <small style={{ color: 'var(--login-text-muted)' }}>{appConfig.ui.adminPanel.defaultAdminNote}</small>
                 </p>
 
                 <input

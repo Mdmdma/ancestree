@@ -7,7 +7,7 @@ const DebugControls = ({ showDebug, setShowDebug }) => {
       style={{
         width: '100%',
         padding: '12px',
-        backgroundColor: showDebug ? '#FF5722' : '#9C27B0',
+        backgroundColor: showDebug ? 'var(--button-debug-on)' : 'var(--button-debug-off)',
         color: 'white',
         border: 'none',
         borderRadius: '5px',
@@ -15,8 +15,8 @@ const DebugControls = ({ showDebug, setShowDebug }) => {
         cursor: 'pointer',
         marginBottom: '10px'
       }}
-      onMouseOver={(e) => e.target.style.backgroundColor = showDebug ? '#E64A19' : '#7B1FA2'}
-      onMouseOut={(e) => e.target.style.backgroundColor = showDebug ? '#FF5722' : '#9C27B0'}
+      onMouseOver={(e) => e.target.style.backgroundColor = showDebug ? 'var(--button-debug-on-hover)' : 'var(--button-debug-off-hover)'}
+      onMouseOut={(e) => e.target.style.backgroundColor = showDebug ? 'var(--button-debug-on)' : 'var(--button-debug-off)'}
     >
       {showDebug ? '🚫 Hide Debug' : '🔧 Show Debug'}
     </button>

@@ -57,7 +57,7 @@ export default function FamilyNode({ data }) {
         width: `${circleSize}px`,
         height: `${circleSize}px`,
         borderRadius: "100%",
-        backgroundColor: "#f3f4f6",
+        backgroundColor: "var(--node-family-bg)",
         border: "2px solid #9ca3af",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
       }}
@@ -67,7 +67,7 @@ export default function FamilyNode({ data }) {
           fontWeight: "bold", 
           fontSize: fontSize,
           textAlign: "center",
-          color: "#374151",
+          color: "var(--node-family-border)",
           wordBreak: "break-word",
           padding: "4px"
         }}

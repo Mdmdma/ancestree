@@ -26,7 +26,7 @@ export default function PartnerEdge(props) {
   const isExpartner = type === 'expartner';
 
   // Partner edges stay green, expartner edges are gray
-  const edgeColor = isExpartner ? '#999999' : '#4ecdc4';
+  const edgeColor = isExpartner ? 'var(--edge-expartner)' : 'var(--edge-partner)';
 
   const [, labelX, labelY] = getBezierPath({
     sourceX,

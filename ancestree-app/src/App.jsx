@@ -319,7 +319,7 @@ const AddNodeOnEdgeDrop = () => {
             alignItems: 'center', 
             height: '100vh',
             fontSize: '18px',
-            color: '#666'
+            color: 'var(--app-loading-text)'
           }}>
             Checking authentication...
           </div>
@@ -332,7 +332,7 @@ const AddNodeOnEdgeDrop = () => {
             flexDirection: 'column',
             gap: '20px',
             fontSize: '18px',
-            color: '#666'
+            color: 'var(--app-loading-text)'
           }}>
             <div>🔐</div>
             <div>Please login to access your family tree</div>
