@@ -387,11 +387,19 @@ export const encryptedApi = {
     if (!shouldSkipGeocoding() && node.data) {
       const { city, zip, country } = node.data;
       if (city || zip || country) {
+        // Import generateAddressHash from geocodingUtils
+        const { generateAddressHash } = await import('./geocodingUtils');
+        
         const coords = await geocodeAddress(city, zip, country);
+        const addressHash = await generateAddressHash(city, zip, country);
+        const timestamp = new Date().toISOString();
+        
         nodeToSend.data = {
           ...nodeToSend.data,
           latitude: coords.latitude,
-          longitude: coords.longitude
+          longitude: coords.longitude,
+          addressHash: addressHash,
+          lastGeocoded: timestamp
         };
       }
     }
@@ -418,20 +426,28 @@ export const encryptedApi = {
     if (!shouldSkipGeocoding() && updates.data) {
       const { city, zip, country } = updates.data;
       if (city !== undefined || zip !== undefined || country !== undefined) {
+        // Import generateAddressHash from geocodingUtils
+        const { generateAddressHash } = await import('./geocodingUtils');
+        
         const coords = await geocodeAddress(
           city || '', 
           zip || '', 
           country || ''
         );
+        const addressHash = await generateAddressHash(city || '', zip || '', country || '');
+        const timestamp = new Date().toISOString();
+        
         updatesToSend.data = {
           ...updatesToSend.data,
           latitude: coords.latitude,
-          longitude: coords.longitude
+          longitude: coords.longitude,
+          addressHash: addressHash,
+          lastGeocoded: timestamp
         };
       }
     }
     
-    // Encrypt the updates
+    // Encrypt the updates in data object
     if (isEncryptionEnabled() && updatesToSend.data) {
       const key = getDerivedKey();
       if (key) {
@@ -446,6 +462,37 @@ export const encryptedApi = {
           }
         }
         updatesToSend.data = { ...updatesToSend.data, ...encryptedData };
+      }
+    }
+    
+    // IMPORTANT: Encrypt root-level geocoding fields (from geocodingService)
+    // These are sent as root-level properties, not in data object
+    if (isEncryptionEnabled()) {
+      const key = getDerivedKey();
+      if (key) {
+        // Encrypt latitude if present at root level
+        if (updatesToSend.latitude !== undefined && updatesToSend.latitude !== null && updatesToSend.latitude !== '') {
+          console.log(`[EncryptionAPI] Encrypting root-level latitude: ${updatesToSend.latitude}`);
+          updatesToSend.latitude = await encryptValueFast(String(updatesToSend.latitude), key, true);
+        }
+        
+        // Encrypt longitude if present at root level
+        if (updatesToSend.longitude !== undefined && updatesToSend.longitude !== null && updatesToSend.longitude !== '') {
+          console.log(`[EncryptionAPI] Encrypting root-level longitude: ${updatesToSend.longitude}`);
+          updatesToSend.longitude = await encryptValueFast(String(updatesToSend.longitude), key, true);
+        }
+        
+        // Encrypt addressHash if present at root level
+        if (updatesToSend.addressHash !== undefined && updatesToSend.addressHash !== null && updatesToSend.addressHash !== '') {
+          console.log(`[EncryptionAPI] Encrypting root-level addressHash: ${updatesToSend.addressHash}`);
+          updatesToSend.addressHash = await encryptValueFast(String(updatesToSend.addressHash), key, true);
+        }
+        
+        // Encrypt lastGeocoded if present at root level
+        if (updatesToSend.lastGeocoded !== undefined && updatesToSend.lastGeocoded !== null && updatesToSend.lastGeocoded !== '') {
+          console.log(`[EncryptionAPI] Encrypting root-level lastGeocoded: ${updatesToSend.lastGeocoded}`);
+          updatesToSend.lastGeocoded = await encryptValueFast(String(updatesToSend.lastGeocoded), key, true);
+        }
       }
     }
     

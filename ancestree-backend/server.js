@@ -1082,24 +1082,56 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
         return;
       }
       
-      // Broadcast the update to other users in the family room (exclude the sender)
-      const updatedNode = {
-        id,
-        position,
-        data: data,
-        type: req.body.type // Include if provided
-      };
-    
-      const ioInstance = req.app.get('io');
-      if (socketId) {
-        // Exclude the sender from receiving this event
-        ioInstance.to(`family-${familyId}`).except(socketId).emit('node:updated', updatedNode);
-      } else {
-        // Fallback: broadcast to all (for backwards compatibility)
-        ioInstance.to(`family-${familyId}`).emit('node:updated', updatedNode);
-      }
-      
-      res.json({ success: true, changes: this.changes });
+      // After update, fetch the complete node from database to broadcast
+      // This ensures all fields including geocoding data are included
+      familyDb.get('SELECT * FROM nodes WHERE id = ?', [id], (fetchErr, updatedRow) => {
+        if (fetchErr) {
+          console.error('Error fetching updated node for broadcast:', fetchErr);
+          // Still send response even if broadcast fails
+          res.json({ success: true, changes: this.changes });
+          return;
+        }
+        
+        // Build complete updated node object from DB row
+        const updatedNode = {
+          id: updatedRow.id,
+          type: updatedRow.type,
+          position: { x: updatedRow.position_x, y: updatedRow.position_y },
+          data: {
+            name: updatedRow.name,
+            surname: updatedRow.surname,
+            maidenName: updatedRow.maiden_name,
+            birthDate: updatedRow.birth_date,
+            deathDate: updatedRow.death_date,
+            city: updatedRow.city,
+            zip: updatedRow.zip,
+            country: updatedRow.country,
+            phone: updatedRow.phone,
+            email: updatedRow.email,
+            latitude: updatedRow.latitude,
+            longitude: updatedRow.longitude,
+            addressHash: updatedRow.address_hash,
+            lastGeocoded: updatedRow.last_geocoded,
+            bloodline: Boolean(updatedRow.bloodline),
+            preferredImageId: updatedRow.preferred_image_id,
+            isSelected: false
+          }
+        };
+        
+        // Broadcast the complete updated node to other users in the family room
+        const ioInstance = req.app.get('io');
+        if (socketId) {
+          // Exclude the sender from receiving this event
+          console.log(`[UPDATE NODE] Broadcasting node:updated to family-${familyId}, Node ID: ${id}, excluding socket: ${socketId}`);
+          ioInstance.to(`family-${familyId}`).except(socketId).emit('node:updated', updatedNode);
+        } else {
+          // Fallback: broadcast to all (for backwards compatibility)
+          console.log(`[UPDATE NODE] Broadcasting node:updated to family-${familyId}, Node ID: ${id} (no socket ID)`);
+          ioInstance.to(`family-${familyId}`).emit('node:updated', updatedNode);
+        }
+        
+        res.json({ success: true, changes: this.changes });
+      });
     });
   } catch (error) {
     console.error('Error updating node:', error);
