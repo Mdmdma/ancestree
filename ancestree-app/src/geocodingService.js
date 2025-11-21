@@ -187,7 +187,8 @@ const processQueue = async () => {
       
       console.log(`[GeocodingService] Geocoding node ${node.id}: ${street} ${housenumber}, ${city}, ${zip}, ${country}`);
       
-      const result = await geocodeAddress(city, zip, country);
+      // Use all address fields for better accuracy
+      const result = await geocodeAddress(street, housenumber, city, zip, country);
       
       if (result && result.latitude && result.longitude) {
         // Geocoding succeeded

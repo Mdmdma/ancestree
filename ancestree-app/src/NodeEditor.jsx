@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import PictureSlideshow from './PictureSlideshow';
+import AddressAutocomplete from './components/AddressAutocomplete';
 import { appConfig } from './config';
 import { queueGeocoding } from './geocodingService';
 import { api } from './api';
@@ -28,6 +29,9 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
 
   const [showSlideshow, setShowSlideshow] = useState(false);
   const [showStreetFields, setShowStreetFields] = useState(true);
+  const [showPhoneField, setShowPhoneField] = useState(true);
+  const [showEmailField, setShowEmailField] = useState(true);
+  const [addressAutocompleteValue, setAddressAutocompleteValue] = useState('');
   const updateTimeoutRef = useRef(null);
   const nameInputRef = useRef(null);
   const previousNodeIdRef = useRef(null);
@@ -46,8 +50,8 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       }
       
       // After update, check if we need to geocode
-      // This happens when city, zip, or country fields change
-      const addressFields = ['city', 'zip', 'country'];
+      // This happens when any address field changes
+      const addressFields = ['street', 'housenumber', 'city', 'zip', 'country'];
       const addressChanged = addressFields.some(field => field in data);
       
       if (addressChanged && node) {
@@ -77,6 +81,8 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       try {
         const settings = await api.getFamilySettings();
         setShowStreetFields(settings.showStreetFields !== undefined ? Boolean(settings.showStreetFields) : true);
+        setShowPhoneField(settings.showPhoneField !== undefined ? Boolean(settings.showPhoneField) : true);
+        setShowEmailField(settings.showEmailField !== undefined ? Boolean(settings.showEmailField) : true);
       } catch (err) {
         // If fetch fails, default to showing fields
         console.error('Failed to fetch field visibility settings:', err);
@@ -114,6 +120,9 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         positionX: node.position?.x || 0,
         positionY: node.position?.y || 0
       });
+      
+      // Keep autocomplete field empty - it's only for searching
+      setAddressAutocompleteValue('');
       
       // Only focus and select text when a new node is selected
       if (isNewlySelected) {
@@ -154,6 +163,40 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       delete dataWithoutPosition.positionY;
       debouncedUpdate(node.id, dataWithoutPosition);
     }
+  };
+
+  // Handle address autocomplete selection
+  const handleAddressSelect = (addressData) => {
+    console.log('[NodeEditor] Address selected from autocomplete:', addressData);
+    
+    // Update form data with all address components
+    const newData = {
+      ...formData,
+      street: addressData.street || '',
+      housenumber: addressData.housenumber || '',
+      city: addressData.city || '',
+      zip: addressData.zip || '',
+      country: addressData.country || ''
+    };
+    
+    setFormData(newData);
+    // Keep autocomplete field empty after selection
+    setAddressAutocompleteValue('');
+    
+    // Save to database (exclude position fields)
+    const dataToSave = { ...newData };
+    delete dataToSave.positionX;
+    delete dataToSave.positionY;
+    
+    // Immediate update (no debounce) since user explicitly selected
+    onUpdate(node.id, dataToSave);
+    
+    // Queue geocoding after database save
+    const updatedNode = {
+      ...node,
+      data: { ...node.data, ...dataToSave }
+    };
+    queueGeocoding(updatedNode);
   };
 
   const handleDelete = () => {
@@ -295,25 +338,44 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         )}
       </div>
 
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.phone}</label>
-      <input
-        type="tel"
-        value={formData.phone}
-        onChange={(e) => handleInputChange('phone', e.target.value)}
-        style={inputStyle}
-        placeholder={appConfig.ui.nodeEditor.placeholders.phone}
+      {/* Phone field - conditionally visible */}
+      {showPhoneField && (
+        <>
+          <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.phone}</label>
+          <input
+            type="tel"
+            value={formData.phone}
+            onChange={(e) => handleInputChange('phone', e.target.value)}
+            style={inputStyle}
+            placeholder={appConfig.ui.nodeEditor.placeholders.phone}
+          />
+        </>
+      )}
+
+      {/* Email field - conditionally visible */}
+      {showEmailField && (
+        <>
+          <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.email}</label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleInputChange('email', e.target.value)}
+            style={inputStyle}
+            placeholder={appConfig.ui.nodeEditor.placeholders.email}
+          />
+        </>
+      )}
+
+      {/* Unified Address Autocomplete */}
+      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.addressAutocomplete}</label>
+      <AddressAutocomplete
+        value={addressAutocompleteValue}
+        onSelect={handleAddressSelect}
+        placeholder={appConfig.ui.nodeEditor.placeholders.addressAutocomplete}
+        inputStyle={inputStyle}
       />
 
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.email}</label>
-      <input
-        type="email"
-        value={formData.email}
-        onChange={(e) => handleInputChange('email', e.target.value)}
-        style={inputStyle}
-        placeholder={appConfig.ui.nodeEditor.placeholders.email}
-      />
-
-      {/* Street fields - conditionally visible */}
+      {/* Individual Address Fields - Read-only display / manual edit fallback */}
       {showStreetFields && (
         <div style={addressRowStyle}>
           <div style={{ flex: 1 }}>

@@ -39,15 +39,18 @@ export const generateAddressHash = async (street, housenumber, city, zip, countr
 
 /**
  * Geocode an address using Photon API (Komoot)
+ * Now accepts all address fields for more accurate geocoding
+ * @param {string} street - Street name
+ * @param {string} housenumber - House number
  * @param {string} city - City name
  * @param {string} zip - ZIP/postal code
  * @param {string} country - Country name
  * @returns {Promise<{latitude: number, longitude: number}|null>} Coordinates or null if failed
  */
-export const geocodeAddress = async (city, zip, country) => {
+export const geocodeAddress = async (street, housenumber, city, zip, country) => {
   try {
-    // Build query string from address components
-    const addressParts = [city, zip, country].filter(Boolean);
+    // Build query string from all address components for better accuracy
+    const addressParts = [street, housenumber, city, zip, country].filter(Boolean);
     if (addressParts.length === 0) {
       return null;
     }
@@ -82,8 +85,82 @@ export const geocodeAddress = async (city, zip, country) => {
       longitude
     };
   } catch (error) {
-    console.error(`[Geocoding] Failed to geocode address (${city}, ${zip}, ${country}):`, error.message);
+    console.error(`[Geocoding] Failed to geocode address:`, error.message);
     return null;
+  }
+};
+
+/**
+ * Search for address suggestions using Photon API autocomplete
+ * @param {string} query - Partial address string (minimum 3 characters)
+ * @param {number} limit - Number of suggestions to return (default: 3)
+ * @returns {Promise<Array>} Array of address suggestions with parsed components
+ */
+export const searchAddressSuggestions = async (query, limit = 3) => {
+  try {
+    // Require minimum 3 characters
+    if (!query || query.trim().length < 3) {
+      return [];
+    }
+    
+    const trimmedQuery = query.trim();
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmedQuery)}&lang=de&limit=${limit}`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Photon API returned ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.features || data.features.length === 0) {
+      return [];
+    }
+    
+    // Parse and format suggestions
+    return data.features.map((feature, index) => {
+      const props = feature.properties;
+      const [longitude, latitude] = feature.geometry.coordinates;
+      
+      // Extract address components from Photon response
+      const street = props.street || '';
+      const housenumber = props.housenumber || '';
+      const city = props.city || props.town || props.village || '';
+      const zip = props.postcode || '';
+      const country = props.country || '';
+      const state = props.state || '';
+      
+      // Build display label with available components
+      const addressParts = [];
+      if (street && housenumber) {
+        addressParts.push(`${street} ${housenumber}`);
+      } else if (street) {
+        addressParts.push(street);
+      }
+      if (city) addressParts.push(city);
+      if (zip) addressParts.push(zip);
+      if (country) addressParts.push(country);
+      
+      const displayLabel = addressParts.join(', ') || 'Unknown location';
+      
+      return {
+        id: `${feature.properties.osm_id || index}`,
+        displayLabel,
+        street,
+        housenumber,
+        city,
+        zip,
+        country,
+        state,
+        latitude,
+        longitude,
+        raw: feature // Keep raw data for debugging
+      };
+    });
+  } catch (error) {
+    console.error('[AddressAutocomplete] Search failed:', error.message);
+    return [];
   }
 };
 

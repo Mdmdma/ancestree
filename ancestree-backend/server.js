@@ -646,9 +646,9 @@ app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) 
   }
 });
 
-// Get family settings (display name, purpose, encryption status, skip_geocoding, show_street_fields)
+// Get family settings (display name, purpose, encryption status, skip_geocoding, show_street_fields, show_phone_field, show_email_field)
 app.get('/api/family/settings', authenticateToken, (req, res) => {
-  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, skip_geocoding, show_street_fields FROM users WHERE id = ?', 
+  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, skip_geocoding, show_street_fields, show_phone_field, show_email_field FROM users WHERE id = ?', 
     [req.user.id], 
     (err, settings) => {
       if (err) {
@@ -666,7 +666,9 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
         encryptionEnabled: Boolean(settings.encryption_enabled),
         encryptionSalt: settings.encryption_salt,
         skipGeocoding: Boolean(settings.skip_geocoding),
-        showStreetFields: Boolean(settings.show_street_fields)
+        showStreetFields: Boolean(settings.show_street_fields),
+        showPhoneField: Boolean(settings.show_phone_field),
+        showEmailField: Boolean(settings.show_email_field)
       });
     }
   );
@@ -761,6 +763,40 @@ app.post('/api/family/street-fields-visibility', authenticateToken, (req, res) =
       }
 
       res.json({ success: true, message: 'Street fields visibility updated successfully' });
+    }
+  );
+});
+
+// Update show_phone_field setting
+app.post('/api/family/phone-field-visibility', authenticateToken, (req, res) => {
+  const { showPhoneField } = req.body;
+
+  authDb.run('UPDATE users SET show_phone_field = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [showPhoneField ? 1 : 0, req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating show_phone_field:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Phone field visibility updated successfully' });
+    }
+  );
+});
+
+// Update show_email_field setting
+app.post('/api/family/email-field-visibility', authenticateToken, (req, res) => {
+  const { showEmailField } = req.body;
+
+  authDb.run('UPDATE users SET show_email_field = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [showEmailField ? 1 : 0, req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating show_email_field:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Email field visibility updated successfully' });
     }
   );
 });

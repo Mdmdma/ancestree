@@ -216,7 +216,8 @@ export const appConfig = {
         housenumber: 'Nr:',
         city: 'Stadt:',
         zip: 'PLZ:',
-        country: 'Land (Code):'
+        country: 'Land (Code):',
+        addressAutocomplete: 'Adresse (mit Autovervollständigung)'
       },
       placeholders: {
         phone: 'z.B. +43 5287 87123',
@@ -226,7 +227,8 @@ export const appConfig = {
         housenumber: 'z.B. 42',
         city: 'z.B. Innsbruck',
         zip: '6020',
-        country: 'z.B. AT, DE, CH'
+        country: 'z.B. AT, DE, CH',
+        addressAutocomplete: 'Ganze Adresse eingeben: Straße, Stadt, Land...'
       },
       debug: {
         title: '🔧 Debug Felder',
@@ -304,8 +306,16 @@ export const appConfig = {
         description: "Steuere, welche Felder im Dateneditor angezeigt werden.",
         streetFieldsLabel: "Straße und Hausnummer anzeigen",
         streetFieldsHint: "Wenn aktiviert, werden die Felder für Straße und Hausnummer im Editor angezeigt.",
+        phoneFieldLabel: "Telefonnummer anzeigen",
+        phoneFieldHint: "Wenn aktiviert, wird das Feld für Telefonnummer im Editor angezeigt.",
+        emailFieldLabel: "E-Mail-Adresse anzeigen",
+        emailFieldHint: "Wenn aktiviert, wird das Feld für E-Mail-Adresse im Editor angezeigt.",
         showSuccess: "Straßenfelder werden nun angezeigt",
         hideSuccess: "Straßenfelder sind nun ausgeblendet",
+        phoneShowSuccess: "Telefonnummer-Feld wird nun angezeigt",
+        phoneHideSuccess: "Telefonnummer-Feld ist nun ausgeblendet",
+        emailShowSuccess: "E-Mail-Feld wird nun angezeigt",
+        emailHideSuccess: "E-Mail-Feld ist nun ausgeblendet",
         updateError: "Fehler beim Aktualisieren der Feldersichtbarkeit"
       },
       errors: {

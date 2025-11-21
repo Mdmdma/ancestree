@@ -180,6 +180,28 @@ const initializeAuthDb = () => {
               }
             });
           }
+          
+          // Check and add show_phone_field
+          if (!columnNames.includes('show_phone_field')) {
+            authDb.run("ALTER TABLE users ADD COLUMN show_phone_field BOOLEAN DEFAULT 1", (err) => {
+              if (err) {
+                console.error('Error adding show_phone_field column:', err);
+              } else {
+                console.log('Added show_phone_field column to users table');
+              }
+            });
+          }
+          
+          // Check and add show_email_field
+          if (!columnNames.includes('show_email_field')) {
+            authDb.run("ALTER TABLE users ADD COLUMN show_email_field BOOLEAN DEFAULT 1", (err) => {
+              if (err) {
+                console.error('Error adding show_email_field column:', err);
+              } else {
+                console.log('Added show_email_field column to users table');
+              }
+            });
+          }
         });
       }
     });

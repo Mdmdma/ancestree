@@ -256,6 +256,38 @@ export const api = {
     return result;
   },
 
+  async updatePhoneFieldVisibility(showPhoneField) {
+    const response = await fetch(`${API_BASE_URL}/family/phone-field-visibility`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ showPhoneField })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update phone field visibility setting');
+    }
+    
+    return result;
+  },
+
+  async updateEmailFieldVisibility(showEmailField) {
+    const response = await fetch(`${API_BASE_URL}/family/email-field-visibility`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ showEmailField })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update email field visibility setting');
+    }
+    
+    return result;
+  },
+
   // Load initial data
   async loadNodes() {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
