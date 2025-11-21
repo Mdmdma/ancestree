@@ -57,78 +57,6 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
-// Helper function to generate address hash for geocoding optimization
-const generateAddressHash = (city, zip, country) => {
-  const addressString = [city, zip, country]
-    .filter(Boolean)
-    .map(part => part.toString().trim().toLowerCase())
-    .join('|');
-  return crypto.createHash('md5').update(addressString).digest('hex');
-};
-
-// Helper function to perform smart geocoding (only when address changes)
-const performSmartGeocoding = async (nodeData, currentNode = null) => {
-  const { city, zip, country } = nodeData;
-  
-  // Generate new address hash
-  const newAddressHash = generateAddressHash(city, zip, country);
-  
-  // If we have a current node and the address hash hasn't changed, keep existing coordinates
-  if (currentNode && currentNode.address_hash === newAddressHash && 
-      currentNode.latitude !== null && currentNode.longitude !== null) {
-    return {
-      latitude: currentNode.latitude,
-      longitude: currentNode.longitude,
-      address_hash: newAddressHash
-    };
-  }
-  
-  // If no valid address components, return null coordinates
-  if (!city && !zip && !country) {
-    return {
-      latitude: null,
-      longitude: null,
-      address_hash: null
-    };
-  }
-  
-  // Perform geocoding for new/changed address
-  try {
-    const address = [city, zip, country].filter(Boolean).join(', ');
-    const geocodeResponse = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-      params: {
-        address: address,
-        key: process.env.GOOGLE_MAPS_API_KEY
-      }
-    });
-    
-    if (geocodeResponse.data.status === 'OK' && geocodeResponse.data.results.length > 0) {
-      const location = geocodeResponse.data.results[0].geometry.location;
-      console.log(`Geocoded address "${address}" to: ${location.lat}, ${location.lng}`);
-      
-      return {
-        latitude: location.lat,
-        longitude: location.lng,
-        address_hash: newAddressHash
-      };
-    } else {
-      console.log(`Geocoding failed for address "${address}": ${geocodeResponse.data.status}`);
-      return {
-        latitude: null,
-        longitude: null,
-        address_hash: newAddressHash
-      };
-    }
-  } catch (error) {
-    console.error('Error during geocoding:', error.message);
-    return {
-      latitude: null,
-      longitude: null,
-      address_hash: newAddressHash
-    };
-  }
-};
-
 // Configure CORS origins based on environment
 const getCorsOrigins = () => {
   const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -961,7 +889,8 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
           email: row.email,
           latitude: row.latitude,
           longitude: row.longitude,
-          address_hash: row.address_hash,
+          addressHash: row.address_hash,  // Convert to camelCase
+          lastGeocoded: row.last_geocoded,  // Add missing field
           bloodline: Boolean(row.bloodline),
           preferredImageId: row.preferred_image_id,
           isSelected: false
@@ -1016,17 +945,16 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
   try {
     const familyDb = getFamilyDb(familyName);
     
-    // Perform smart geocoding for address
-    const geocodingResult = await performSmartGeocoding(data);
-    
+    // Note: Geocoding is now handled client-side
+    // Accept latitude, longitude, addressHash, and lastGeocoded from client
     familyDb.run(`INSERT INTO nodes (
       id, type, position_x, position_y, name, surname, maiden_name, birth_date, death_date,
-      city, zip, country, phone, email, latitude, longitude, address_hash,
+      city, zip, country, phone, email, latitude, longitude, address_hash, last_geocoded,
       bloodline, preferred_image_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       id, type, position.x, position.y, data.name, data.surname, data.maidenName,
       data.birthDate, data.deathDate, data.city, data.zip, data.country, data.phone,
-      data.email, geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
+      data.email, data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
       data.bloodline ? 1 : 0, data.preferredImageId || null
     ], function(err) {
       if (err) {
@@ -1037,12 +965,7 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
       // Create the full node object for broadcasting
       const newNode = {
         id, type, position, 
-        data: {
-          ...data,
-          latitude: geocodingResult.latitude,
-          longitude: geocodingResult.longitude,
-          address_hash: geocodingResult.address_hash
-        },
+        data: data,
         deletable: true,
         selectable: true
       };
@@ -1072,7 +995,7 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
   try {
     const familyDb = getFamilyDb(familyName);
     
-    // First, get the current node to check if geocoding is needed
+    // Check if node exists
     const getCurrentNode = () => {
       return new Promise((resolve, reject) => {
         familyDb.get('SELECT * FROM nodes WHERE id = ?', [id], (err, row) => {
@@ -1088,20 +1011,72 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Node not found or access denied' });
     }
     
-    // Perform smart geocoding (only if address changed)
-    const geocodingResult = await performSmartGeocoding(data, currentNode);
+    // Handle partial updates (e.g., geocoding updates latitude/longitude/addressHash/lastGeocoded)
+    // vs full updates (data object with all fields)
+    let updateQuery;
+    let updateParams;
     
-    familyDb.run(`UPDATE nodes SET 
-      position_x = ?, position_y = ?, name = ?, surname = ?, maiden_name = ?, birth_date = ?,
-      death_date = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
-      latitude = ?, longitude = ?, address_hash = ?,
-      bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?`, [
-      position?.x, position?.y, data.name, data.surname, data.maidenName, data.birthDate,
-      data.deathDate, data.city, data.zip, data.country, data.phone, data.email,
-      geocodingResult.latitude, geocodingResult.longitude, geocodingResult.address_hash,
-      data.bloodline ? 1 : 0, data.preferredImageId || null, id
-    ], function(err) {
+    if (data) {
+      // Full update with data object
+      updateQuery = `UPDATE nodes SET 
+        position_x = ?, position_y = ?, name = ?, surname = ?, maiden_name = ?, birth_date = ?,
+        death_date = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
+        latitude = ?, longitude = ?, address_hash = ?, last_geocoded = ?,
+        bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`;
+      updateParams = [
+        position?.x, position?.y, data.name, data.surname, data.maidenName, data.birthDate,
+        data.deathDate, data.city, data.zip, data.country, data.phone, data.email,
+        data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
+        data.bloodline ? 1 : 0, data.preferredImageId || null, id
+      ];
+    } else {
+      // Partial update - build dynamic query based on provided fields
+      const updates = [];
+      const params = [];
+      
+      if (position !== undefined) {
+        if (position.x !== undefined) {
+          updates.push('position_x = ?');
+          params.push(position.x);
+        }
+        if (position.y !== undefined) {
+          updates.push('position_y = ?');
+          params.push(position.y);
+        }
+      }
+      
+      // Handle root-level geocoding fields (from geocodingService)
+      if (req.body.latitude !== undefined) {
+        updates.push('latitude = ?');
+        params.push(req.body.latitude);
+      }
+      if (req.body.longitude !== undefined) {
+        updates.push('longitude = ?');
+        params.push(req.body.longitude);
+      }
+      if (req.body.addressHash !== undefined) {
+        updates.push('address_hash = ?');
+        params.push(req.body.addressHash);
+      }
+      if (req.body.lastGeocoded !== undefined) {
+        updates.push('last_geocoded = ?');
+        params.push(req.body.lastGeocoded);
+      }
+      
+      if (updates.length === 0) {
+        return res.status(400).json({ error: 'No fields to update' });
+      }
+      
+      updates.push('updated_at = CURRENT_TIMESTAMP');
+      updateQuery = `UPDATE nodes SET ${updates.join(', ')} WHERE id = ?`;
+      params.push(id);
+      updateParams = params;
+    }
+    
+    // Note: Geocoding is now handled client-side
+    // Accept latitude, longitude, addressHash, and lastGeocoded from client
+    familyDb.run(updateQuery, updateParams, function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
@@ -1111,12 +1086,7 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
       const updatedNode = {
         id,
         position,
-        data: {
-          ...data,
-          latitude: geocodingResult.latitude,
-          longitude: geocodingResult.longitude,
-          address_hash: geocodingResult.address_hash
-        },
+        data: data,
         type: req.body.type // Include if provided
       };
     
@@ -1618,103 +1588,6 @@ app.post('/api/test/create-self-loops', authenticateToken, (req, res) => {
   } catch (error) {
     console.error('Error creating test edges:', error);
     res.status(500).json({ error: 'Failed to create test edges' });
-  }
-});
-
-// ============= GEOCODING ENDPOINTS =============
-
-// Geocode address using Google Maps API
-app.post('/api/geocode', async (req, res) => {
-  const { address } = req.body;
-  
-  if (!address || address.trim() === '') {
-    return res.status(400).json({ error: 'Address is required' });
-  }
-  
-  try {
-    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!googleMapsApiKey) {
-      return res.status(500).json({ error: 'Google Maps API key not configured' });
-    }
-    
-    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-      params: {
-        address: address.trim(),
-        key: googleMapsApiKey
-      }
-    });
-    
-    if (response.data.status === 'OK' && response.data.results.length > 0) {
-      const result = response.data.results[0];
-      const location = result.geometry.location;
-      
-      res.json({
-        lat: location.lat,
-        lng: location.lng,
-        formatted_address: result.formatted_address,
-        place_id: result.place_id
-      });
-    } else if (response.data.status === 'ZERO_RESULTS') {
-      res.status(404).json({ error: 'Address not found' });
-    } else if (response.data.status === 'OVER_QUERY_LIMIT') {
-      res.status(429).json({ error: 'Google Maps API quota exceeded' });
-    } else {
-      console.error('Google Maps API error:', response.data);
-      res.status(500).json({ error: 'Failed to geocode address: ' + response.data.status });
-    }
-  } catch (error) {
-    console.error('Geocoding error:', error.message);
-    res.status(500).json({ error: 'Failed to geocode address' });
-  }
-});
-
-// Geocode for encryption - accepts unencrypted address components
-app.post('/api/geocode-for-encryption', authenticateToken, async (req, res) => {
-  const { city, zip, country } = req.body;
-  
-  // Build address from components
-  const addressParts = [city, zip, country].filter(Boolean);
-  if (addressParts.length === 0) {
-    return res.json({ latitude: null, longitude: null });
-  }
-  
-  const address = addressParts.join(', ');
-  
-  try {
-    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!googleMapsApiKey) {
-      return res.status(500).json({ error: 'Google Maps API key not configured' });
-    }
-    
-    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-      params: {
-        address: address.trim(),
-        key: googleMapsApiKey
-      }
-    });
-    
-    if (response.data.status === 'OK' && response.data.results.length > 0) {
-      const result = response.data.results[0];
-      const location = result.geometry.location;
-      
-      // Return coordinates as numbers (client will encrypt them as strings)
-      res.json({
-        latitude: location.lat,
-        longitude: location.lng
-      });
-    } else if (response.data.status === 'ZERO_RESULTS') {
-      // Address not found - return null coordinates
-      res.json({ latitude: null, longitude: null });
-    } else if (response.data.status === 'OVER_QUERY_LIMIT') {
-      res.status(429).json({ error: 'Google Maps API quota exceeded' });
-    } else {
-      console.error('Google Maps API error:', response.data);
-      res.json({ latitude: null, longitude: null });
-    }
-  } catch (error) {
-    console.error('Geocoding error:', error.message);
-    // Return null coordinates on error rather than failing
-    res.json({ latitude: null, longitude: null });
   }
 });
 
