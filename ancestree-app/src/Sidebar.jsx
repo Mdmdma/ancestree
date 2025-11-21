@@ -1,7 +1,7 @@
 import React from 'react';
 import NodeEditor from './NodeEditor';
 import ImageGallery from './ImageGallery';
-import MapView from './MapView';
+import OpenStreetMapView from './OpenStreetMapView';
 import ElkDebugOverlay from './ElkDebugOverlay';
 import NodeSearch from './NodeSearch';
 import { appConfig } from './config';
@@ -230,7 +230,7 @@ const Sidebar = ({
         )}
         
         {activeTab === 'map' && (
-          <MapView 
+          <OpenStreetMapView 
             nodes={nodes}
             selectedNode={selectedNode}
             onPersonSelect={onPersonSelectFromMap}

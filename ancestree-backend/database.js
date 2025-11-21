@@ -202,6 +202,7 @@ const initializeFamilyDb = (familyDb) => {
       latitude REAL,
       longitude REAL,
       address_hash TEXT,
+      last_geocoded DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (preferred_image_id) REFERENCES images (id) ON DELETE SET NULL
@@ -260,6 +261,26 @@ const initializeFamilyDb = (familyDb) => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
     )`);
+
+    // Migration: Add last_geocoded column to nodes table if it doesn't exist
+    familyDb.all("PRAGMA table_info(nodes)", (err, columns) => {
+      if (err) {
+        console.error('Error checking nodes table schema:', err);
+        return;
+      }
+      
+      const columnNames = columns.map(col => col.name);
+      
+      if (!columnNames.includes('last_geocoded')) {
+        familyDb.run("ALTER TABLE nodes ADD COLUMN last_geocoded DATETIME", (err) => {
+          if (err) {
+            console.error('Error adding last_geocoded column to nodes:', err);
+          } else {
+            console.log('Added last_geocoded column to nodes table');
+          }
+        });
+      }
+    });
   });
 };
 

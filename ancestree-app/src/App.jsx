@@ -117,6 +117,7 @@ const AddNodeOnEdgeDrop = () => {
     setTreeOperations({
       autoLayout: data.autoLayout,
       fitTreeToView: data.fitTreeToView,
+      zoomToNode: data.zoomToNode,
       updateNode: data.updateNode,
       refreshData: data.refreshData,
       selectNode: data.selectNode
@@ -265,20 +266,25 @@ const AddNodeOnEdgeDrop = () => {
   }, [nodes, isTaggingMode]);
 
   const handlePersonSelectFromMap = useCallback((personId) => {
+    // Do nothing if clicking the already selected marker
+    if (selectedNode && selectedNode.id === personId) {
+      console.log('[Map Selection] Node already selected, ignoring click');
+      return;
+    }
+
     const person = nodes.find(node => node.id === personId);
     if (person) {
+      // Update selected node (this will turn the marker red)
       setSelectedNode(person);
+      
+      // Zoom to the node and show immediate family in the tree view
       setTimeout(() => {
-        if (treeOperations?.fitTreeToView) {
-          treeOperations.fitTreeToView({
-            padding: 0.3,
-            duration: 1000,
-            nodes: [{ id: personId }]
-          });
+        if (treeOperations?.zoomToNode) {
+          treeOperations.zoomToNode(personId);
         }
-      }, 150);
+      }, 100);
     }
-  }, [nodes, treeOperations]);
+  }, [nodes, selectedNode, treeOperations]);
 
   const handleTaggingModeChange = useCallback((isTagging) => {
     setIsTaggingMode(isTagging);

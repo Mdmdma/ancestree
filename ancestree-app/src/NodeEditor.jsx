@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import PictureSlideshow from './PictureSlideshow';
 import { appConfig } from './config';
+import { queueGeocoding } from './geocodingService';
 
 function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [], socket }) {
   const { deleteElements } = useReactFlow();
@@ -39,8 +40,23 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       } else {
         onUpdate(nodeId, data);
       }
-    }, 2000); // 300ms debounce
-  }, [onUpdate]);
+      
+      // After update, check if we need to geocode
+      // This happens when city, zip, or country fields change
+      const addressFields = ['city', 'zip', 'country'];
+      const addressChanged = addressFields.some(field => field in data);
+      
+      if (addressChanged && node) {
+        console.log('[NodeEditor] Address field changed, queuing geocoding for node:', nodeId);
+        // Queue geocoding with updated data
+        const updatedNode = {
+          ...node,
+          data: { ...node.data, ...data }
+        };
+        queueGeocoding(updatedNode);
+      }
+    }, 2000); // 2000ms debounce
+  }, [onUpdate, node]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

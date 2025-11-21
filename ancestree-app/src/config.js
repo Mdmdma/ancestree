@@ -384,16 +384,7 @@ export const appConfig = {
       noLocationsMessage: "Füge Stadt- und Länderinformationen zu Personen im Editor hinzu, um sie auf der Karte zu sehen.",
       mapIcon: "🗺️",
       errors: {
-        failedToLoad: "Fehler beim Laden der Standorte",
-        googleMapsLoad: "Fehler beim Laden von Google Maps. Bitte überprüfe deinen API-Schlüssel und die Internetverbindung.",
-        apiKeyNotConfigured: "Google Maps API key not configured. Please check the setup documentation.",
-        setupInstructions: {
-          title: "Setup Instructions:",
-          step1: "1. Google Maps API-Schlüssel in der Google Cloud Console erstellen",
-          step2: "2. Füge ihn deiner .env-Datei als VITE_GOOGLE_MAPS_API_KEY hinzu",
-          step3: "3. Aktiviere die Maps JavaScript API und die Geocoding API",
-          seeDocumentation: "Siehe GOOGLE_MAPS_SETUP.md für detaillierte Anweisungen."
-        }
+        failedToLoad: "Fehler beim Laden der Standorte"
       },
       noLocations: "Keine Standorte gefunden"
     },

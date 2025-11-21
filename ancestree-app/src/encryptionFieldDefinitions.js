@@ -30,6 +30,9 @@ export const NODE_ENCRYPTED_FIELDS = [
   'latitude',
   'longitude',
   
+  // Timestamps
+  'lastGeocoded',  // When the address was last geocoded
+  
   // Additional fields (if they exist)
   'biography',
   'occupation',
@@ -56,7 +59,8 @@ export const NODE_DB_ENCRYPTED_COLUMNS = [
   'email',
   'latitude',  // Will be converted to string for encryption
   'longitude',  // Will be converted to string for encryption
-  'address_hash'
+  'address_hash',
+  'last_geocoded'  // Timestamp when address was geocoded
 ];
 
 /**

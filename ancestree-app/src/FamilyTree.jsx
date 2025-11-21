@@ -21,6 +21,7 @@ import { encryptedApi } from './encryptedApi';
 import { useDebounce } from './hooks/useDebounce';
 import { isEncryptionEnabled, getDerivedKey, isBatchOperationInProgress } from './encryptionSession';
 import { decryptNodeData, decryptEdgeData } from './encryptedApi';
+import { queueBatchGeocoding } from './geocodingService';
 
 import '@xyflow/react/dist/style.css';
 
@@ -534,6 +535,11 @@ const FamilyTree = ({
         
         setEdges(processedEdges);
         
+        // Queue geocoding check for all nodes (will run in background)
+        // Only geocodes nodes where address hash has changed
+        console.log('[FamilyTree] Queuing geocoding check for loaded nodes');
+        queueBatchGeocoding(processedNodes);
+        
       } catch (error) {
         console.error('Failed to load data:', error);
       } finally {
@@ -598,6 +604,11 @@ const FamilyTree = ({
       }));
       
       setNodes(processedNodes);
+      setEdges(processedEdges);
+      
+      // Queue geocoding check for all nodes
+      console.log('[FamilyTree] Queuing geocoding check after refresh');
+      queueBatchGeocoding(processedNodes);
       setEdges(processedEdges);
     } catch (error) {
       console.error('Failed to refresh data:', error);
@@ -1187,6 +1198,75 @@ const FamilyTree = ({
       duration: 800
     });
   }, [fitView]);
+
+  // Zoom to a specific node and show immediate family
+  // Adjustable zoom level: 1.5 shows node + immediate family context
+  // Lower values (e.g., 1.2) show more context, higher values (e.g., 2.0) show less
+  const zoomToNode = useCallback((nodeId) => {
+    const targetNode = nodes.find(n => n.id === nodeId);
+    if (!targetNode || !targetNode.position) {
+      console.warn('[ZoomToNode] Node not found or has no position:', nodeId);
+      return;
+    }
+
+    // Get connected nodes (parents, partners, children) to calculate bounds
+    const connectedNodeIds = new Set([nodeId]);
+    
+    // Find all edges connected to this node
+    edges.forEach(edge => {
+      if (edge.source === nodeId) {
+        connectedNodeIds.add(edge.target);
+      }
+      if (edge.target === nodeId) {
+        connectedNodeIds.add(edge.source);
+      }
+    });
+
+    // Get positions of all connected nodes
+    const connectedNodes = nodes.filter(n => connectedNodeIds.has(n.id) && n.position);
+    
+    if (connectedNodes.length === 0) {
+      console.warn('[ZoomToNode] No connected nodes found');
+      return;
+    }
+
+    // Calculate bounding box for connected nodes
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    connectedNodes.forEach(node => {
+      const x = node.position.x;
+      const y = node.position.y;
+      const width = node.width || 200; // Default node width
+      const height = node.height || 80; // Default node height
+      
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    });
+
+    // Calculate center and dimensions
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const width = maxX - minX;
+    const height = maxY - minY;
+
+    // Use fitView with calculated bounds
+    // This ensures smooth pan and zoom to show the node and immediate family
+    fitView({
+      nodes: connectedNodes.map(n => ({ id: n.id })),
+      duration: 800,
+      padding: 0.3,
+      // ZOOM LEVEL ADJUSTMENT:
+      // Increase minZoom to zoom in more (e.g., 1.8 for closer view)
+      // Decrease minZoom to zoom out more (e.g., 1.2 for wider view)
+      // Default: 1.5 provides good balance showing node + immediate family
+      minZoom: 1.5,
+      maxZoom: 1.5
+    });
+
+    console.log('[ZoomToNode] Zooming to node:', nodeId, 'with', connectedNodes.length, 'connected nodes');
+  }, [nodes, edges, fitView]);
 
   // Handle ReactFlow initialization - fit view when ready
   const handleInit = useCallback((reactFlowInstance) => {
@@ -2065,11 +2145,12 @@ const FamilyTree = ({
         edges,
         autoLayout,
         fitTreeToView,
+        zoomToNode,
         updateNode,
         refreshData
       });
     }
-  }, [nodes, edges, autoLayout, fitTreeToView, updateNode, refreshData, onNodeUpdate]);
+  }, [nodes, edges, autoLayout, fitTreeToView, zoomToNode, updateNode, refreshData, onNodeUpdate]);
 
   if (loading) {
     return <div>{appConfig.ui.loading.familyTree}</div>;

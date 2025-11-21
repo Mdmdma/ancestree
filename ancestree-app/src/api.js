@@ -240,22 +240,6 @@ export const api = {
     return result;
   },
 
-  async geocodeForEncryption(city, zip, country) {
-    const response = await fetch(`${API_BASE_URL}/geocode-for-encryption`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ city, zip, country })
-    });
-    
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to geocode address');
-    }
-    
-    return result;
-  },
-
   // Load initial data
   async loadNodes() {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
@@ -617,22 +601,6 @@ export const api = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to set preferred image');
-    }
-    
-    return response.json();
-  },
-
-  // Geocoding operations
-  async geocodeAddress(address) {
-    const response = await fetch(`${API_BASE_URL}/geocode`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ address })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to geocode address');
     }
     
     return response.json();
