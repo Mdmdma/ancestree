@@ -6,14 +6,16 @@
 /**
  * Generate MD5 hash of address components
  * Used to detect when an address has changed and needs re-geocoding
+ * @param {string} street - Street name
+ * @param {string} housenumber - House number
  * @param {string} city - City name
  * @param {string} zip - ZIP/postal code
  * @param {string} country - Country name
  * @returns {Promise<string>} MD5 hash of the address
  */
-export const generateAddressHash = async (city, zip, country) => {
+export const generateAddressHash = async (street, housenumber, city, zip, country) => {
   // Create normalized address string
-  const addressString = [city, zip, country]
+  const addressString = [street, housenumber, city, zip, country]
     .filter(Boolean)
     .map(part => part.toString().trim().toLowerCase())
     .join('|');

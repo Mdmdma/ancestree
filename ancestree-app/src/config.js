@@ -212,6 +212,8 @@ export const appConfig = {
         deathDate: 'Todestag:',
         phone: 'Telefon:',
         email: 'E-Mail:',
+        street: 'Straße:',
+        housenumber: 'Nr:',
         city: 'Stadt:',
         zip: 'PLZ:',
         country: 'Land (Code):'
@@ -220,6 +222,8 @@ export const appConfig = {
         phone: 'z.B. +43 5287 87123',
         email: 'z.B. name@beispiel.com',
         maidenName: 'z.B. Müller (falls abweichend)',
+        street: 'z.B. Hauptstraße',
+        housenumber: 'z.B. 42',
         city: 'z.B. Innsbruck',
         zip: '6020',
         country: 'z.B. AT, DE, CH'
@@ -271,7 +275,8 @@ export const appConfig = {
       menu: {
         familyParameters: "Familienparameter",
         passwords: "Passwörter",
-        security: "Sicherheit"
+        security: "Sicherheit",
+        visibleFields: "Sichtbare Felder"
       },
       familyParameters: {
         title: "Familienparameter",
@@ -293,6 +298,15 @@ export const appConfig = {
         encryptionHint: "Wenn aktiviert, werden alle gespeicherten Daten client-seitig mit dem Familienpasswort verschlüsselt.",
         skipGeocodingLabel: "Geocoding überspringen",
         skipGeocodingHint: "Wenn aktiviert, werden Adressen nicht automatisch geokodiert."
+      },
+      visibleFields: {
+        title: "Sichtbare Felder",
+        description: "Steuere, welche Felder im Dateneditor angezeigt werden.",
+        streetFieldsLabel: "Straße und Hausnummer anzeigen",
+        streetFieldsHint: "Wenn aktiviert, werden die Felder für Straße und Hausnummer im Editor angezeigt.",
+        showSuccess: "Straßenfelder werden nun angezeigt",
+        hideSuccess: "Straßenfelder sind nun ausgeblendet",
+        updateError: "Fehler beim Aktualisieren der Feldersichtbarkeit"
       },
       errors: {
         passwordsDoNotMatch: "Passwörter stimmen nicht überein",

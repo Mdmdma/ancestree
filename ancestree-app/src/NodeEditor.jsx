@@ -3,6 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import PictureSlideshow from './PictureSlideshow';
 import { appConfig } from './config';
 import { queueGeocoding } from './geocodingService';
+import { api } from './api';
 
 function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [], socket }) {
   const { deleteElements } = useReactFlow();
@@ -13,6 +14,8 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
     maidenName: '',
     birthDate: '',
     deathDate: '',
+    street: '',
+    housenumber: '',
     city: '',
     zip: '',
     country: '',
@@ -24,6 +27,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
   });
 
   const [showSlideshow, setShowSlideshow] = useState(false);
+  const [showStreetFields, setShowStreetFields] = useState(true);
   const updateTimeoutRef = useRef(null);
   const nameInputRef = useRef(null);
   const previousNodeIdRef = useRef(null);
@@ -67,6 +71,20 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
     };
   }, []);
 
+  // Fetch visibility settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await api.getFamilySettings();
+        setShowStreetFields(settings.showStreetFields !== undefined ? Boolean(settings.showStreetFields) : true);
+      } catch (err) {
+        // If fetch fails, default to showing fields
+        console.error('Failed to fetch field visibility settings:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
   useEffect(() => {
     // Apply any pending updates from the previous node before switching
     if (updateTimeoutRef.current) {
@@ -84,6 +102,8 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         maidenName: node.data.maidenName || '',
         birthDate: node.data.birthDate || '',
         deathDate: node.data.deathDate || '',
+        street: node.data.street || '',
+        housenumber: node.data.housenumber || '',
         city: node.data.city || '',
         zip: node.data.zip || '',
         country: node.data.country || '',
@@ -292,6 +312,33 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         style={inputStyle}
         placeholder={appConfig.ui.nodeEditor.placeholders.email}
       />
+
+      {/* Street fields - conditionally visible */}
+      {showStreetFields && (
+        <div style={addressRowStyle}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.street}</label>
+            <input
+              type="text"
+              value={formData.street}
+              onChange={(e) => handleInputChange('street', e.target.value)}
+              style={inputStyle}
+              placeholder={appConfig.ui.nodeEditor.placeholders.street}
+            />
+          </div>
+          <div style={{ width: '80px' }}>
+            <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.housenumber}</label>
+            <input
+              type="text"
+              value={formData.housenumber}
+              onChange={(e) => handleInputChange('housenumber', e.target.value)}
+              style={inputStyle}
+              placeholder={appConfig.ui.nodeEditor.placeholders.housenumber}
+              maxLength={10}
+            />
+          </div>
+        </div>
+      )}
 
       <div style={addressRowStyle}>
         <div style={{ flex: 1 }}>

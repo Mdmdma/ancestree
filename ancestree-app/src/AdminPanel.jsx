@@ -18,6 +18,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState(null);
   const [skipGeocoding, setSkipGeocoding] = useState(false);
+  const [showStreetFields, setShowStreetFields] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -63,6 +64,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
         setEncryptionEnabled(Boolean(settings.encryptionEnabled));
         setEncryptionSalt(settings.encryptionSalt || null);
         setSkipGeocoding(Boolean(settings.skipGeocoding));
+        setShowStreetFields(settings.showStreetFields !== undefined ? Boolean(settings.showStreetFields) : true);
       } catch (err) {
         // ignore if not authenticated
       }
@@ -372,6 +374,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
               <button onClick={() => setActiveTab('familyParameters')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'familyParameters' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.familyParameters}</button>
               <button onClick={() => setActiveTab('passwords')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'passwords' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.passwords}</button>
               <button onClick={() => setActiveTab('security')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'security' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.security}</button>
+              <button onClick={() => setActiveTab('visibleFields')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'visibleFields' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.visibleFields}</button>
               <button onClick={() => setActiveTab('test')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'test' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>🧪 Test</button>
             </div>
 
@@ -614,6 +617,72 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                         position: 'absolute',
                         top: '3px',
                         left: skipGeocoding ? '33px' : '3px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: 'white',
+                        transition: 'left 0.3s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'visibleFields' && (
+                <div style={{ backgroundColor: '#34495e', padding: '20px', borderRadius: '8px' }}>
+                  <h3 style={{ marginTop: 0 }}>{appConfig.ui.adminPanel.visibleFields.title}</h3>
+                  <p style={{ color: '#bdc3c7', fontSize: '14px', marginBottom: '20px' }}>
+                    {appConfig.ui.adminPanel.visibleFields.description}
+                  </p>
+                  
+                  {/* Street Fields Visibility Toggle */}
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ color: 'white', flex: 1 }}>
+                      {appConfig.ui.adminPanel.visibleFields.streetFieldsLabel}
+                      <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                        {appConfig.ui.adminPanel.visibleFields.streetFieldsHint}
+                      </div>
+                    </label>
+                    <button
+                      disabled={loading}
+                      onClick={async () => {
+                        const newValue = !showStreetFields;
+                        setLoading(true);
+                        setError('');
+                        setSuccess('');
+                        try {
+                          await api.updateStreetFieldsVisibility(newValue);
+                          setShowStreetFields(newValue);
+                          setSuccess(newValue ? appConfig.ui.adminPanel.visibleFields.showSuccess : appConfig.ui.adminPanel.visibleFields.hideSuccess);
+                          setTimeout(() => setSuccess(''), 3000);
+                          // Trigger data reload to update UI
+                          if (onDataReload) {
+                            onDataReload();
+                          }
+                        } catch (err) {
+                          setError(`${appConfig.ui.adminPanel.visibleFields.updateError}: ${err.message}`);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      style={{
+                        position: 'relative',
+                        width: '60px',
+                        height: '30px',
+                        borderRadius: '15px',
+                        border: 'none',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        backgroundColor: showStreetFields ? '#27ae60' : '#7f8c8d',
+                        transition: 'background-color 0.3s ease',
+                        opacity: loading ? 0.6 : 1,
+                        padding: 0
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: showStreetFields ? '33px' : '3px',
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',

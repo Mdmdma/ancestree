@@ -646,9 +646,9 @@ app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) 
   }
 });
 
-// Get family settings (display name, purpose, encryption status, skip_geocoding)
+// Get family settings (display name, purpose, encryption status, skip_geocoding, show_street_fields)
 app.get('/api/family/settings', authenticateToken, (req, res) => {
-  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, skip_geocoding FROM users WHERE id = ?', 
+  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, skip_geocoding, show_street_fields FROM users WHERE id = ?', 
     [req.user.id], 
     (err, settings) => {
       if (err) {
@@ -665,7 +665,8 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
         purpose: settings.purpose,
         encryptionEnabled: Boolean(settings.encryption_enabled),
         encryptionSalt: settings.encryption_salt,
-        skipGeocoding: Boolean(settings.skip_geocoding)
+        skipGeocoding: Boolean(settings.skip_geocoding),
+        showStreetFields: Boolean(settings.show_street_fields)
       });
     }
   );
@@ -743,6 +744,23 @@ app.post('/api/family/skip-geocoding', authenticateToken, (req, res) => {
       }
 
       res.json({ success: true, message: 'Skip geocoding setting updated successfully' });
+    }
+  );
+});
+
+// Update show_street_fields setting
+app.post('/api/family/street-fields-visibility', authenticateToken, (req, res) => {
+  const { showStreetFields } = req.body;
+
+  authDb.run('UPDATE users SET show_street_fields = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [showStreetFields ? 1 : 0, req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating show_street_fields:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Street fields visibility updated successfully' });
     }
   );
 });
@@ -882,6 +900,8 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
           maidenName: row.maiden_name,
           birthDate: row.birth_date,
           deathDate: row.death_date,
+          street: row.street,
+          housenumber: row.housenumber,
           city: row.city,
           zip: row.zip,
           country: row.country,
@@ -949,11 +969,11 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
     // Accept latitude, longitude, addressHash, and lastGeocoded from client
     familyDb.run(`INSERT INTO nodes (
       id, type, position_x, position_y, name, surname, maiden_name, birth_date, death_date,
-      city, zip, country, phone, email, latitude, longitude, address_hash, last_geocoded,
+      street, housenumber, city, zip, country, phone, email, latitude, longitude, address_hash, last_geocoded,
       bloodline, preferred_image_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       id, type, position.x, position.y, data.name, data.surname, data.maidenName,
-      data.birthDate, data.deathDate, data.city, data.zip, data.country, data.phone,
+      data.birthDate, data.deathDate, data.street, data.housenumber, data.city, data.zip, data.country, data.phone,
       data.email, data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
       data.bloodline ? 1 : 0, data.preferredImageId || null
     ], function(err) {
@@ -1020,13 +1040,13 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
       // Full update with data object
       updateQuery = `UPDATE nodes SET 
         position_x = ?, position_y = ?, name = ?, surname = ?, maiden_name = ?, birth_date = ?,
-        death_date = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
+        death_date = ?, street = ?, housenumber = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
         latitude = ?, longitude = ?, address_hash = ?, last_geocoded = ?,
         bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?`;
       updateParams = [
         position?.x, position?.y, data.name, data.surname, data.maidenName, data.birthDate,
-        data.deathDate, data.city, data.zip, data.country, data.phone, data.email,
+        data.deathDate, data.street, data.housenumber, data.city, data.zip, data.country, data.phone, data.email,
         data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
         data.bloodline ? 1 : 0, data.preferredImageId || null, id
       ];

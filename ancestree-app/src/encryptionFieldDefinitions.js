@@ -18,6 +18,8 @@ export const NODE_ENCRYPTED_FIELDS = [
   'deathDate',
   
   // Location
+  'street',
+  'housenumber',
   'city',
   'zip',
   'country',
@@ -52,6 +54,8 @@ export const NODE_DB_ENCRYPTED_COLUMNS = [
   'maiden_name',
   'birth_date',
   'death_date',
+  'street',
+  'housenumber',
   'city',
   'zip',
   'country',

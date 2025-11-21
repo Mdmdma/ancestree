@@ -169,6 +169,17 @@ const initializeAuthDb = () => {
               }
             });
           }
+          
+          // Check and add show_street_fields
+          if (!columnNames.includes('show_street_fields')) {
+            authDb.run("ALTER TABLE users ADD COLUMN show_street_fields BOOLEAN DEFAULT 1", (err) => {
+              if (err) {
+                console.error('Error adding show_street_fields column:', err);
+              } else {
+                console.log('Added show_street_fields column to users table');
+              }
+            });
+          }
         });
       }
     });
@@ -192,6 +203,8 @@ const initializeFamilyDb = (familyDb) => {
       maiden_name TEXT,
       birth_date TEXT,
       death_date TEXT,
+      street TEXT,
+      housenumber TEXT,
       city TEXT,
       zip TEXT,
       country TEXT,
@@ -277,6 +290,28 @@ const initializeFamilyDb = (familyDb) => {
             console.error('Error adding last_geocoded column to nodes:', err);
           } else {
             console.log('Added last_geocoded column to nodes table');
+          }
+        });
+      }
+      
+      // Migration: Add street column to nodes table if it doesn't exist
+      if (!columnNames.includes('street')) {
+        familyDb.run("ALTER TABLE nodes ADD COLUMN street TEXT", (err) => {
+          if (err) {
+            console.error('Error adding street column to nodes:', err);
+          } else {
+            console.log('Added street column to nodes table');
+          }
+        });
+      }
+      
+      // Migration: Add housenumber column to nodes table if it doesn't exist
+      if (!columnNames.includes('housenumber')) {
+        familyDb.run("ALTER TABLE nodes ADD COLUMN housenumber TEXT", (err) => {
+          if (err) {
+            console.error('Error adding housenumber column to nodes:', err);
+          } else {
+            console.log('Added housenumber column to nodes table');
           }
         });
       }

@@ -60,18 +60,20 @@ const notifyListeners = (nodeId, success, coordinates) => {
 export const needsGeocoding = async (node) => {
   if (!node || !node.data) return false;
   
-  const { city, zip, country, addressHash: storedHash } = node.data;
+  const { street, housenumber, city, zip, country, addressHash: storedHash } = node.data;
   
   // If no address components, no geocoding needed
-  if (!city && !zip && !country) {
+  if (!street && !housenumber && !city && !zip && !country) {
     console.log(`[GeocodingService] Node ${node.id} has no address components, skipping`);
     return false;
   }
   
   // Calculate current address hash
-  const currentHash = await generateAddressHash(city, zip, country);
+  const currentHash = await generateAddressHash(street, housenumber, city, zip, country);
   
   console.log(`[GeocodingService] Node ${node.id} hash check:`, {
+    street,
+    housenumber,
     city,
     zip,
     country,
@@ -181,9 +183,9 @@ const processQueue = async () => {
       
       // Geocode the address
       const { node } = item;
-      const { city, zip, country } = node.data;
+      const { street, housenumber, city, zip, country } = node.data;
       
-      console.log(`[GeocodingService] Geocoding node ${node.id}: ${city}, ${zip}, ${country}`);
+      console.log(`[GeocodingService] Geocoding node ${node.id}: ${street} ${housenumber}, ${city}, ${zip}, ${country}`);
       
       const result = await geocodeAddress(city, zip, country);
       
@@ -192,7 +194,7 @@ const processQueue = async () => {
         console.log(`[GeocodingService] Successfully geocoded node ${node.id}: ${result.latitude}, ${result.longitude}`);
         
         // Generate new address hash
-        const newHash = await generateAddressHash(city, zip, country);
+        const newHash = await generateAddressHash(street, housenumber, city, zip, country);
         
         // Get current timestamp for last_geocoded
         const timestamp = new Date().toISOString();
@@ -211,10 +213,10 @@ const processQueue = async () => {
         state.stats.successCount++;
       } else {
         // Geocoding failed - set coordinates to null
-        console.error(`[GeocodingService] Geocoding failed for node ${node.id}: ${city}, ${zip}, ${country}`);
+        console.error(`[GeocodingService] Geocoding failed for node ${node.id}: ${street} ${housenumber}, ${city}, ${zip}, ${country}`);
         
         // Generate new address hash anyway
-        const newHash = await generateAddressHash(city, zip, country);
+        const newHash = await generateAddressHash(street, housenumber, city, zip, country);
         const timestamp = new Date().toISOString();
         
         // Update node with null coordinates
@@ -239,6 +241,8 @@ const processQueue = async () => {
       // On error, try to update with null coordinates
       try {
         const newHash = await generateAddressHash(
+          item.node.data.street,
+          item.node.data.housenumber,
           item.node.data.city,
           item.node.data.zip,
           item.node.data.country

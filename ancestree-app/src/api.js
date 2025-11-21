@@ -240,6 +240,22 @@ export const api = {
     return result;
   },
 
+  async updateStreetFieldsVisibility(showStreetFields) {
+    const response = await fetch(`${API_BASE_URL}/family/street-fields-visibility`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ showStreetFields })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update street fields visibility setting');
+    }
+    
+    return result;
+  },
+
   // Load initial data
   async loadNodes() {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
