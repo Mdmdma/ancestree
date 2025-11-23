@@ -191,6 +191,22 @@ export const api = {
     return result;
   },
 
+  async deleteFamily(adminPassword) {
+    const response = await fetch(`${API_BASE_URL}/auth/delete-family`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ adminPassword })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete family');
+    }
+    
+    return result;
+  },
+
   // Family settings operations
   async getFamilySettings() {
     const response = await fetch(`${API_BASE_URL}/family/settings`, {

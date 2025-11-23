@@ -12,6 +12,7 @@
   "dependencies": {
     "@xyflow/react": "^12.8.2",
     "elkjs": "^0.10.0",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "react": "^19.1.0",
     "react-bootstrap-icons": "^1.11.6",

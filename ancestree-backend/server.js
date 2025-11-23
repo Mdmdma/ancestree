@@ -10,7 +10,7 @@ const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
-const { authDb, getFamilyDb, getFamilyDbById, insertDefaultNodeForFamily, ensureFamilyHasNodes } = require('./database');
+const { authDb, getFamilyDb, getFamilyDbById, insertDefaultNodeForFamily, ensureFamilyHasNodes, closeFamilyDatabase } = require('./database');
 const axios = require('axios'); // Add axios for API calls
 const http = require('http');
 const { Server } = require('socket.io');
@@ -642,6 +642,76 @@ app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) 
     );
   } catch (error) {
     console.error('Admin password change error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete family database and auth entry (admin only)
+app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
+  const { adminPassword } = req.body;
+
+  if (!adminPassword) {
+    return res.status(400).json({ error: 'Admin password is required to delete family' });
+  }
+
+  try {
+    // First verify admin password
+    authDb.get('SELECT family_name, admin_password_hash FROM users WHERE id = ?', [req.user.id], async (err, user) => {
+      if (err) {
+        console.error('Database error during family deletion:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify admin password
+      const passwordMatch = await bcrypt.compare(adminPassword, user.admin_password_hash);
+      if (!passwordMatch) {
+        return res.status(401).json({ error: 'Invalid admin password' });
+      }
+
+      const familyName = user.family_name;
+      const familyDbPath = path.join(__dirname, 'databases', `database_family_${familyName}.db`);
+
+      // Close the database connection if it's in the cache
+      closeFamilyDatabase(familyName, (closeErr) => {
+        if (closeErr) {
+          console.error(`Error closing database for ${familyName}:`, closeErr);
+          return res.status(500).json({ error: 'Failed to close database connection' });
+        }
+
+        // Delete the family database file
+        try {
+          if (fs.existsSync(familyDbPath)) {
+            fs.unlinkSync(familyDbPath);
+            console.log(`Deleted family database: ${familyDbPath}`);
+          } else {
+            console.log(`Family database file not found: ${familyDbPath}`);
+          }
+        } catch (fsError) {
+          console.error('Error deleting family database file:', fsError);
+          return res.status(500).json({ error: 'Failed to delete family database file' });
+        }
+
+        // Delete the user from auth database
+        authDb.run('DELETE FROM users WHERE id = ?', [req.user.id], function(deleteErr) {
+          if (deleteErr) {
+            console.error('Database error during user deletion:', deleteErr);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+
+          console.log(`Deleted family "${familyName}" from auth database`);
+          res.json({ 
+            success: true, 
+            message: `Family "${familyName}" and all associated data have been permanently deleted` 
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Family deletion error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

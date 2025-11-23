@@ -73,6 +73,30 @@ const closeAllFamilyDatabases = () => {
 };
 
 /**
+ * Close a specific family database connection
+ * @param {string} familyName - The family name to close the database for
+ * @param {Function} callback - Callback with (err)
+ */
+const closeFamilyDatabase = (familyName, callback) => {
+  if (familyDatabases.has(familyName)) {
+    const db = familyDatabases.get(familyName);
+    db.close((err) => {
+      if (err) {
+        console.error(`Error closing database for family ${familyName}:`, err);
+        if (callback) callback(err);
+      } else {
+        familyDatabases.delete(familyName);
+        console.log(`Closed database connection for family ${familyName}`);
+        if (callback) callback(null);
+      }
+    });
+  } else {
+    // Database not in cache, nothing to close
+    if (callback) callback(null);
+  }
+};
+
+/**
  * Initialize the authentication database schema
  */
 const initializeAuthDb = () => {
@@ -411,6 +435,7 @@ module.exports = {
   getFamilyDb,
   getFamilyDbById,
   closeAllFamilyDatabases,
+  closeFamilyDatabase,
   insertDefaultNodeForFamily,
   ensureFamilyHasNodes
 };

@@ -278,7 +278,8 @@ export const appConfig = {
         familyParameters: "Familienparameter",
         passwords: "Passwörter",
         security: "Sicherheit",
-        visibleFields: "Sichtbare Felder"
+        visibleFields: "Sichtbare Felder",
+        dangerZone: "⚠️ Gefahrenzone"
       },
       familyParameters: {
         title: "Familienparameter",
@@ -341,6 +342,33 @@ export const appConfig = {
           encrypting: "Verschlüssele Daten...",
           decrypting: "Entschlüssele Daten...",
           complete: "Abgeschlossen!"
+        }
+      },
+      dangerZone: {
+        title: "⚠️ Gefahrenzone",
+        description: "Die Aktionen in diesem Bereich sind unwiderruflich und löschen dauerhaft alle Familiendaten.",
+        deleteDatabase: {
+          title: "Familiendatenbank löschen",
+          description: "Dies wird dauerhaft löschen:",
+          items: {
+            treeData: "Alle Stammbaumdaten (Personen, Beziehungen)",
+            images: "Alle Bilder und Medien",
+            locations: "Alle Standortdaten",
+            databaseFile: "Die Familiendatenbankdatei",
+            authEntry: "Deinen Familien-Account aus der Authentifizierungsdatenbank"
+          },
+          deleteButton: "Familiendatenbank löschen",
+          finalWarning: {
+            title: "⚠️ LETZTE WARNUNG",
+            message: "Diese Aktion kann nicht rückgängig gemacht werden. Alle Daten gehen dauerhaft verloren."
+          },
+          confirmLabel: "Tippe <strong>LÖSCHEN</strong> zur Bestätigung:",
+          confirmPlaceholder: "LÖSCHEN",
+          adminPasswordLabel: "Admin-Passwort eingeben:",
+          adminPasswordPlaceholder: "Admin-Passwort",
+          deleteButtonFinal: "🗑️ Dauerhaft löschen",
+          deleting: "Wird gelöscht...",
+          cancelButton: "Abbrechen"
         }
       }
     },

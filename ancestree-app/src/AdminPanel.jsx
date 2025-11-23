@@ -43,6 +43,12 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     withPadding: true
   });
 
+  // Delete family state
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteAdminPassword, setDeleteAdminPassword] = useState('');
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -227,6 +233,37 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     }
   };
 
+  const handleDeleteFamily = async () => {
+    if (deleteConfirmText !== 'LÖSCHEN') {
+      setDeleteError('Bitte tippe LÖSCHEN zur Bestätigung');
+      return;
+    }
+
+    if (!deleteAdminPassword) {
+      setDeleteError('Admin-Passwort ist erforderlich');
+      return;
+    }
+
+    setLoading(true);
+    setDeleteError('');
+
+    try {
+      await api.deleteFamily(deleteAdminPassword);
+      
+      // Clear all local storage and logout
+      api.logout();
+      localStorage.clear();
+      
+      // Close the admin panel and redirect to login
+      alert('Familie erfolgreich gelöscht. Du wirst zur Login-Seite weitergeleitet.');
+      window.location.href = '/';
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -380,6 +417,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
               <button onClick={() => setActiveTab('security')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'security' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.security}</button>
               <button onClick={() => setActiveTab('visibleFields')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'visibleFields' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.visibleFields}</button>
               <button onClick={() => setActiveTab('test')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'test' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>🧪 Test</button>
+              <button onClick={() => setActiveTab('dangerZone')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'dangerZone' ? '#c0392b' : 'transparent', color: activeTab === 'dangerZone' ? 'white' : '#e74c3c', border: '1px solid #e74c3c', textAlign: 'left', fontWeight: '600' }}>{appConfig.ui.adminPanel.menu.dangerZone}</button>
             </div>
 
             {/* Content area */}
@@ -1021,6 +1059,164 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {activeTab === 'dangerZone' && (
+                <div style={{ backgroundColor: '#34495e', padding: '20px', borderRadius: '8px' }}>
+                  <h3 style={{ marginTop: 0, color: '#e74c3c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {appConfig.ui.adminPanel.dangerZone.title}
+                  </h3>
+                  <p style={{ color: '#bdc3c7', fontSize: '14px', marginBottom: '20px' }}>
+                    {appConfig.ui.adminPanel.dangerZone.description}
+                  </p>
+
+                  <div style={{ 
+                    backgroundColor: '#2c3e50', 
+                    padding: '20px', 
+                    borderRadius: '8px',
+                    border: '2px solid #e74c3c'
+                  }}>
+                    <h4 style={{ marginTop: 0, color: '#e74c3c' }}>{appConfig.ui.adminPanel.dangerZone.deleteDatabase.title}</h4>
+                    <p style={{ color: '#bdc3c7', fontSize: '14px', marginBottom: '15px' }}>
+                      {appConfig.ui.adminPanel.dangerZone.deleteDatabase.description}
+                    </p>
+                    <ul style={{ color: '#95a5a6', fontSize: '14px', marginBottom: '20px', paddingLeft: '20px' }}>
+                      <li>{appConfig.ui.adminPanel.dangerZone.deleteDatabase.items.treeData}</li>
+                      <li>{appConfig.ui.adminPanel.dangerZone.deleteDatabase.items.images}</li>
+                      <li>{appConfig.ui.adminPanel.dangerZone.deleteDatabase.items.locations}</li>
+                      <li>{appConfig.ui.adminPanel.dangerZone.deleteDatabase.items.databaseFile}</li>
+                      <li>{appConfig.ui.adminPanel.dangerZone.deleteDatabase.items.authEntry}</li>
+                    </ul>
+                    
+                    {!showDeleteConfirmation ? (
+                      <button
+                        onClick={() => setShowDeleteConfirmation(true)}
+                        style={{
+                          padding: '12px 20px',
+                          backgroundColor: '#e74c3c',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {appConfig.ui.adminPanel.dangerZone.deleteDatabase.deleteButton}
+                      </button>
+                    ) : (
+                      <div style={{ marginTop: '15px' }}>
+                        <div style={{ 
+                          backgroundColor: '#c0392b', 
+                          padding: '15px', 
+                          borderRadius: '6px',
+                          marginBottom: '15px'
+                        }}>
+                          <p style={{ color: 'white', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
+                            {appConfig.ui.adminPanel.dangerZone.deleteDatabase.finalWarning.title}
+                          </p>
+                          <p style={{ color: '#ecf0f1', fontSize: '13px', marginBottom: '0' }}>
+                            {appConfig.ui.adminPanel.dangerZone.deleteDatabase.finalWarning.message}
+                          </p>
+                        </div>
+
+                        {deleteError && (
+                          <div style={{
+                            backgroundColor: '#e74c3c',
+                            color: 'white',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            marginBottom: '12px',
+                            fontSize: '14px'
+                          }}>
+                            {deleteError}
+                          </div>
+                        )}
+
+                        <label style={{ display: 'block', marginBottom: '8px', color: '#ecf0f1', fontSize: '14px' }} dangerouslySetInnerHTML={{ __html: appConfig.ui.adminPanel.dangerZone.deleteDatabase.confirmLabel }}>
+                        </label>
+                        <input
+                          type="text"
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          placeholder={appConfig.ui.adminPanel.dangerZone.deleteDatabase.confirmPlaceholder}
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            marginBottom: '12px',
+                            fontSize: '14px',
+                            boxSizing: 'border-box'
+                          }}
+                          disabled={loading}
+                        />
+
+                        <label style={{ display: 'block', marginBottom: '8px', color: '#ecf0f1', fontSize: '14px' }}>
+                          {appConfig.ui.adminPanel.dangerZone.deleteDatabase.adminPasswordLabel}
+                        </label>
+                        <input
+                          type="password"
+                          value={deleteAdminPassword}
+                          onChange={(e) => setDeleteAdminPassword(e.target.value)}
+                          placeholder={appConfig.ui.adminPanel.dangerZone.deleteDatabase.adminPasswordPlaceholder}
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            marginBottom: '15px',
+                            fontSize: '14px',
+                            boxSizing: 'border-box'
+                          }}
+                          disabled={loading}
+                        />
+
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button
+                            onClick={handleDeleteFamily}
+                            disabled={loading || deleteConfirmText !== 'LÖSCHEN' || !deleteAdminPassword}
+                            style={{
+                              flex: 1,
+                              padding: '12px',
+                              backgroundColor: (loading || deleteConfirmText !== 'LÖSCHEN' || !deleteAdminPassword) ? '#7f8c8d' : '#c0392b',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              cursor: (loading || deleteConfirmText !== 'LÖSCHEN' || !deleteAdminPassword) ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {loading ? appConfig.ui.adminPanel.dangerZone.deleteDatabase.deleting : appConfig.ui.adminPanel.dangerZone.deleteDatabase.deleteButtonFinal}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setShowDeleteConfirmation(false);
+                              setDeleteConfirmText('');
+                              setDeleteAdminPassword('');
+                              setDeleteError('');
+                            }}
+                            disabled={loading}
+                            style={{
+                              flex: 1,
+                              padding: '12px',
+                              backgroundColor: '#95a5a6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              cursor: loading ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {appConfig.ui.adminPanel.dangerZone.deleteDatabase.cancelButton}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
