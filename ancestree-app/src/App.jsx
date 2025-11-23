@@ -5,7 +5,7 @@ import AppHeader from './AppHeader';
 import Sidebar from './Sidebar';
 import Login from './Login';
 import AdminPanel from './AdminPanel';
-import { api, getAuthToken, getSocketServerUrl } from './api';
+import { api, getAuthToken, getSocketServerUrl, setLogoutCallback, setLastFamilyName } from './api';
 import { encryptedApi } from './encryptedApi';
 import { clearSession } from './encryptionSession';
 import { useSocket } from './hooks/useSocket';
@@ -33,6 +33,33 @@ const AddNodeOnEdgeDrop = () => {
   // Initialize socket connection when authenticated
   const socketData = useSocket(getSocketServerUrl(), isAuthenticated);
 
+  // Handle logout - wrapped in useCallback to maintain stable reference
+  // MUST be defined before useEffect that uses it
+  const handleLogout = useCallback(() => {
+    console.log('🔴🔴🔴 [App] handleLogout CALLED 🔴🔴🔴');
+    console.log('[App] Clearing session and logging out user');
+    api.logout();
+    clearSession(); // Clear encryption session
+    setIsAuthenticated(false);
+    setUser(null);
+    console.log('[App] ✅ Logout complete - user should see login screen');
+  }, []);
+
+  // Set up logout callback for decryption failures
+  useEffect(() => {
+    console.log('🟢 [App] Setting up logout callback in useEffect');
+    setLogoutCallback(() => {
+      console.log('🔴 [App] Auto-logout CALLBACK INVOKED by decryption failure');
+      handleLogout();
+    });
+    
+    // Cleanup
+    return () => {
+      console.log('🟡 [App] Cleaning up logout callback');
+      setLogoutCallback(null);
+    };
+  }, [handleLogout]); // Re-register when handleLogout changes
+
   // Check authentication on app load
   useEffect(() => {
     const checkAuth = async () => {
@@ -58,15 +85,9 @@ const AddNodeOnEdgeDrop = () => {
   const handleLoginSuccess = async (userData, password) => {
     setIsAuthenticated(true);
     setUser(userData);
+    // Store the family name for auto-fill after forced logout
+    setLastFamilyName(userData.familyName);
     // Note: Encryption session is initialized in Login.jsx via initializeSession()
-  };
-
-  // Handle logout
-  const handleLogout = () => {
-    api.logout();
-    clearSession(); // Clear encryption session
-    setIsAuthenticated(false);
-    setUser(null);
   };
 
   // Handle admin panel

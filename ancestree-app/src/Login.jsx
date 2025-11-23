@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from './api.js';
+import { api, getLastFamilyName } from './api.js';
 import { initializeSession } from './encryptionSession';
 import { appConfig } from './config.js';
 
@@ -20,6 +20,14 @@ export default function Login({ onLoginSuccess }) {
         const status = await api.checkAuthStatus();
         setAuthStatus(status);
         setIsRegistering(status.requiresSetup);
+        
+        // Pre-fill family name from last login if not registering
+        if (!status.requiresSetup) {
+          const lastFamily = getLastFamilyName();
+          if (lastFamily) {
+            setFamilyName(lastFamily);
+          }
+        }
       } catch (error) {
         console.error('Failed to check auth status:', error);
       }

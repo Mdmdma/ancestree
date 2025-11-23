@@ -16,7 +16,7 @@ import BloodlineEdge from './BloodlineEdge';
 import BloodlineEdgeHidden from './BloodlineEdgeHidden';
 import BloodlineEdgeFake from './BloodlineEdgeFake';
 import ElkDebugOverlay from './ElkDebugOverlay';
-import { api } from './api';
+import { api, triggerLogout } from './api';
 import { encryptedApi } from './encryptedApi';
 import { useDebounce } from './hooks/useDebounce';
 import { isEncryptionEnabled, getDerivedKey, isBatchOperationInProgress } from './encryptionSession';
@@ -52,6 +52,47 @@ const nodeOrigin = [0.5, 0];
 // Helper function to check if an edge is a partner or expartner edge
 const isPartnerEdge = (edge) => {
   return edge.type === 'partner' || edge.type === 'expartner';
+};
+
+// Helper function to check if edge has any encrypted properties
+// This indicates decryption failed and user should be logged out
+const hasEncryptedProperties = (edge) => {
+  // Check common edge properties that might be encrypted
+  const propsToCheck = ['type', 'label', 'source', 'target', 'id'];
+  
+  for (const prop of propsToCheck) {
+    if (edge[prop] && typeof edge[prop] === 'string' && edge[prop].startsWith('enc:')) {
+      console.error(`[FamilyTree] Detected encrypted edge property "${prop}": ${edge[prop].substring(0, 50)}...`);
+      return true;
+    }
+  }
+  
+  // Check edge data properties
+  if (edge.data) {
+    for (const [key, value] of Object.entries(edge.data)) {
+      if (value && typeof value === 'string' && value.startsWith('enc:')) {
+        console.error(`[FamilyTree] Detected encrypted edge data property "${key}": ${value.substring(0, 50)}...`);
+        return true;
+      }
+    }
+  }
+  
+  return false;
+};
+
+// Helper function to check if node has any encrypted properties that should be decrypted
+const hasEncryptedNodeProperties = (node) => {
+  if (!node.data) return false;
+  
+  // Check node data properties for encrypted values
+  for (const [key, value] of Object.entries(node.data)) {
+    if (value && typeof value === 'string' && value.startsWith('enc:')) {
+      console.error(`[FamilyTree] Detected encrypted node data property "${key}": ${value.substring(0, 50)}...`);
+      return true;
+    }
+  }
+  
+  return false;
 };
 
 // Helper function to check if a node is on the bloodline
@@ -290,14 +331,31 @@ const FamilyTree = ({
     socket.on('node:created', async (remoteNode) => {
       console.log('[SOCKET] Received node:created event for node:', remoteNode.id, 'Current socket ID:', socket.id);
       
+      // Check if node has encrypted properties (indicates decryption failure)
+      if (hasEncryptedNodeProperties(remoteNode)) {
+        console.error('[SOCKET] Detected encrypted node properties on node:created - triggering logout');
+        console.error('[SOCKET] Encrypted node:', remoteNode);
+        triggerLogout();
+        return;
+      }
+      
       // Decrypt the node if encryption is enabled
       let nodeToAdd = remoteNode;
       if (isEncryptionEnabled() && getDerivedKey()) {
         try {
           nodeToAdd = await decryptNodeData(remoteNode);
           console.log('[SOCKET] Decrypted node:', nodeToAdd.id);
+          
+          // Double-check after decryption
+          if (hasEncryptedNodeProperties(nodeToAdd)) {
+            console.error('[SOCKET] Node still encrypted after decryption - triggering logout');
+            triggerLogout();
+            return;
+          }
         } catch (error) {
           console.error('[SOCKET] Failed to decrypt node:', error);
+          // Decryption error will trigger logout via encryptedApi
+          return;
         }
       }
       
@@ -317,14 +375,31 @@ const FamilyTree = ({
     socket.on('node:updated', async (remoteNode) => {
       console.log('Remote node updated:', remoteNode);
       
+      // Check if node has encrypted properties (indicates decryption failure)
+      if (hasEncryptedNodeProperties(remoteNode)) {
+        console.error('[SOCKET] Detected encrypted node properties on node:updated - triggering logout');
+        console.error('[SOCKET] Encrypted node:', remoteNode);
+        triggerLogout();
+        return;
+      }
+      
       // Decrypt the node if encryption is enabled
       let nodeToUpdate = remoteNode;
       if (isEncryptionEnabled() && getDerivedKey()) {
         try {
           nodeToUpdate = await decryptNodeData(remoteNode);
           console.log('[SOCKET] Decrypted updated node:', nodeToUpdate.id);
+          
+          // Double-check after decryption
+          if (hasEncryptedNodeProperties(nodeToUpdate)) {
+            console.error('[SOCKET] Node still encrypted after decryption - triggering logout');
+            triggerLogout();
+            return;
+          }
         } catch (error) {
           console.error('[SOCKET] Failed to decrypt updated node:', error);
+          // Decryption error will trigger logout via encryptedApi
+          return;
         }
       }
       
@@ -366,14 +441,31 @@ const FamilyTree = ({
     socket.on('edge:created', async (remoteEdge) => {
       console.log('Remote edge created:', remoteEdge);
       
+      // Check if edge has encrypted properties (indicates decryption failure)
+      if (hasEncryptedProperties(remoteEdge)) {
+        console.error('[SOCKET] Detected encrypted edge properties on edge:created - triggering logout');
+        console.error('[SOCKET] Encrypted edge:', remoteEdge);
+        triggerLogout();
+        return;
+      }
+      
       // Decrypt the edge if encryption is enabled
       let edgeToAdd = remoteEdge;
       if (isEncryptionEnabled() && getDerivedKey()) {
         try {
           edgeToAdd = await decryptEdgeData(remoteEdge);
           console.log('[SOCKET] Decrypted created edge:', edgeToAdd.id);
+          
+          // Double-check after decryption
+          if (hasEncryptedProperties(edgeToAdd)) {
+            console.error('[SOCKET] Edge still encrypted after decryption - triggering logout');
+            triggerLogout();
+            return;
+          }
         } catch (error) {
           console.error('[SOCKET] Failed to decrypt created edge:', error);
+          // Decryption error will trigger logout via encryptedApi
+          return;
         }
       }
       
@@ -392,14 +484,31 @@ const FamilyTree = ({
     socket.on('edge:updated', async (remoteEdge) => {
       console.log('Remote edge updated:', remoteEdge);
       
+      // Check if edge has encrypted properties (indicates decryption failure)
+      if (hasEncryptedProperties(remoteEdge)) {
+        console.error('[SOCKET] Detected encrypted edge properties on edge:updated - triggering logout');
+        console.error('[SOCKET] Encrypted edge:', remoteEdge);
+        triggerLogout();
+        return;
+      }
+      
       // Decrypt the edge if encryption is enabled
       let edgeToUpdate = remoteEdge;
       if (isEncryptionEnabled() && getDerivedKey()) {
         try {
           edgeToUpdate = await decryptEdgeData(remoteEdge);
           console.log('[SOCKET] Decrypted updated edge:', edgeToUpdate.id);
+          
+          // Double-check after decryption
+          if (hasEncryptedProperties(edgeToUpdate)) {
+            console.error('[SOCKET] Edge still encrypted after decryption - triggering logout');
+            triggerLogout();
+            return;
+          }
         } catch (error) {
           console.error('[SOCKET] Failed to decrypt updated edge:', error);
+          // Decryption error will trigger logout via encryptedApi
+          return;
         }
       }
       
@@ -581,6 +690,29 @@ const FamilyTree = ({
         encryptedApi.loadEdges()
       ]);
       
+      // Check if any edges have encrypted properties (indicates decryption failure)
+      const encryptedEdge = edgesData.find(edge => hasEncryptedProperties(edge));
+      if (encryptedEdge) {
+        console.error('❌❌❌ [FamilyTree] ENCRYPTED EDGE DETECTED IN refreshData ❌❌❌');
+        console.error('[FamilyTree] Edge type:', encryptedEdge.type);
+        console.error('[FamilyTree] Edge ID:', encryptedEdge.id);
+        console.error('[FamilyTree] This means decryption failed - triggering logout');
+        console.error('[FamilyTree] Encrypted edge:', encryptedEdge);
+        triggerLogout();
+        return; // Stop processing
+      }
+      
+      // Check if any nodes have encrypted properties (indicates decryption failure)
+      const encryptedNode = nodesData.find(node => hasEncryptedNodeProperties(node));
+      if (encryptedNode) {
+        console.error('❌❌❌ [FamilyTree] ENCRYPTED NODE DETECTED IN refreshData ❌❌❌');
+        console.error('[FamilyTree] Node ID:', encryptedNode.id);
+        console.error('[FamilyTree] This means decryption failed - triggering logout');
+        console.error('[FamilyTree] Encrypted node:', encryptedNode);
+        triggerLogout();
+        return; // Stop processing
+      }
+      
       // Process nodes with React Flow properties
       const processedNodes = nodesData.map(node => ({
         ...node,
@@ -611,7 +743,7 @@ const FamilyTree = ({
       queueBatchGeocoding(processedNodes);
       setEdges(processedEdges);
     } catch (error) {
-      console.error('Failed to refresh data:', error);
+      console.error('❌ [FamilyTree] Failed to refresh data:', error);
     }
   }, [setNodes, setEdges, showDebug]);
 

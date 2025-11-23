@@ -7,6 +7,9 @@ export { API_BASE_URL };
 // Authentication token management
 let authToken = localStorage.getItem('authToken');
 
+// Logout callback for when decryption fails
+let logoutCallback = null;
+
 // Helper function to get auth headers
 const getAuthHeaders = (socketId = null) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -31,6 +34,44 @@ export const setAuthToken = (token) => {
 
 // Get auth token
 export const getAuthToken = () => authToken;
+
+// Set logout callback for decryption failures
+export const setLogoutCallback = (callback) => {
+  logoutCallback = callback;
+};
+
+// Trigger logout from API layer
+export const triggerLogout = () => {
+  console.log('🔴🔴🔴 [API] triggerLogout CALLED 🔴🔴🔴');
+  console.log('[API] Callback exists:', !!logoutCallback);
+  console.log('[API] Stack trace:', new Error().stack);
+  
+  if (logoutCallback) {
+    console.log('[API] ✅ Executing logout callback...');
+    try {
+      logoutCallback();
+      console.log('[API] ✅ Logout callback executed successfully');
+    } catch (error) {
+      console.error('[API] ❌ Error executing logout callback:', error);
+    }
+  } else {
+    console.error('[API] ❌❌❌ NO LOGOUT CALLBACK REGISTERED ❌❌❌');
+    console.error('[API] Cannot trigger logout - callback is null/undefined');
+    console.error('[API] Make sure setLogoutCallback was called in App.jsx');
+  }
+};
+
+// Store last logged-in family name for auto-fill after forced logout
+export const setLastFamilyName = (familyName) => {
+  if (familyName) {
+    localStorage.setItem('lastFamilyName', familyName);
+  }
+};
+
+// Get last logged-in family name
+export const getLastFamilyName = () => {
+  return localStorage.getItem('lastFamilyName') || '';
+};
 
 // Helper function to get the Socket.IO server URL from the API base URL
 export const getSocketServerUrl = () => {

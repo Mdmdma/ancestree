@@ -68,6 +68,16 @@ export const needsGeocoding = async (node) => {
     return false;
   }
   
+  // Check if any address field is encrypted (starts with "enc:")
+  const hasEncryptedField = [street, housenumber, city, zip, country].some(
+    field => field && typeof field === 'string' && field.startsWith('enc:')
+  );
+  
+  if (hasEncryptedField) {
+    console.log(`[GeocodingService] Node ${node.id} has encrypted address fields, skipping geocoding`);
+    return false;
+  }
+  
   // Calculate current address hash
   const currentHash = await generateAddressHash(street, housenumber, city, zip, country);
   

@@ -3,7 +3,7 @@
  * Wraps all API calls to automatically encrypt/decrypt data based on session state
  */
 
-import { baseApi } from './api';
+import { baseApi, triggerLogout } from './api';
 import {
   isEncryptionEnabled,
   getDerivedKey,
@@ -87,8 +87,11 @@ const decryptNodeData = async (node) => {
   
   const key = getDerivedKey();
   if (!key) {
-    console.warn('[EncryptionAPI] Encryption enabled but no key available');
-    return node;
+    console.error('❌❌❌ [EncryptionAPI] decryptNodeData - NO ENCRYPTION KEY AVAILABLE ❌❌❌');
+    console.error('[EncryptionAPI] Node ID:', node.id);
+    console.error('[EncryptionAPI] This should trigger logout immediately');
+    triggerLogout();
+    throw new Error('No encryption key available');
   }
   
   console.log('[EncryptionAPI] decryptNodeData - decrypting node:', node.id);
@@ -112,10 +115,13 @@ const decryptNodeData = async (node) => {
             decrypted.data[field] = decryptedValue;
           }
         } catch (error) {
+          console.error('❌❌❌ [EncryptionAPI] DECRYPTION FAILED ❌❌❌');
           console.error(`[EncryptionAPI] Failed to decrypt field "${field}":`, error);
           console.error(`[EncryptionAPI] Field value:`, node.data[field].substring(0, 50));
-          // Leave the encrypted value as-is if decryption fails
-          decrypted.data[field] = node.data[field];
+          console.error('[EncryptionAPI] This should trigger logout immediately');
+          // Trigger logout on decryption failure
+          triggerLogout();
+          throw new Error(`Failed to decrypt node data: ${error.message}`);
         }
       }
     }
@@ -155,7 +161,13 @@ const decryptEdgeData = async (edge) => {
   }
   
   const key = getDerivedKey();
-  if (!key) return edge;
+  if (!key) {
+    console.error('❌❌❌ [EncryptionAPI] decryptEdgeData - NO ENCRYPTION KEY AVAILABLE ❌❌❌');
+    console.error('[EncryptionAPI] Edge ID:', edge.id);
+    console.error('[EncryptionAPI] This should trigger logout immediately');
+    triggerLogout();
+    throw new Error('No encryption key available');
+  }
   
   console.log('[EncryptionAPI] decryptEdgeData - decrypting edge:', edge.id);
   
@@ -168,10 +180,13 @@ const decryptEdgeData = async (edge) => {
         console.log(`[EncryptionAPI] Decrypted edge ${field}: "${edge[field].substring(0, 30)}..." → "${decryptedValue}"`);
         decrypted[field] = decryptedValue;
       } catch (error) {
+        console.error('❌❌❌ [EncryptionAPI] EDGE DECRYPTION FAILED ❌❌❌');
         console.error(`[EncryptionAPI] Failed to decrypt edge field "${field}":`, error);
         console.error(`[EncryptionAPI] Edge field value:`, edge[field].substring(0, 50));
-        // Leave the encrypted value as-is if decryption fails
-        decrypted[field] = edge[field];
+        console.error('[EncryptionAPI] This should trigger logout immediately');
+        // Trigger logout on decryption failure
+        triggerLogout();
+        throw new Error(`Failed to decrypt edge data: ${error.message}`);
       }
     }
   }
@@ -210,14 +225,28 @@ const decryptImageData = async (image) => {
   }
   
   const key = getDerivedKey();
-  if (!key) return image;
+  if (!key) {
+    console.error('❌❌❌ [EncryptionAPI] decryptImageData - NO ENCRYPTION KEY AVAILABLE ❌❌❌');
+    console.error('[EncryptionAPI] Image ID:', image.id);
+    console.error('[EncryptionAPI] This should trigger logout immediately');
+    triggerLogout();
+    throw new Error('No encryption key available');
+  }
   
   const decrypted = { ...image };
   
   // Decrypt image fields
   for (const field of IMAGE_ENCRYPTED_FIELDS) {
     if (image[field] && typeof image[field] === 'string' && image[field].startsWith('enc:')) {
-      decrypted[field] = await decryptValueFast(image[field], key, true);
+      try {
+        decrypted[field] = await decryptValueFast(image[field], key, true);
+      } catch (error) {
+        console.error('❌❌❌ [EncryptionAPI] IMAGE DECRYPTION FAILED ❌❌❌');
+        console.error(`[EncryptionAPI] Failed to decrypt image field "${field}":`, error);
+        console.error('[EncryptionAPI] This should trigger logout immediately');
+        triggerLogout();
+        throw new Error(`Failed to decrypt image data: ${error.message}`);
+      }
     }
   }
   
@@ -229,10 +258,26 @@ const decryptImageData = async (image) => {
       
       // Decrypt personName and personSurname if they're encrypted
       if (person.personName && typeof person.personName === 'string' && person.personName.startsWith('enc:')) {
-        decryptedPerson.personName = await decryptValueFast(person.personName, key, true);
+        try {
+          decryptedPerson.personName = await decryptValueFast(person.personName, key, true);
+        } catch (error) {
+          console.error('❌❌❌ [EncryptionAPI] IMAGE PERSON NAME DECRYPTION FAILED ❌❌❌');
+          console.error(`[EncryptionAPI] Failed to decrypt personName:`, error);
+          console.error('[EncryptionAPI] This should trigger logout immediately');
+          triggerLogout();
+          throw new Error(`Failed to decrypt image person data: ${error.message}`);
+        }
       }
       if (person.personSurname && typeof person.personSurname === 'string' && person.personSurname.startsWith('enc:')) {
-        decryptedPerson.personSurname = await decryptValueFast(person.personSurname, key, true);
+        try {
+          decryptedPerson.personSurname = await decryptValueFast(person.personSurname, key, true);
+        } catch (error) {
+          console.error('❌❌❌ [EncryptionAPI] IMAGE PERSON SURNAME DECRYPTION FAILED ❌❌❌');
+          console.error(`[EncryptionAPI] Failed to decrypt personSurname:`, error);
+          console.error('[EncryptionAPI] This should trigger logout immediately');
+          triggerLogout();
+          throw new Error(`Failed to decrypt image person data: ${error.message}`);
+        }
       }
       
       decrypted.people.push(decryptedPerson);
@@ -273,13 +318,27 @@ const decryptChatMessageData = async (chatMessage) => {
   }
   
   const key = getDerivedKey();
-  if (!key) return chatMessage;
+  if (!key) {
+    console.error('❌❌❌ [EncryptionAPI] decryptChatMessageData - NO ENCRYPTION KEY AVAILABLE ❌❌❌');
+    console.error('[EncryptionAPI] Chat message ID:', chatMessage.id);
+    console.error('[EncryptionAPI] This should trigger logout immediately');
+    triggerLogout();
+    throw new Error('No encryption key available');
+  }
   
   const decrypted = { ...chatMessage };
   
   for (const field of CHAT_MESSAGE_ENCRYPTED_FIELDS) {
     if (chatMessage[field] && typeof chatMessage[field] === 'string' && chatMessage[field].startsWith('enc:')) {
-      decrypted[field] = await decryptValueFast(chatMessage[field], key, true);
+      try {
+        decrypted[field] = await decryptValueFast(chatMessage[field], key, true);
+      } catch (error) {
+        console.error('❌❌❌ [EncryptionAPI] CHAT MESSAGE DECRYPTION FAILED ❌❌❌');
+        console.error(`[EncryptionAPI] Failed to decrypt chat message field "${field}":`, error);
+        console.error('[EncryptionAPI] This should trigger logout immediately');
+        triggerLogout();
+        throw new Error(`Failed to decrypt chat message data: ${error.message}`);
+      }
     }
   }
   
@@ -325,13 +384,28 @@ export const encryptedApi = {
     const key = getDerivedKey();
     console.log('[EncryptedAPI] loadNodes - encryption enabled:', encEnabled, 'has key:', !!key, 'nodes count:', nodes.length);
     
-    if (!encEnabled) {
-      console.log('[EncryptedAPI] Returning nodes without decryption (encryption disabled)');
-      return nodes;
-    }
-    
-    if (!key) {
-      console.warn('[EncryptedAPI] Encryption enabled but no key - returning encrypted data');
+    // CRITICAL CHECK: If any node has encrypted data (starts with "enc:"), 
+    // but we don't have encryption enabled or a key, trigger logout
+    if (!encEnabled || !key) {
+      // Check if any node has encrypted fields
+      const hasEncryptedData = nodes.some(node => {
+        if (!node.data) return false;
+        return Object.values(node.data).some(value => 
+          value && typeof value === 'string' && value.startsWith('enc:')
+        );
+      });
+      
+      if (hasEncryptedData) {
+        console.error('❌❌❌ [EncryptedAPI] loadNodes - ENCRYPTED DATA DETECTED BUT NO KEY ❌❌❌');
+        console.error('[EncryptedAPI] Encryption enabled:', encEnabled, 'Has key:', !!key);
+        console.error('[EncryptedAPI] This means user refreshed page and lost encryption session');
+        console.error('[EncryptedAPI] Triggering logout immediately');
+        triggerLogout();
+        throw new Error('Encrypted data detected but no decryption key available');
+      }
+      
+      // No encrypted data found, safe to return
+      console.log('[EncryptedAPI] No encrypted data found, returning nodes as-is');
       return nodes;
     }
     
@@ -350,7 +424,41 @@ export const encryptedApi = {
   async loadEdges() {
     const edges = await baseApi.loadEdges();
     
-    if (!isEncryptionEnabled()) {
+    const encEnabled = isEncryptionEnabled();
+    const key = getDerivedKey();
+    
+    // CRITICAL CHECK: If any edge has encrypted data (starts with "enc:"), 
+    // but we don't have encryption enabled or a key, trigger logout
+    if (!encEnabled || !key) {
+      // Check if any edge has encrypted fields
+      const hasEncryptedData = edges.some(edge => {
+        // Check edge properties
+        const propsToCheck = ['type', 'label'];
+        for (const prop of propsToCheck) {
+          if (edge[prop] && typeof edge[prop] === 'string' && edge[prop].startsWith('enc:')) {
+            return true;
+          }
+        }
+        // Check edge data
+        if (edge.data) {
+          return Object.values(edge.data).some(value => 
+            value && typeof value === 'string' && value.startsWith('enc:')
+          );
+        }
+        return false;
+      });
+      
+      if (hasEncryptedData) {
+        console.error('❌❌❌ [EncryptedAPI] loadEdges - ENCRYPTED DATA DETECTED BUT NO KEY ❌❌❌');
+        console.error('[EncryptedAPI] Encryption enabled:', encEnabled, 'Has key:', !!key);
+        console.error('[EncryptedAPI] This means user refreshed page and lost encryption session');
+        console.error('[EncryptedAPI] Triggering logout immediately');
+        triggerLogout();
+        throw new Error('Encrypted edge data detected but no decryption key available');
+      }
+      
+      // No encrypted data found, safe to return
+      console.log('[EncryptedAPI] No encrypted edge data found, returning edges as-is');
       return edges;
     }
     
@@ -366,7 +474,32 @@ export const encryptedApi = {
   async loadImages() {
     const images = await baseApi.loadImages();
     
-    if (!isEncryptionEnabled()) {
+    const encEnabled = isEncryptionEnabled();
+    const key = getDerivedKey();
+    
+    // CRITICAL CHECK: If any image has encrypted data (starts with "enc:"), 
+    // but we don't have encryption enabled or a key, trigger logout
+    if (!encEnabled || !key) {
+      // Check if any image has encrypted fields
+      const hasEncryptedData = images.some(image => {
+        if (!image) return false;
+        // Check image properties
+        return Object.values(image).some(value => 
+          value && typeof value === 'string' && value.startsWith('enc:')
+        );
+      });
+      
+      if (hasEncryptedData) {
+        console.error('❌❌❌ [EncryptedAPI] loadImages - ENCRYPTED DATA DETECTED BUT NO KEY ❌❌❌');
+        console.error('[EncryptedAPI] Encryption enabled:', encEnabled, 'Has key:', !!key);
+        console.error('[EncryptedAPI] This means user refreshed page and lost encryption session');
+        console.error('[EncryptedAPI] Triggering logout immediately');
+        triggerLogout();
+        throw new Error('Encrypted image data detected but no decryption key available');
+      }
+      
+      // No encrypted data found, safe to return
+      console.log('[EncryptedAPI] No encrypted image data found, returning images as-is');
       return images;
     }
     
