@@ -2036,18 +2036,19 @@ const FamilyTree = ({
           if (newNode && newEdge) {
             // Save to database - node will be added via socket event
             console.log('[CREATE NODE] Creating node via API, Node ID:', newNode.id);
-            await encryptedApi.createNode(newNode, socket?.id);
-            // Note: Don't add node to local state here - let socket listener handle it
+            try {
+              await encryptedApi.createNode(newNode, socket?.id);
+              // Note: Don't add node to local state here - let socket listener handle it
 
-            // Create edge after a short delay
-            setTimeout(async () => {
-              try {
-                await encryptedApi.createEdge(newEdge, socket?.id);
-                
-                // Add the edge to local state immediately
-                setEdges((eds) => [...eds, newEdge]);
-                
-                // Special case: If we created a partner node through family parentconnection, create partner edge to existing bloodline node
+              // Create edge after a short delay
+              setTimeout(async () => {
+                try {
+                  await encryptedApi.createEdge(newEdge, socket?.id);
+                  
+                  // Add the edge to local state immediately
+                  setEdges((eds) => [...eds, newEdge]);
+                  
+                  // Special case: If we created a partner node through family parentconnection, create partner edge to existing bloodline node
                 if (newNode.type === 'person' && sourceNode.type === 'family' && sourceHandle === 'parentconnection' && isPartnerNode && existingBloodlineNode) {
                   console.log(`🔗 Creating partner edge between bloodline node ${existingBloodlineNode.data.name} and new partner node ${newNode.data.name}`);
                   
@@ -2161,6 +2162,19 @@ const FamilyTree = ({
                 console.error('Failed to create edge:', error);
               }
             }, 100);
+            } catch (error) {
+              // Handle node creation error (e.g., when node creation is locked)
+              console.error('Failed to create node:', error);
+              if (error.message && error.message.includes('locked')) {
+                setTimeout(() => {
+                  alert(`${appConfig.ui.alerts.nodeCreationLocked.title}\n\n${appConfig.ui.alerts.nodeCreationLocked.message}`);
+                }, 100);
+              } else {
+                setTimeout(() => {
+                  alert('Fehler beim Erstellen des Knotens: ' + error.message);
+                }, 100);
+              }
+            }
           }
           
         } catch (error) {

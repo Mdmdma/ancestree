@@ -20,6 +20,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   const [activeTab, setActiveTab] = useState('familyParameters');
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState(null);
+  const [nodeCreationLocked, setNodeCreationLocked] = useState(false);
   const [showStreetFields, setShowStreetFields] = useState(true);
   const [showPhoneField, setShowPhoneField] = useState(true);
   const [showEmailField, setShowEmailField] = useState(true);
@@ -78,10 +79,11 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     // fetch protected settings if authenticated
     const fetchSettings = async () => {
       try {
-        // Fetch family settings (encryption, field visibility)
+        // Fetch family settings (encryption, field visibility, node creation lock)
         const settings = await api.getFamilySettings();
         setEncryptionEnabled(Boolean(settings.encryptionEnabled));
         setEncryptionSalt(settings.encryptionSalt || null);
+        setNodeCreationLocked(Boolean(settings.nodeCreationLocked));
         setShowStreetFields(settings.showStreetFields !== undefined ? Boolean(settings.showStreetFields) : true);
         setShowPhoneField(settings.showPhoneField !== undefined ? Boolean(settings.showPhoneField) : true);
         setShowEmailField(settings.showEmailField !== undefined ? Boolean(settings.showEmailField) : true);
@@ -730,6 +732,57 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                         position: 'absolute',
                         top: '3px',
                         left: encryptionEnabled ? '33px' : '3px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: 'white',
+                        transition: 'left 0.3s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                  </div>
+
+                  {/* Node Creation Lock Toggle */}
+                  <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ color: 'white', flex: 1 }}>
+                      {appConfig.ui.adminPanel.security.nodeCreationLockLabel}
+                      <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                        {appConfig.ui.adminPanel.security.nodeCreationLockHint}
+                      </div>
+                    </label>
+                    <button
+                      disabled={loading}
+                      onClick={async () => {
+                        setLoading(true);
+                        setError('');
+                        try {
+                          await api.updateNodeCreationLock(!nodeCreationLocked);
+                          setNodeCreationLocked(!nodeCreationLocked);
+                          setSuccess(`Knotenerstellung ${!nodeCreationLocked ? 'gesperrt' : 'freigegeben'}`);
+                          setTimeout(() => setSuccess(''), 3000);
+                        } catch (err) {
+                          setError(err.message);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      style={{
+                        position: 'relative',
+                        width: '60px',
+                        height: '30px',
+                        borderRadius: '15px',
+                        border: 'none',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        backgroundColor: nodeCreationLocked ? '#e74c3c' : '#7f8c8d',
+                        transition: 'background-color 0.3s ease',
+                        opacity: loading ? 0.6 : 1,
+                        padding: 0
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: nodeCreationLocked ? '33px' : '3px',
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',

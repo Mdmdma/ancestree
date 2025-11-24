@@ -772,7 +772,7 @@ app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
 
 // Get family settings (encryption status, show_street_fields, show_phone_field, show_email_field)
 app.get('/api/family/settings', authenticateToken, (req, res) => {
-  authDb.get('SELECT encryption_enabled, encryption_salt, show_street_fields, show_phone_field, show_email_field FROM users WHERE id = ?', 
+  authDb.get('SELECT encryption_enabled, encryption_salt, show_street_fields, show_phone_field, show_email_field, node_creation_locked FROM users WHERE id = ?', 
     [req.user.id], 
     (err, settings) => {
       if (err) {
@@ -789,7 +789,8 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
         encryptionSalt: settings.encryption_salt,
         showStreetFields: Boolean(settings.show_street_fields),
         showPhoneField: Boolean(settings.show_phone_field),
-        showEmailField: Boolean(settings.show_email_field)
+        showEmailField: Boolean(settings.show_email_field),
+        nodeCreationLocked: Boolean(settings.node_creation_locked)
       });
     }
   );
@@ -922,6 +923,23 @@ app.post('/api/family/email-field-visibility', authenticateToken, (req, res) => 
       }
 
       res.json({ success: true, message: 'Email field visibility updated successfully' });
+    }
+  );
+});
+
+// Update node_creation_locked setting
+app.post('/api/family/node-creation-lock', authenticateToken, (req, res) => {
+  const { nodeCreationLocked } = req.body;
+
+  authDb.run('UPDATE users SET node_creation_locked = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [nodeCreationLocked ? 1 : 0, req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating node_creation_locked:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Node creation lock updated successfully' });
     }
   );
 });
@@ -1124,6 +1142,21 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
   const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   try {
+    // Check if node creation is locked
+    const lockStatus = await new Promise((resolve, reject) => {
+      authDb.get('SELECT node_creation_locked FROM users WHERE id = ?', [familyId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    
+    if (lockStatus && lockStatus.node_creation_locked) {
+      return res.status(403).json({ 
+        error: 'Node creation is currently locked by the administrator. Please contact the admin to unlock node creation.',
+        locked: true 
+      });
+    }
+    
     const familyDb = getFamilyDb(familyName);
     
     // Note: Geocoding is now handled client-side

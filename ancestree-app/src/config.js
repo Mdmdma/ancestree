@@ -305,7 +305,9 @@ export const appConfig = {
       security: {
         title: "Sicherheit",
         encryptionLabel: "Client-seitige Verschlüsselung aktivieren",
-        encryptionHint: "Wenn aktiviert, werden alle gespeicherten Daten client-seitig mit dem Familienpasswort verschlüsselt."
+        encryptionHint: "Wenn aktiviert, werden alle gespeicherten Daten client-seitig mit dem Familienpasswort verschlüsselt.",
+        nodeCreationLockLabel: "Knotenerstellung sperren",
+        nodeCreationLockHint: "Wenn aktiviert, können Benutzer keine neuen Knoten im Stammbaum erstellen"
       },
       visibleFields: {
         title: "Sichtbare Felder",
@@ -519,6 +521,14 @@ export const appConfig = {
       galleryButton: "🖼️ Familien-Album",
       fullscreenButton: "⛶ Vollbild",
       exitFullscreenButton: "⛶ Vollbild verlassen"
+    },
+
+    // Alerts and notifications
+    alerts: {
+      nodeCreationLocked: {
+        title: "⚠️ Knotenerstellung gesperrt",
+        message: "Die Knotenerstellung ist derzeit vom Administrator deaktiviert. Bitte kontaktiere den Administrator, um die Knotenerstellung freizuschalten."
+      }
     },
 
     // Chat component for image discussions

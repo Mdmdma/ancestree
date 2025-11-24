@@ -336,6 +336,22 @@ export const api = {
     return result;
   },
 
+  async updateNodeCreationLock(nodeCreationLocked) {
+    const response = await fetch(`${API_BASE_URL}/family/node-creation-lock`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ nodeCreationLocked })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update node creation lock setting');
+    }
+    
+    return result;
+  },
+
   // Load initial data
   async loadNodes() {
     const response = await fetch(`${API_BASE_URL}/nodes`, {
@@ -359,7 +375,16 @@ export const api = {
       headers: getAuthHeaders(socketId),
       body: JSON.stringify(node)
     });
-    return response.json();
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      const error = new Error(result.error || 'Failed to create node');
+      error.locked = result.locked;
+      throw error;
+    }
+    
+    return result;
   },
 
   async updateNode(id, updates, socketId = null) {

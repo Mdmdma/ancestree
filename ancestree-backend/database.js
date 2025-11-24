@@ -215,6 +215,17 @@ const initializeAuthDb = () => {
               }
             });
           }
+          
+          // Check and add node_creation_locked
+          if (!columnNames.includes('node_creation_locked')) {
+            authDb.run("ALTER TABLE users ADD COLUMN node_creation_locked BOOLEAN DEFAULT 0", (err) => {
+              if (err) {
+                console.error('Error adding node_creation_locked column:', err);
+              } else {
+                console.log('Added node_creation_locked column to users table');
+              }
+            });
+          }
         });
       }
     });
