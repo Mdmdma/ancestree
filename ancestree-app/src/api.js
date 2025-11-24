@@ -277,22 +277,6 @@ export const api = {
     return result;
   },
 
-  async updateSkipGeocoding(skipGeocoding) {
-    const response = await fetch(`${API_BASE_URL}/family/skip-geocoding`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ skipGeocoding })
-    });
-    
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to update skip geocoding setting');
-    }
-    
-    return result;
-  },
-
   async updateStreetFieldsVisibility(showStreetFields) {
     const response = await fetch(`${API_BASE_URL}/family/street-fields-visibility`, {
       method: 'POST',

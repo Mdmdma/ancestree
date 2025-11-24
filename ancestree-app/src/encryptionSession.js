@@ -11,17 +11,15 @@ let sessionState = {
   encryptionEnabled: false,
   encryptionSalt: null,
   derivedKey: null,
-  skipGeocoding: false,
   familyName: null,
   isBatchOperationInProgress: false, // Flag to indicate when batch encryption/decryption is happening
-  originalSkipGeocoding: false, // Store original setting to restore after batch operation
   pauseKeyCheck: false // Flag to pause key availability checks during sensitive operations
 };
 
 /**
  * Initialize encryption session on login
  * @param {string} familyPassword - The family password
- * @param {Object} familySettings - Settings from API (encryptionEnabled, encryptionSalt, skipGeocoding)
+ * @param {Object} familySettings - Settings from API (encryptionEnabled, encryptionSalt)
  * @returns {Promise<Object>} Session state
  */
 export const initializeSession = async (familyPassword, familySettings = {}) => {
@@ -30,7 +28,6 @@ export const initializeSession = async (familyPassword, familySettings = {}) => 
   sessionState.familyPassword = familyPassword;
   sessionState.encryptionEnabled = Boolean(familySettings.encryptionEnabled);
   sessionState.encryptionSalt = familySettings.encryptionSalt || null;
-  sessionState.skipGeocoding = Boolean(familySettings.skipGeocoding);
   sessionState.familyName = familySettings.familyName || null;
   
   console.log('[EncryptionSession] Session state set - encryptionEnabled:', sessionState.encryptionEnabled, 'has salt:', !!sessionState.encryptionSalt);
@@ -110,15 +107,6 @@ export const updatePassword = async (newPassword, newSalt = null) => {
 };
 
 /**
- * Update skip_geocoding setting
- * @param {boolean} skip - Whether to skip geocoding
- */
-export const updateSkipGeocoding = (skip) => {
-  sessionState.skipGeocoding = Boolean(skip);
-  console.log(`[EncryptionSession] Skip geocoding: ${sessionState.skipGeocoding}`);
-};
-
-/**
  * Get current session state
  * @returns {Object} Current session state (without sensitive data)
  */
@@ -126,7 +114,6 @@ export const getSessionState = () => {
   return {
     encryptionEnabled: sessionState.encryptionEnabled,
     encryptionSalt: sessionState.encryptionSalt,
-    skipGeocoding: sessionState.skipGeocoding,
     hasKey: sessionState.derivedKey !== null,
     hasFamilyPassword: sessionState.familyPassword !== null,
     familyName: sessionState.familyName
@@ -174,35 +161,20 @@ export const isEncryptionEnabled = () => {
 };
 
 /**
- * Check if geocoding should be skipped
- * @returns {boolean} Whether to skip geocoding
- */
-export const shouldSkipGeocoding = () => {
-  // Always skip geocoding during batch operations
-  if (sessionState.isBatchOperationInProgress) {
-    return true;
-  }
-  return sessionState.skipGeocoding;
-};
-
-/**
- * Start a batch operation (enables temporary geocoding skip)
+ * Start a batch operation (pauses key checks and UI renders)
  */
 export const startBatchOperation = () => {
-  console.log('[EncryptionSession] Starting batch operation - pausing geocoding and UI renders');
-  sessionState.originalSkipGeocoding = sessionState.skipGeocoding;
+  console.log('[EncryptionSession] Starting batch operation - pausing UI renders');
   sessionState.isBatchOperationInProgress = true;
-  sessionState.skipGeocoding = true; // Force skip geocoding during batch operations
   sessionState.pauseKeyCheck = true; // Pause key availability checks
 };
 
 /**
- * End a batch operation (restores original geocoding setting)
+ * End a batch operation (restores normal operation)
  */
 export const endBatchOperation = () => {
   console.log('[EncryptionSession] Ending batch operation - restoring normal operation');
   sessionState.isBatchOperationInProgress = false;
-  sessionState.skipGeocoding = sessionState.originalSkipGeocoding;
   sessionState.pauseKeyCheck = false; // Resume key availability checks
 };
 
@@ -352,7 +324,6 @@ if (import.meta.env.DEV) {
     console.log('Has Salt:', !!sessionState.encryptionSalt);
     console.log('Has Derived Key:', !!sessionState.derivedKey);
     console.log('Has Password:', !!sessionState.familyPassword);
-    console.log('Skip Geocoding:', sessionState.skipGeocoding);
     console.log('Family Name:', sessionState.familyName);
     console.log('================================');
     return sessionState;
@@ -363,13 +334,11 @@ export default {
   initializeSession,
   updateEncryptionStatus,
   updatePassword,
-  updateSkipGeocoding,
   getSessionState,
   getDerivedKey,
   getFamilyPassword,
   getEncryptionSalt,
   isEncryptionEnabled,
-  shouldSkipGeocoding,
   startBatchOperation,
   endBatchOperation,
   isBatchOperationInProgress,

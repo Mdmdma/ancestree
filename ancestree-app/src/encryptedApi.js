@@ -336,11 +336,6 @@ export const encryptedApi = {
   updatePurpose: baseApi.updatePurpose,
   setEncryptionStatus: baseApi.setEncryption,
   
-  // Skip geocoding setting (may still be used for admin settings)
-  async updateSkipGeocoding(skipGeocoding) {
-    return baseApi.updateSkipGeocoding(skipGeocoding);
-  },
-  
   // Load operations with decryption
   async loadNodes() {
     const nodes = await baseApi.loadNodes();

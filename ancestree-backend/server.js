@@ -721,9 +721,9 @@ app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
   }
 });
 
-// Get family settings (display name, purpose, encryption status, skip_geocoding, show_street_fields, show_phone_field, show_email_field)
+// Get family settings (display name, purpose, encryption status, show_street_fields, show_phone_field, show_email_field)
 app.get('/api/family/settings', authenticateToken, (req, res) => {
-  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, skip_geocoding, show_street_fields, show_phone_field, show_email_field FROM users WHERE id = ?', 
+  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, show_street_fields, show_phone_field, show_email_field FROM users WHERE id = ?', 
     [req.user.id], 
     (err, settings) => {
       if (err) {
@@ -740,7 +740,6 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
         purpose: settings.purpose,
         encryptionEnabled: Boolean(settings.encryption_enabled),
         encryptionSalt: settings.encryption_salt,
-        skipGeocoding: Boolean(settings.skip_geocoding),
         showStreetFields: Boolean(settings.show_street_fields),
         showPhoneField: Boolean(settings.show_phone_field),
         showEmailField: Boolean(settings.show_email_field)
@@ -804,23 +803,6 @@ app.post('/api/family/purpose', authenticateToken, (req, res) => {
       }
 
       res.json({ success: true, message: 'Purpose updated successfully' });
-    }
-  );
-});
-
-// Update skip_geocoding setting
-app.post('/api/family/skip-geocoding', authenticateToken, (req, res) => {
-  const { skipGeocoding } = req.body;
-
-  authDb.run('UPDATE users SET skip_geocoding = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-    [skipGeocoding ? 1 : 0, req.user.id], 
-    function(err) {
-      if (err) {
-        console.error('Database error updating skip_geocoding:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-
-      res.json({ success: true, message: 'Skip geocoding setting updated successfully' });
     }
   );
 });

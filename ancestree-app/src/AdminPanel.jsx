@@ -3,7 +3,7 @@ import { api } from './api';
 import { appConfig } from './config';
 import { runEncryptionPerformanceTest, formatTestResults, getDatabaseFieldEstimates } from './encryptionPerformanceTest';
 import { enableEncryption, disableEncryption } from './encryptionBatchOperations';
-import { updateEncryptionStatus, updateSkipGeocoding as updateSessionSkipGeocoding, getFamilyPassword, updatePassword, startEncryptionToggle, endEncryptionToggle } from './encryptionSession';
+import { updateEncryptionStatus, getFamilyPassword, updatePassword, pauseKeyCheck, resumeKeyCheck } from './encryptionSession';
 import { exportFamilyDataWithMetadata } from './exportUtils';
 
 const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName, onDataReload }) => {
@@ -1466,9 +1466,9 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   setEncryptionProgress({ phase: 'loading', percent: 0, message: 'Initializing...' });
                   
                   try {
-                    // CRITICAL: Start encryption toggle mode to prevent auto-logout
-                    startEncryptionToggle();
-                    console.log('[AdminPanel] 🔄 Started encryption toggle mode');
+                    // CRITICAL: Pause key checks to prevent auto-logout during encryption operations
+                    pauseKeyCheck();
+                    console.log('[AdminPanel] 🔄 Paused key availability checks');
                     
                     if (pendingEncryptionAction === 'enable') {
                       // Call enableEncryption with progress callback (password is already in session)
@@ -1484,9 +1484,9 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       setEncryptionEnabled(true);
                       setEncryptionSalt(result.salt);
                       
-                      // End toggle mode BEFORE reloading data
-                      console.log('[AdminPanel] ✅ Ending encryption toggle mode');
-                      endEncryptionToggle();
+                      // Resume key checks BEFORE reloading data
+                      console.log('[AdminPanel] ✅ Resuming key availability checks');
+                      resumeKeyCheck();
                       
                       setSuccess('Encryption enabled successfully');
                       
@@ -1509,9 +1509,9 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       setEncryptionEnabled(false);
                       setEncryptionSalt(null);
                       
-                      // End toggle mode BEFORE reloading data
-                      console.log('[AdminPanel] ✅ Ending encryption toggle mode');
-                      endEncryptionToggle();
+                      // Resume key checks BEFORE reloading data
+                      console.log('[AdminPanel] ✅ Resuming key availability checks');
+                      resumeKeyCheck();
                       
                       setSuccess('Encryption disabled successfully');
                       
@@ -1524,8 +1524,8 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   } catch (err) {
                     setError(`Encryption operation failed: ${err.message}`);
                     console.error('Encryption toggle error:', err);
-                    // CRITICAL: End toggle mode even on error
-                    endEncryptionToggle();
+                    // CRITICAL: Resume key checks even on error
+                    resumeKeyCheck();
                   } finally {
                     setLoading(false);
                     setEncryptionProgress(null);

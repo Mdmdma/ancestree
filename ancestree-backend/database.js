@@ -183,17 +183,6 @@ const initializeAuthDb = () => {
             });
           }
           
-          // Check and add skip_geocoding
-          if (!columnNames.includes('skip_geocoding')) {
-            authDb.run("ALTER TABLE users ADD COLUMN skip_geocoding BOOLEAN DEFAULT 0", (err) => {
-              if (err) {
-                console.error('Error adding skip_geocoding column:', err);
-              } else {
-                console.log('Added skip_geocoding column to users table');
-              }
-            });
-          }
-          
           // Check and add show_street_fields
           if (!columnNames.includes('show_street_fields')) {
             authDb.run("ALTER TABLE users ADD COLUMN show_street_fields BOOLEAN DEFAULT 1", (err) => {
