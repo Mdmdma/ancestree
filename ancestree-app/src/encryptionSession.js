@@ -278,10 +278,6 @@ export const clearSession = () => {
   // Clear cached key
   clearCachedKey();
   
-  // Keep encryption status (will be reloaded on next login)
-  // sessionState.encryptionEnabled = false;
-  // sessionState.skipGeocoding = false;
-  
   console.log('[EncryptionSession] Session cleared');
 };
 

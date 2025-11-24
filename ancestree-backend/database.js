@@ -310,6 +310,21 @@ const initializeFamilyDb = (familyDb) => {
       FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
     )`);
 
+    // Admin table for UI key-value settings (purpose, display_name, etc.)
+    familyDb.run(`CREATE TABLE IF NOT EXISTS admin (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      value TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating admin table:', err);
+      } else {
+        console.log('Admin table initialized');
+      }
+    });
+
     // Migration: Add last_geocoded column to nodes table if it doesn't exist
     familyDb.all("PRAGMA table_info(nodes)", (err, columns) => {
       if (err) {

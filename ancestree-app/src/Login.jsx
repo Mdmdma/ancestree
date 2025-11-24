@@ -59,7 +59,6 @@ export default function Login({ onLoginSuccess }) {
           familySettings = {
             encryptionEnabled: result.encryptionEnabled,
             encryptionSalt: result.encryptionSalt,
-            skipGeocoding: false, // Default for new families
             familyName: result.user.familyName
           };
         } else {

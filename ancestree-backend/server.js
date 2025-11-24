@@ -721,9 +721,9 @@ app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
   }
 });
 
-// Get family settings (display name, purpose, encryption status, show_street_fields, show_phone_field, show_email_field)
+// Get family settings (encryption status, show_street_fields, show_phone_field, show_email_field)
 app.get('/api/family/settings', authenticateToken, (req, res) => {
-  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, show_street_fields, show_phone_field, show_email_field FROM users WHERE id = ?', 
+  authDb.get('SELECT encryption_enabled, encryption_salt, show_street_fields, show_phone_field, show_email_field FROM users WHERE id = ?', 
     [req.user.id], 
     (err, settings) => {
       if (err) {
@@ -736,8 +736,6 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
       }
 
       res.json({
-        displayName: settings.display_name,
-        purpose: settings.purpose,
         encryptionEnabled: Boolean(settings.encryption_enabled),
         encryptionSalt: settings.encryption_salt,
         showStreetFields: Boolean(settings.show_street_fields),
@@ -748,63 +746,84 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
   );
 });
 
-// Get family purpose (public, no auth required for admin panel preview)
-app.get('/api/family/purpose/:familyName', (req, res) => {
-  const { familyName } = req.params;
-  
-  authDb.get('SELECT purpose FROM users WHERE family_name = ?', 
-    [familyName], 
-    (err, result) => {
+// Get all admin settings (key-value pairs from family database)
+app.get('/api/admin/settings', authenticateToken, (req, res) => {
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    familyDb.all('SELECT key, value FROM admin', [], (err, rows) => {
       if (err) {
-        console.error('Database error fetching family purpose:', err);
+        console.error('Database error fetching admin settings:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      if (!result) {
-        return res.status(404).json({ error: 'Family not found' });
+      // Convert array of {key, value} to object
+      const settings = {};
+      if (rows) {
+        rows.forEach(row => {
+          settings[row.key] = row.value || '';
+        });
       }
 
-      res.json({ purpose: result.purpose || '' });
-    }
-  );
+      res.json(settings);
+    });
+  });
 });
 
-// Update display name
-app.post('/api/family/display-name', authenticateToken, (req, res) => {
-  const { displayName } = req.body;
+// Get a specific admin setting by key
+app.get('/api/admin/setting/:key', authenticateToken, (req, res) => {
+  const { key } = req.params;
 
-  if (!displayName) {
-    return res.status(400).json({ error: 'Display name is required' });
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    familyDb.get('SELECT value FROM admin WHERE key = ?', [key], (err, row) => {
+      if (err) {
+        console.error('Database error fetching admin setting:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ value: row ? row.value || '' : '' });
+    });
+  });
+});
+
+// Set an admin setting (upsert)
+app.post('/api/admin/setting', authenticateToken, (req, res) => {
+  const { key, value } = req.body;
+
+  if (!key) {
+    return res.status(400).json({ error: 'Key is required' });
   }
 
-  authDb.run('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-    [displayName, req.user.id], 
-    function(err) {
-      if (err) {
-        console.error('Database error updating display name:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-
-      res.json({ success: true, message: 'Display name updated successfully' });
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  );
-});
 
-// Update purpose
-app.post('/api/family/purpose', authenticateToken, (req, res) => {
-  const { purpose } = req.body;
+    // Use INSERT OR REPLACE to handle upsert
+    familyDb.run(
+      `INSERT INTO admin (key, value, updated_at) 
+       VALUES (?, ?, CURRENT_TIMESTAMP) 
+       ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP`,
+      [key, value || '', value || ''],
+      function(err) {
+        if (err) {
+          console.error('Database error updating admin setting:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
 
-  authDb.run('UPDATE users SET purpose = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-    [purpose || '', req.user.id], 
-    function(err) {
-      if (err) {
-        console.error('Database error updating purpose:', err);
-        return res.status(500).json({ error: 'Internal server error' });
+        res.json({ success: true, message: 'Admin setting updated successfully' });
       }
-
-      res.json({ success: true, message: 'Purpose updated successfully' });
-    }
-  );
+    );
+  });
 });
 
 // Update show_street_fields setting
@@ -2641,6 +2660,81 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(indexPath);
   });
 }
+
+// Migration: Move purpose and display_name from auth DB to family DB admin table
+function migrateAdminSettingsToFamilyDb() {
+  console.log('[Migration] Starting admin settings migration...');
+  
+  authDb.all('SELECT id, family_name, display_name, purpose FROM users', [], (err, families) => {
+    if (err) {
+      console.error('[Migration] Error fetching families for migration:', err);
+      return;
+    }
+    
+    if (!families || families.length === 0) {
+      console.log('[Migration] No families to migrate');
+      return;
+    }
+    
+    let migratedCount = 0;
+    
+    families.forEach((family) => {
+      try {
+        const familyDb = getFamilyDb(family.family_name);
+        
+        // Check if admin table exists and has data
+        familyDb.all('SELECT key FROM admin', [], (err, rows) => {
+          if (err) {
+            console.error(`[Migration] Error checking admin table for family ${family.family_name}:`, err);
+            return;
+          }
+          
+          const existingKeys = rows ? rows.map(r => r.key) : [];
+          
+          // Migrate display_name if it exists and is not already migrated
+          if (family.display_name && !existingKeys.includes('display_name')) {
+            familyDb.run(
+              'INSERT INTO admin (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+              ['display_name', family.display_name],
+              (err) => {
+                if (err) {
+                  console.error(`[Migration] Error migrating display_name for family ${family.family_name}:`, err);
+                } else {
+                  console.log(`[Migration] Migrated display_name for family ${family.family_name}`);
+                }
+              }
+            );
+          }
+          
+          // Migrate purpose if it exists and is not already migrated
+          if (family.purpose && !existingKeys.includes('purpose')) {
+            familyDb.run(
+              'INSERT INTO admin (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+              ['purpose', family.purpose],
+              (err) => {
+                if (err) {
+                  console.error(`[Migration] Error migrating purpose for family ${family.family_name}:`, err);
+                } else {
+                  console.log(`[Migration] Migrated purpose for family ${family.family_name}`);
+                }
+              }
+            );
+          }
+          
+          migratedCount++;
+          if (migratedCount === families.length) {
+            console.log(`[Migration] Admin settings migration completed for ${families.length} families`);
+          }
+        });
+      } catch (error) {
+        console.error(`[Migration] Error migrating family ${family.family_name}:`, error);
+      }
+    });
+  });
+}
+
+// Run migration on startup
+migrateAdminSettingsToFamilyDb();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);

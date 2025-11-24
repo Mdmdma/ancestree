@@ -166,6 +166,22 @@ export const CHAT_MESSAGE_DB_ENCRYPTED_COLUMNS = [
 ];
 
 /**
+ * Admin settings fields to encrypt
+ * These are key-value pairs stored in the admin table
+ * The 'value' column is encrypted when encryption is enabled
+ */
+export const ADMIN_ENCRYPTED_FIELDS = [
+  'value'  // The value column containing the setting data
+];
+
+/**
+ * Database column names for admin settings
+ */
+export const ADMIN_DB_ENCRYPTED_COLUMNS = [
+  'value'
+];
+
+/**
  * Get all fields that should be encrypted for a given data type
  */
 export const getEncryptedFields = (dataType) => {
@@ -183,6 +199,9 @@ export const getEncryptedFields = (dataType) => {
     case 'chat_message':
     case 'chatMessage':
       return CHAT_MESSAGE_ENCRYPTED_FIELDS;
+    case 'admin':
+    case 'admin_setting':
+      return ADMIN_ENCRYPTED_FIELDS;
     default:
       console.warn(`Unknown data type for encryption: ${dataType}`);
       return [];
@@ -207,6 +226,9 @@ export const getEncryptedDbColumns = (dataType) => {
     case 'chat_message':
     case 'chatMessage':
       return CHAT_MESSAGE_DB_ENCRYPTED_COLUMNS;
+    case 'admin':
+    case 'admin_setting':
+      return ADMIN_DB_ENCRYPTED_COLUMNS;
     default:
       console.warn(`Unknown data type for DB columns: ${dataType}`);
       return [];

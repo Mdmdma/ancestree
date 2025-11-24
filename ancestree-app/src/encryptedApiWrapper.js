@@ -6,8 +6,7 @@
 import { api as baseApi } from './api';
 import {
   isEncryptionEnabled,
-  getDerivedKey,
-  shouldSkipGeocoding
+  getDerivedKey
 } from './encryptionSession';
 import {
   encryptValueFast,
@@ -218,11 +217,6 @@ export const encryptedApi = {
   updatePurpose: baseApi.updatePurpose,
   setEncryptionStatus: baseApi.setEncryption,
   
-  // Add skip geocoding method
-  async updateSkipGeocoding(skipGeocoding) {
-    return baseApi.updateSkipGeocoding(skipGeocoding);
-  },
-  
   // Geocoding for encryption
   async geocodeForEncryption(city, zip, country) {
     return baseApi.geocodeForEncryption(city, zip, country);
@@ -281,18 +275,8 @@ export const encryptedApi = {
   async createNode(node, socketId = null) {
     let nodeToSend = { ...node };
     
-    // Handle geocoding if enabled and data has address fields
-    if (!shouldSkipGeocoding() && node.data) {
-      const { city, zip, country } = node.data;
-      if (city || zip || country) {
-        const coords = await geocodeAddress(city, zip, country);
-        nodeToSend.data = {
-          ...nodeToSend.data,
-          latitude: coords.latitude,
-          longitude: coords.longitude
-        };
-      }
-    }
+    // Geocoding is now handled client-side via geocodingService
+    // No need to geocode here anymore
     
     // Encrypt if encryption is enabled
     nodeToSend = await encryptNodeData(nodeToSend);
@@ -312,22 +296,8 @@ export const encryptedApi = {
   async updateNode(id, updates, socketId = null) {
     let updatesToSend = { ...updates };
     
-    // Handle geocoding if address changed
-    if (!shouldSkipGeocoding() && updates.data) {
-      const { city, zip, country } = updates.data;
-      if (city !== undefined || zip !== undefined || country !== undefined) {
-        const coords = await geocodeAddress(
-          city || '', 
-          zip || '', 
-          country || ''
-        );
-        updatesToSend.data = {
-          ...updatesToSend.data,
-          latitude: coords.latitude,
-          longitude: coords.longitude
-        };
-      }
-    }
+    // Geocoding is now handled client-side via geocodingService
+    // No need to geocode here anymore
     
     // Encrypt the updates
     if (isEncryptionEnabled() && updatesToSend.data) {

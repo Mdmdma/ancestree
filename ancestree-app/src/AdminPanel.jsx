@@ -57,36 +57,33 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   useEffect(() => {
     if (!isOpen) return;
 
-    // fetch public purpose preview
-    const fetchPurpose = async () => {
-      try {
-        if (familyName) {
-          const res = await api.getFamilyPurpose(familyName);
-          setPurposePreview(res.purpose || '');
-        }
-      } catch (err) {
-        console.error('Failed to fetch family purpose preview:', err);
-      }
-    };
-
     // fetch protected settings if authenticated
     const fetchSettings = async () => {
       try {
+        // Fetch family settings (encryption, field visibility)
         const settings = await api.getFamilySettings();
-        setDisplayName(settings.displayName || '');
         setEncryptionEnabled(Boolean(settings.encryptionEnabled));
         setEncryptionSalt(settings.encryptionSalt || null);
         setShowStreetFields(settings.showStreetFields !== undefined ? Boolean(settings.showStreetFields) : true);
         setShowPhoneField(settings.showPhoneField !== undefined ? Boolean(settings.showPhoneField) : true);
         setShowEmailField(settings.showEmailField !== undefined ? Boolean(settings.showEmailField) : true);
+
+        // Fetch admin settings (purpose, display_name) from encrypted admin table
+        // Use encryptedApi to handle automatic decryption
+        const { encryptedApi } = await import('./encryptedApi');
+        const adminSettings = await encryptedApi.getAdminSettings();
+        setDisplayName(adminSettings.display_name || '');
+        setPurposePreview(adminSettings.purpose || '');
       } catch (err) {
+        console.error('Failed to fetch settings:', err);
         // ignore if not authenticated
       }
     };
 
-    fetchPurpose();
-    fetchSettings();
-  }, [isOpen, familyName]);
+    if (isAuthenticated) {
+      fetchSettings();
+    }
+  }, [isOpen, isAuthenticated]);
 
   if (!isOpen) return null;
 
@@ -469,7 +466,22 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.familyParameters.purposeLabel}</label>
                   <textarea value={purposePreview} onChange={(e) => setPurposePreview(e.target.value)} rows={4} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} />
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={async () => { setLoading(true); setError(''); setSuccess(''); try { await api.updateDisplayName(displayName); await api.updatePurpose(purposePreview); setSuccess('Family parameters updated'); } catch (err) { setError(err.message); } finally { setLoading(false); setTimeout(() => setSuccess(''), 3000); } }} disabled={loading} style={{ padding: '10px', borderRadius: '6px', background: '#3498db', color: 'white', border: 'none' }}>{appConfig.ui.adminPanel.familyParameters.saveButton}</button>
+                    <button onClick={async () => { 
+                      setLoading(true); 
+                      setError(''); 
+                      setSuccess(''); 
+                      try { 
+                        const { encryptedApi } = await import('./encryptedApi');
+                        await encryptedApi.updateDisplayName(displayName); 
+                        await encryptedApi.updatePurpose(purposePreview); 
+                        setSuccess('Family parameters updated'); 
+                      } catch (err) { 
+                        setError(err.message); 
+                      } finally { 
+                        setLoading(false); 
+                        setTimeout(() => setSuccess(''), 3000); 
+                      } 
+                    }} disabled={loading} style={{ padding: '10px', borderRadius: '6px', background: '#3498db', color: 'white', border: 'none' }}>{appConfig.ui.adminPanel.familyParameters.saveButton}</button>
                   </div>
                 </div>
               )}

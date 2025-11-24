@@ -299,9 +299,7 @@ export const appConfig = {
       security: {
         title: "Sicherheit",
         encryptionLabel: "Client-seitige Verschlüsselung aktivieren",
-        encryptionHint: "Wenn aktiviert, werden alle gespeicherten Daten client-seitig mit dem Familienpasswort verschlüsselt.",
-        skipGeocodingLabel: "Geocoding überspringen",
-        skipGeocodingHint: "Wenn aktiviert, werden Adressen nicht automatisch geokodiert."
+        encryptionHint: "Wenn aktiviert, werden alle gespeicherten Daten client-seitig mit dem Familienpasswort verschlüsselt."
       },
       visibleFields: {
         title: "Sichtbare Felder",

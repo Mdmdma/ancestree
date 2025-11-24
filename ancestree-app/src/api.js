@@ -218,47 +218,58 @@ export const api = {
     return result;
   },
 
-  async getFamilyPurpose(familyName) {
-    const response = await fetch(`${API_BASE_URL}/family/purpose/${encodeURIComponent(familyName)}`);
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to fetch family purpose');
-    }
-    
-    return result;
-  },
-
-  async updateDisplayName(displayName) {
-    const response = await fetch(`${API_BASE_URL}/family/display-name`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ displayName })
+  // Admin settings operations (key-value store in family database)
+  async getAdminSettings() {
+    const response = await fetch(`${API_BASE_URL}/admin/settings`, {
+      headers: getAuthHeaders()
     });
     
     const result = await response.json();
     
     if (!response.ok) {
-      throw new Error(result.error || 'Failed to update display name');
+      throw new Error(result.error || 'Failed to fetch admin settings');
     }
     
     return result;
+  },
+
+  async getAdminSetting(key) {
+    const response = await fetch(`${API_BASE_URL}/admin/setting/${encodeURIComponent(key)}`, {
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to fetch admin setting');
+    }
+    
+    return result;
+  },
+
+  async setAdminSetting(key, value) {
+    const response = await fetch(`${API_BASE_URL}/admin/setting`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ key, value })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update admin setting');
+    }
+    
+    return result;
+  },
+
+  // Legacy methods for backward compatibility - now use admin settings
+  async updateDisplayName(displayName) {
+    return this.setAdminSetting('display_name', displayName);
   },
 
   async updatePurpose(purpose) {
-    const response = await fetch(`${API_BASE_URL}/family/purpose`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ purpose })
-    });
-    
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to update purpose');
-    }
-    
-    return result;
+    return this.setAdminSetting('purpose', purpose);
   },
 
   async setEncryption(enabled, salt) {

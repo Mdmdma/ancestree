@@ -19,7 +19,8 @@ import {
   EDGE_ENCRYPTED_FIELDS,
   IMAGE_ENCRYPTED_FIELDS,
   IMAGE_PEOPLE_ENCRYPTED_FIELDS,
-  CHAT_MESSAGE_ENCRYPTED_FIELDS
+  CHAT_MESSAGE_ENCRYPTED_FIELDS,
+  ADMIN_ENCRYPTED_FIELDS
 } from './encryptionFieldDefinitions';
 
 /**
@@ -328,13 +329,92 @@ export const encryptedApi = {
   adminLogin: baseApi.adminLogin,
   changeFamilyPassword: baseApi.changeFamilyPassword,
   changeAdminPassword: baseApi.changeAdminPassword,
+  deleteFamily: baseApi.deleteFamily,
   
-  // Pass through family settings
+  // Pass through family settings (non-encrypted settings in auth DB)
   getFamilySettings: baseApi.getFamilySettings,
-  getFamilyPurpose: baseApi.getFamilyPurpose,
-  updateDisplayName: baseApi.updateDisplayName,
-  updatePurpose: baseApi.updatePurpose,
   setEncryptionStatus: baseApi.setEncryption,
+  updateStreetFieldsVisibility: baseApi.updateStreetFieldsVisibility,
+  updatePhoneFieldVisibility: baseApi.updatePhoneFieldVisibility,
+  updateEmailFieldVisibility: baseApi.updateEmailFieldVisibility,
+  
+  // Admin settings operations (encrypted key-value store in family DB)
+  async getAdminSettings() {
+    const settings = await baseApi.getAdminSettings();
+    
+    const encEnabled = isEncryptionEnabled();
+    const key = getDerivedKey();
+    
+    // If encryption is not enabled or we don't have a key, return settings as-is
+    if (!encEnabled || !key) {
+      console.log('[EncryptedAPI] No decryption available for admin settings, returning as-is');
+      return settings;
+    }
+    
+    // Decrypt all setting values
+    const decryptedSettings = {};
+    for (const [settingKey, value] of Object.entries(settings)) {
+      if (value && typeof value === 'string' && value.startsWith('enc:')) {
+        try {
+          decryptedSettings[settingKey] = await decryptValueFast(value, key, true);
+        } catch (error) {
+          console.error(`[EncryptedAPI] Failed to decrypt admin setting "${settingKey}":`, error);
+          decryptedSettings[settingKey] = value; // Keep encrypted if decryption fails
+        }
+      } else {
+        decryptedSettings[settingKey] = value;
+      }
+    }
+    
+    return decryptedSettings;
+  },
+  
+  async getAdminSetting(key) {
+    const result = await baseApi.getAdminSetting(key);
+    
+    const encEnabled = isEncryptionEnabled();
+    const encKey = getDerivedKey();
+    
+    // If encryption is not enabled or we don't have a key, return value as-is
+    if (!encEnabled || !encKey || !result.value) {
+      return result;
+    }
+    
+    // Decrypt the value if it's encrypted
+    if (typeof result.value === 'string' && result.value.startsWith('enc:')) {
+      try {
+        result.value = await decryptValueFast(result.value, encKey, true);
+      } catch (error) {
+        console.error(`[EncryptedAPI] Failed to decrypt admin setting "${key}":`, error);
+        // Keep encrypted value if decryption fails
+      }
+    }
+    
+    return result;
+  },
+  
+  async setAdminSetting(key, value) {
+    let valueToSend = value;
+    
+    // Encrypt the value if encryption is enabled
+    if (isEncryptionEnabled()) {
+      const encKey = getDerivedKey();
+      if (encKey && value !== null && value !== undefined && value !== '') {
+        valueToSend = await encryptValueFast(String(value), encKey, true);
+      }
+    }
+    
+    return baseApi.setAdminSetting(key, valueToSend);
+  },
+  
+  // Legacy methods - now use admin settings
+  async updateDisplayName(displayName) {
+    return this.setAdminSetting('display_name', displayName);
+  },
+  
+  async updatePurpose(purpose) {
+    return this.setAdminSetting('purpose', purpose);
+  },
   
   // Load operations with decryption
   async loadNodes() {
@@ -704,16 +784,17 @@ export const encryptedApi = {
     
     // Step 1: Load all data
     if (onProgress) onProgress({ phase: 'loading', percent: 5, message: 'Loading encrypted data...' });
-    const [nodes, edges, images, chatMessages] = await Promise.all([
+    const [nodes, edges, images, chatMessages, adminSettings] = await Promise.all([
       baseApi.loadNodes(),
       baseApi.loadEdges(),
       baseApi.loadImages(),
-      baseApi.loadChatMessages ? baseApi.loadChatMessages() : Promise.resolve([])
+      baseApi.loadChatMessages ? baseApi.loadChatMessages() : Promise.resolve([]),
+      baseApi.getAdminSettings()
     ]);
     
-    console.log(`[EncryptedAPI] Loaded: ${nodes.length} nodes, ${edges.length} edges, ${images.length} images, ${chatMessages.length} messages`);
+    console.log(`[EncryptedAPI] Loaded: ${nodes.length} nodes, ${edges.length} edges, ${images.length} images, ${chatMessages.length} messages, ${Object.keys(adminSettings).length} admin settings`);
     
-    const totalItems = nodes.length + edges.length + images.length + chatMessages.length;
+    const totalItems = nodes.length + edges.length + images.length + chatMessages.length + Object.keys(adminSettings).length;
     let processedItems = 0;
     
     if (totalItems === 0) {
@@ -814,6 +895,23 @@ export const encryptedApi = {
       if (processedItems % 5 === 0) updateProgress('decrypting', `Decrypting messages... (${processedItems}/${totalItems})`);
     }
     
+    // Decrypt admin settings
+    const decryptedAdminSettings = {};
+    for (const [key, value] of Object.entries(adminSettings)) {
+      if (value && typeof value === 'string' && value.startsWith('enc:')) {
+        try {
+          decryptedAdminSettings[key] = await decryptValueFast(value, oldKey, true);
+        } catch (error) {
+          console.error(`[EncryptedAPI] Failed to decrypt admin setting ${key}:`, error);
+          throw new Error(`Failed to decrypt admin settings. Please verify your current password is correct.`);
+        }
+      } else {
+        decryptedAdminSettings[key] = value;
+      }
+      processedItems++;
+      updateProgress('decrypting', `Decrypting admin settings... (${processedItems}/${totalItems})`);
+    }
+    
     // Step 3: Generate new salt and derive new key
     if (onProgress) onProgress({ phase: 'deriving_key', percent: 45, message: 'Generating new encryption key...' });
     const newSalt = generateSalt();
@@ -880,6 +978,18 @@ export const encryptedApi = {
       await baseApi.updateChatMessage(message.id, encryptedMessage);
       processedItems++;
       if (processedItems % 5 === 0) updateProgress('encrypting', `Encrypting messages... (${processedItems}/${totalItems})`);
+    }
+    
+    // Re-encrypt admin settings
+    for (const [key, value] of Object.entries(decryptedAdminSettings)) {
+      if (value !== null && value !== undefined && value !== '') {
+        const encryptedValue = await encryptValueFast(String(value), newKey, true);
+        await baseApi.setAdminSetting(key, encryptedValue);
+      } else {
+        await baseApi.setAdminSetting(key, value);
+      }
+      processedItems++;
+      updateProgress('encrypting', `Encrypting admin settings... (${processedItems}/${totalItems})`);
     }
     
     // Step 5: Update encryption settings with new salt and change password
