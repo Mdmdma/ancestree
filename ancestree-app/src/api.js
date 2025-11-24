@@ -7,7 +7,7 @@ export { API_BASE_URL };
 // Authentication token management
 let authToken = localStorage.getItem('authToken');
 
-// Logout callback for when decryption fails
+// Logout callback for when decryption key is unavailable
 let logoutCallback = null;
 
 // Helper function to get auth headers
@@ -35,29 +35,25 @@ export const setAuthToken = (token) => {
 // Get auth token
 export const getAuthToken = () => authToken;
 
-// Set logout callback for decryption failures
+// Set logout callback for encryption key check failures
 export const setLogoutCallback = (callback) => {
   logoutCallback = callback;
 };
 
 // Trigger logout from API layer
 export const triggerLogout = () => {
-  console.log('🔴🔴🔴 [API] triggerLogout CALLED 🔴🔴🔴');
-  console.log('[API] Callback exists:', !!logoutCallback);
-  console.log('[API] Stack trace:', new Error().stack);
+  console.log('🔴 [API] triggerLogout called - encryption key unavailable');
   
   if (logoutCallback) {
-    console.log('[API] ✅ Executing logout callback...');
+    console.log('[API] Executing logout callback...');
     try {
       logoutCallback();
-      console.log('[API] ✅ Logout callback executed successfully');
+      console.log('[API] Logout callback executed successfully');
     } catch (error) {
-      console.error('[API] ❌ Error executing logout callback:', error);
+      console.error('[API] Error executing logout callback:', error);
     }
   } else {
-    console.error('[API] ❌❌❌ NO LOGOUT CALLBACK REGISTERED ❌❌❌');
-    console.error('[API] Cannot trigger logout - callback is null/undefined');
-    console.error('[API] Make sure setLogoutCallback was called in App.jsx');
+    console.error('[API] No logout callback registered');
   }
 };
 

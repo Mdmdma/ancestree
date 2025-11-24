@@ -3,7 +3,7 @@ import { api } from './api';
 import { appConfig } from './config';
 import { runEncryptionPerformanceTest, formatTestResults, getDatabaseFieldEstimates } from './encryptionPerformanceTest';
 import { enableEncryption, disableEncryption } from './encryptionBatchOperations';
-import { updateEncryptionStatus, updateSkipGeocoding as updateSessionSkipGeocoding, getFamilyPassword, updatePassword } from './encryptionSession';
+import { updateEncryptionStatus, updateSkipGeocoding as updateSessionSkipGeocoding, getFamilyPassword, updatePassword, startEncryptionToggle, endEncryptionToggle } from './encryptionSession';
 import { exportFamilyDataWithMetadata } from './exportUtils';
 
 const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName, onDataReload }) => {
@@ -135,6 +135,9 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
           return;
         }
         
+        // Pause key availability checks during password change
+        pauseKeyCheck();
+        
         // Use the new streamlined password change with automatic re-encryption
         const { encryptedApi } = await import('./encryptedApi');
         
@@ -153,6 +156,9 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
         } else {
           await updatePassword(newFamilyPassword);
         }
+        
+        // Resume key availability checks
+        resumeKeyCheck();
         
         setEncryptionProgress(null);
         setSuccess('Password changed and data re-encrypted successfully!');
@@ -177,6 +183,8 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     } catch (err) {
       setError(err.message);
       setEncryptionProgress(null);
+      // Resume key checks even on error
+      resumeKeyCheck();
     } finally {
       setLoading(false);
     }
@@ -1458,19 +1466,31 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   setEncryptionProgress({ phase: 'loading', percent: 0, message: 'Initializing...' });
                   
                   try {
+                    // CRITICAL: Start encryption toggle mode to prevent auto-logout
+                    startEncryptionToggle();
+                    console.log('[AdminPanel] 🔄 Started encryption toggle mode');
+                    
                     if (pendingEncryptionAction === 'enable') {
                       // Call enableEncryption with progress callback (password is already in session)
                       const result = await enableEncryption((progress) => {
                         setEncryptionProgress(progress);
                       });
                       
-                      // Update local and session state with the new salt
+                      // Update session state FIRST with the new salt and key
+                      console.log('[AdminPanel] Updating session with encryption enabled and new salt');
+                      await updateEncryptionStatus(true, result.salt);
+                      
+                      // Update local UI state
                       setEncryptionEnabled(true);
                       setEncryptionSalt(result.salt);
-                      await updateEncryptionStatus(true, result.salt);
+                      
+                      // End toggle mode BEFORE reloading data
+                      console.log('[AdminPanel] ✅ Ending encryption toggle mode');
+                      endEncryptionToggle();
+                      
                       setSuccess('Encryption enabled successfully');
                       
-                      // Reload all data so UI shows decrypted values immediately
+                      // Reload all data so UI shows encrypted/decrypted values correctly
                       if (onDataReload) {
                         console.log('[AdminPanel] Reloading data after enabling encryption...');
                         await onDataReload();
@@ -1481,12 +1501,21 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                         setEncryptionProgress(progress);
                       });
                       
+                      // Update session state FIRST
+                      console.log('[AdminPanel] Updating session with encryption disabled');
+                      await updateEncryptionStatus(false, null);
+                      
+                      // Update local UI state
                       setEncryptionEnabled(false);
                       setEncryptionSalt(null);
-                      await updateEncryptionStatus(false, null);
+                      
+                      // End toggle mode BEFORE reloading data
+                      console.log('[AdminPanel] ✅ Ending encryption toggle mode');
+                      endEncryptionToggle();
+                      
                       setSuccess('Encryption disabled successfully');
                       
-                      // Reload all data so UI shows unencrypted values immediately
+                      // Reload all data so UI shows unencrypted values correctly
                       if (onDataReload) {
                         console.log('[AdminPanel] Reloading data after disabling encryption...');
                         await onDataReload();
@@ -1495,6 +1524,8 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   } catch (err) {
                     setError(`Encryption operation failed: ${err.message}`);
                     console.error('Encryption toggle error:', err);
+                    // CRITICAL: End toggle mode even on error
+                    endEncryptionToggle();
                   } finally {
                     setLoading(false);
                     setEncryptionProgress(null);

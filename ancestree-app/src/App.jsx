@@ -7,7 +7,7 @@ import Login from './Login';
 import AdminPanel from './AdminPanel';
 import { api, getAuthToken, getSocketServerUrl, setLogoutCallback, setLastFamilyName } from './api';
 import { encryptedApi } from './encryptedApi';
-import { clearSession } from './encryptionSession';
+import { clearSession, isEncryptionEnabled, getDerivedKey, shouldPauseKeyCheck } from './encryptionSession';
 import { useSocket } from './hooks/useSocket';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
@@ -34,31 +34,59 @@ const AddNodeOnEdgeDrop = () => {
   const socketData = useSocket(getSocketServerUrl(), isAuthenticated);
 
   // Handle logout - wrapped in useCallback to maintain stable reference
-  // MUST be defined before useEffect that uses it
   const handleLogout = useCallback(() => {
     console.log('🔴🔴🔴 [App] handleLogout CALLED 🔴🔴🔴');
     console.log('[App] Clearing session and logging out user');
+    
+    // Save family name before clearing user data
+    if (user && user.familyName) {
+      setLastFamilyName(user.familyName);
+    }
+    
     api.logout();
     clearSession(); // Clear encryption session
     setIsAuthenticated(false);
     setUser(null);
     console.log('[App] ✅ Logout complete - user should see login screen');
-  }, []);
+  }, [user]);
 
-  // Set up logout callback for decryption failures
+  // Set up logout callback and periodic key availability check
   useEffect(() => {
-    console.log('🟢 [App] Setting up logout callback in useEffect');
+    console.log('🟢 [App] Setting up logout callback and key check');
+    
+    // Register logout callback
     setLogoutCallback(() => {
-      console.log('🔴 [App] Auto-logout CALLBACK INVOKED by decryption failure');
+      console.log('🔴 [App] Auto-logout triggered - encryption key unavailable');
       handleLogout();
     });
     
+    // Set up periodic check for encryption key availability (every 500ms)
+    const keyCheckInterval = setInterval(() => {
+      // Only check if user is authenticated
+      if (!isAuthenticated) return;
+      
+      // Skip check if paused (during sensitive operations)
+      if (shouldPauseKeyCheck()) {
+        return;
+      }
+      
+      // Check if encryption is enabled but no key is available
+      const encryptionEnabled = isEncryptionEnabled();
+      const hasKey = getDerivedKey() !== null;
+      
+      if (encryptionEnabled && !hasKey) {
+        console.error('❌ [App] Encryption enabled but no key available - triggering auto-logout');
+        handleLogout();
+      }
+    }, 500);
+    
     // Cleanup
     return () => {
-      console.log('🟡 [App] Cleaning up logout callback');
+      console.log('🟡 [App] Cleaning up logout callback and key check');
       setLogoutCallback(null);
+      clearInterval(keyCheckInterval);
     };
-  }, [handleLogout]); // Re-register when handleLogout changes
+  }, [handleLogout, isAuthenticated]);
 
   // Check authentication on app load
   useEffect(() => {
@@ -69,6 +97,26 @@ const AddNodeOnEdgeDrop = () => {
           const result = await api.verifyToken();
           setIsAuthenticated(true);
           setUser(result.user);
+          
+          // CRITICAL: After page refresh, check if encryption is enabled
+          // If it is, we need to log out because we don't have the decryption key
+          try {
+            const settings = await api.getFamilySettings();
+            if (settings.encryptionEnabled) {
+              console.error('❌ [App] Encryption enabled but no session after page refresh - logging out');
+              // Force logout immediately
+              api.logout();
+              clearSession();
+              setIsAuthenticated(false);
+              setUser(null);
+              // Save family name for auto-fill
+              if (result.user && result.user.familyName) {
+                setLastFamilyName(result.user.familyName);
+              }
+            }
+          } catch (settingsError) {
+            console.error('[App] Failed to check encryption settings:', settingsError);
+          }
         } catch {
           console.log('Token invalid, please login again');
           api.logout();

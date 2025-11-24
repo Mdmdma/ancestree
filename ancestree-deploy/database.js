@@ -85,7 +85,7 @@ const initializeAuthDb = () => {
       password_hash TEXT NOT NULL,
       admin_password_hash TEXT,
       purpose TEXT,
-      encryption_enabled BOOLEAN DEFAULT 0,
+      encryption_enabled BOOLEAN DEFAULT 1,
       encryption_salt TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -139,7 +139,7 @@ const initializeAuthDb = () => {
           
           // Check and add encryption_enabled
           if (!columnNames.includes('encryption_enabled')) {
-            authDb.run("ALTER TABLE users ADD COLUMN encryption_enabled BOOLEAN DEFAULT 0", (err) => {
+            authDb.run("ALTER TABLE users ADD COLUMN encryption_enabled BOOLEAN DEFAULT 1", (err) => {
               if (err) {
                 console.error('Error adding encryption_enabled column:', err);
               } else {

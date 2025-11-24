@@ -441,9 +441,12 @@ app.post('/api/auth/register', async (req, res) => {
         // Use displayName if provided, otherwise use familyName
         const finalDisplayName = displayName || familyName;
 
-        // Create user
-        authDb.run('INSERT INTO users (family_name, password_hash, admin_password_hash, display_name) VALUES (?, ?, ?, ?)', 
-          [familyName, passwordHash, adminPasswordHash, finalDisplayName], 
+        // Generate encryption salt for default encryption
+        const encryptionSalt = crypto.randomBytes(16).toString('hex');
+
+        // Create user with encryption enabled by default
+        authDb.run('INSERT INTO users (family_name, password_hash, admin_password_hash, display_name, encryption_enabled, encryption_salt) VALUES (?, ?, ?, ?, ?, ?)', 
+          [familyName, passwordHash, adminPasswordHash, finalDisplayName, 1, encryptionSalt], 
           function(err) {
             if (err) {
               console.error('Database error during user creation:', err);
@@ -472,7 +475,9 @@ app.post('/api/auth/register', async (req, res) => {
                 id: familyId,
                 familyName,
                 displayName: finalDisplayName
-              }
+              },
+              encryptionEnabled: true,
+              encryptionSalt: encryptionSalt
             });
           }
         );

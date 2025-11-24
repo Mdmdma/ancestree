@@ -52,12 +52,27 @@ export default function Login({ onLoginSuccess }) {
       
       // Initialize encryption session
       try {
-        const familySettings = await api.getFamilySettings();
-        await initializeSession(password, {
-          ...familySettings,
-          familyName: result.user.familyName
+        let familySettings;
+        
+        // For registration, encryption settings are in the response
+        if (isRegistering && result.encryptionEnabled !== undefined) {
+          familySettings = {
+            encryptionEnabled: result.encryptionEnabled,
+            encryptionSalt: result.encryptionSalt,
+            skipGeocoding: false, // Default for new families
+            familyName: result.user.familyName
+          };
+        } else {
+          // For login, fetch settings from API
+          familySettings = await api.getFamilySettings();
+          familySettings.familyName = result.user.familyName;
+        }
+        
+        await initializeSession(password, familySettings);
+        console.log('[Login] Encryption session initialized with settings:', {
+          encryptionEnabled: familySettings.encryptionEnabled,
+          hasSalt: !!familySettings.encryptionSalt
         });
-        console.log('[Login] Encryption session initialized');
       } catch (encError) {
         console.error('[Login] Failed to initialize encryption session:', encError);
         // Don't fail login if encryption init fails

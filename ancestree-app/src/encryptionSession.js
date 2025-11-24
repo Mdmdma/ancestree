@@ -14,7 +14,8 @@ let sessionState = {
   skipGeocoding: false,
   familyName: null,
   isBatchOperationInProgress: false, // Flag to indicate when batch encryption/decryption is happening
-  originalSkipGeocoding: false // Store original setting to restore after batch operation
+  originalSkipGeocoding: false, // Store original setting to restore after batch operation
+  pauseKeyCheck: false // Flag to pause key availability checks during sensitive operations
 };
 
 /**
@@ -192,6 +193,7 @@ export const startBatchOperation = () => {
   sessionState.originalSkipGeocoding = sessionState.skipGeocoding;
   sessionState.isBatchOperationInProgress = true;
   sessionState.skipGeocoding = true; // Force skip geocoding during batch operations
+  sessionState.pauseKeyCheck = true; // Pause key availability checks
 };
 
 /**
@@ -201,6 +203,7 @@ export const endBatchOperation = () => {
   console.log('[EncryptionSession] Ending batch operation - restoring normal operation');
   sessionState.isBatchOperationInProgress = false;
   sessionState.skipGeocoding = sessionState.originalSkipGeocoding;
+  sessionState.pauseKeyCheck = false; // Resume key availability checks
 };
 
 /**
@@ -243,6 +246,48 @@ export const reDeriveKey = async () => {
   console.log('[EncryptionSession] Re-deriving encryption key...');
   sessionState.derivedKey = await getCachedKey(sessionState.familyPassword, sessionState.encryptionSalt);
   return sessionState.derivedKey;
+};
+
+/**
+ * Pause key availability checks (for sensitive operations like password changes)
+ */
+export const pauseKeyCheck = () => {
+  console.log('[EncryptionSession] Pausing key availability checks');
+  sessionState.pauseKeyCheck = true;
+};
+
+/**
+ * Resume key availability checks
+ */
+export const resumeKeyCheck = () => {
+  console.log('[EncryptionSession] Resuming key availability checks');
+  sessionState.pauseKeyCheck = false;
+};
+
+/**
+ * Check if key availability checks should be paused
+ * @returns {boolean} Whether checks are paused
+ */
+export const shouldPauseKeyCheck = () => {
+  return sessionState.pauseKeyCheck;
+};
+
+/**
+ * Start encryption toggle operation (pause key checks)
+ * Alias for pauseKeyCheck for backward compatibility
+ */
+export const startEncryptionToggle = () => {
+  console.log('[EncryptionSession] Starting encryption toggle - pausing key checks');
+  pauseKeyCheck();
+};
+
+/**
+ * End encryption toggle operation (resume key checks)
+ * Alias for resumeKeyCheck for backward compatibility
+ */
+export const endEncryptionToggle = () => {
+  console.log('[EncryptionSession] Ending encryption toggle - resuming key checks');
+  resumeKeyCheck();
 };
 
 /**
