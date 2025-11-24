@@ -6,8 +6,7 @@
 import { baseApi } from './api';
 import {
   isEncryptionEnabled,
-  getDerivedKey,
-  shouldSkipGeocoding
+  getDerivedKey
 } from './encryptionSession';
 import {
   encryptValueFast,
@@ -22,23 +21,6 @@ import {
   IMAGE_PEOPLE_ENCRYPTED_FIELDS,
   CHAT_MESSAGE_ENCRYPTED_FIELDS
 } from './encryptionFieldDefinitions';
-
-/**
- * Geocode an address using the backend API
- * @param {string} city
- * @param {string} zip
- * @param {string} country
- * @returns {Promise<{latitude: number|null, longitude: number|null}>}
- */
-const geocodeAddress = async (city, zip, country) => {
-  try {
-    const response = await baseApi.geocodeForEncryption(city, zip, country);
-    return response;
-  } catch (error) {
-    console.error('[EncryptionAPI] Geocoding failed:', error);
-    return { latitude: null, longitude: null };
-  }
-};
 
 /**
  * Encrypt node data before sending to backend
@@ -354,14 +336,9 @@ export const encryptedApi = {
   updatePurpose: baseApi.updatePurpose,
   setEncryptionStatus: baseApi.setEncryption,
   
-  // Add skip geocoding method
+  // Skip geocoding setting (may still be used for admin settings)
   async updateSkipGeocoding(skipGeocoding) {
     return baseApi.updateSkipGeocoding(skipGeocoding);
-  },
-  
-  // Geocoding for encryption
-  async geocodeForEncryption(city, zip, country) {
-    return baseApi.geocodeForEncryption(city, zip, country);
   },
   
   // Load operations with decryption
@@ -439,26 +416,8 @@ export const encryptedApi = {
   async createNode(node, socketId = null) {
     let nodeToSend = { ...node };
     
-    // Handle geocoding if enabled and data has address fields
-    if (!shouldSkipGeocoding() && node.data) {
-      const { city, zip, country } = node.data;
-      if (city || zip || country) {
-        // Import generateAddressHash from geocodingUtils
-        const { generateAddressHash } = await import('./geocodingUtils');
-        
-        const coords = await geocodeAddress(city, zip, country);
-        const addressHash = await generateAddressHash(city, zip, country);
-        const timestamp = new Date().toISOString();
-        
-        nodeToSend.data = {
-          ...nodeToSend.data,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          addressHash: addressHash,
-          lastGeocoded: timestamp
-        };
-      }
-    }
+    // Geocoding is now handled client-side via geocodingService
+    // No need to geocode here anymore
     
     // Encrypt if encryption is enabled
     nodeToSend = await encryptNodeData(nodeToSend);
@@ -478,30 +437,8 @@ export const encryptedApi = {
   async updateNode(id, updates, socketId = null) {
     let updatesToSend = { ...updates };
     
-    // Handle geocoding if address changed
-    if (!shouldSkipGeocoding() && updates.data) {
-      const { city, zip, country } = updates.data;
-      if (city !== undefined || zip !== undefined || country !== undefined) {
-        // Import generateAddressHash from geocodingUtils
-        const { generateAddressHash } = await import('./geocodingUtils');
-        
-        const coords = await geocodeAddress(
-          city || '', 
-          zip || '', 
-          country || ''
-        );
-        const addressHash = await generateAddressHash(city || '', zip || '', country || '');
-        const timestamp = new Date().toISOString();
-        
-        updatesToSend.data = {
-          ...updatesToSend.data,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          addressHash: addressHash,
-          lastGeocoded: timestamp
-        };
-      }
-    }
+    // Geocoding is now handled client-side via geocodingService
+    // No need to geocode here anymore
     
     // Encrypt the updates in data object
     if (isEncryptionEnabled() && updatesToSend.data) {

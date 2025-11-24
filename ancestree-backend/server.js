@@ -1023,8 +1023,8 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
           addressHash: row.address_hash,  // Convert to camelCase
           lastGeocoded: row.last_geocoded,  // Add missing field
           bloodline: Boolean(row.bloodline),
-          preferredImageId: row.preferred_image_id,
-          isSelected: false
+          preferredImageId: row.preferred_image_id
+          // isSelected removed - this is client-only UI state
       }
     }));
     
@@ -1244,8 +1244,8 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
             addressHash: updatedRow.address_hash,
             lastGeocoded: updatedRow.last_geocoded,
             bloodline: Boolean(updatedRow.bloodline),
-            preferredImageId: updatedRow.preferred_image_id,
-            isSelected: false
+            preferredImageId: updatedRow.preferred_image_id
+            // isSelected removed - this is client-only UI state
           }
         };
         

@@ -2,8 +2,8 @@ import React from "react";
 import { Position } from "@xyflow/react";
 import CustomHandle from "./CustomHandle";
 
-export default function PersonNode({ data }) {
-  const { name, surname, birthDate, deathDate, street, city, zip, country, phone, email, latitude, longitude, isSelected, isDebugMode } = data;
+export default function PersonNode({ data, selected }) {
+  const { name, surname, birthDate, deathDate, street, city, zip, country, phone, email, latitude, longitude, isDebugMode } = data;
 
   // Format address display
   const formatAddress = () => {
@@ -45,8 +45,8 @@ export default function PersonNode({ data }) {
     </>
   );
 
-  // If not selected, show only name
-  if (!isSelected) {
+  // If not selected, show only name (use React Flow's selected prop)
+  if (!selected) {
     return (
       <div
         style={{

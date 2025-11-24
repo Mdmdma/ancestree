@@ -372,19 +372,24 @@ const FamilyTree = ({
         }
       }
       
-      setNodes(nds => nds.map(n => 
-        n.id === nodeToUpdate.id 
-          ? { 
-              ...n, 
-              ...nodeToUpdate, 
-              data: { 
-                ...n.data, 
-                ...nodeToUpdate.data, 
-                isRecentChange: true 
-              } 
-            }
-          : n
-      ));
+      // Preserve client-side UI state when applying remote updates
+      setNodes(nds => nds.map(n => {
+        if (n.id !== nodeToUpdate.id) return n;
+        
+        // Merge updates while preserving client-only UI state
+        return {
+          ...n,
+          ...nodeToUpdate,
+          data: {
+            ...n.data,              // Keep existing data first
+            ...nodeToUpdate.data,    // Apply data updates from server
+            isRecentChange: true,    // Mark as recently changed
+            isDebugMode: n.data.isDebugMode  // Preserve debug mode (client-only)
+            // Note: isSelected is NOT in node.data anymore (Strategy 3)
+          },
+          selected: n.selected  // Preserve React Flow's selection state
+        };
+      }));
       addRecentChangeIndicator(nodeToUpdate.id);
     });
 
@@ -399,9 +404,19 @@ const FamilyTree = ({
       // Don't apply our own position updates
       if (updatedBy === socket.id) return;
       
+      // Preserve client-side UI state when updating position
       setNodes(nds => nds.map(n => 
         n.id === nodeId 
-          ? { ...n, position }
+          ? { 
+              ...n, 
+              position,
+              // Preserve selection state and other UI properties
+              selected: n.selected,
+              data: {
+                ...n.data,
+                isDebugMode: n.data.isDebugMode
+              }
+            }
           : n
       ));
     });
@@ -563,8 +578,9 @@ const FamilyTree = ({
             // Provide defaults for new fields if they don't exist
             // Family nodes are always on the bloodline
             bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-            isRecentChange: false, // Initialize recent change indicator
             isDebugMode: showDebug // Add debug mode to node data
+            // isRecentChange removed - transient UI state
+            // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
           }
         }));
         
@@ -635,8 +651,9 @@ const FamilyTree = ({
         data: {
           ...node.data,
           bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-          isRecentChange: false, // Initialize recent change indicator
           isDebugMode: showDebug // Add debug mode to node data
+          // isRecentChange removed - transient UI state
+          // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
         }
       }));
       
@@ -1563,24 +1580,17 @@ const FamilyTree = ({
   );
 
   const onNodeClick = useCallback((event, node) => {
+    // Set selection in App.jsx state
+    // React Flow manages its own selection state
     setSelectedNode(node);
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        data: { ...n.data, isSelected: n.id === node.id }
-      }))
-    );
-  }, [setNodes, setSelectedNode]);
+    // No longer manipulating node.data.isSelected (Strategy 3)
+  }, [setSelectedNode]);
 
   const onPaneClick = useCallback(() => {
+    // Clear selection in App.jsx state
     setSelectedNode(null);
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        data: { ...n.data, isSelected: false }
-      }))
-    );
-  }, [setNodes, setSelectedNode]);
+    // No longer manipulating node.data.isSelected (Strategy 3)
+  }, [setSelectedNode]);
 
   const onConnectStart = useCallback((event, { handleId, handleType, nodeId }) => {
     // Store the starting position of the edge drag
@@ -1773,8 +1783,8 @@ const FamilyTree = ({
                 zip: sourceNode.data.zip || '',
                 country: sourceNode.data.country || '',
                 sourcePersonBirthYear: sourcePersonBirthYear,
-                isSelected: false,
                 bloodline: true // Family nodes are always on the bloodline
+                // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
               };
               
               // Calculate position so the connecting handle is at the drop point
@@ -1868,8 +1878,8 @@ const FamilyTree = ({
                 country: sourceNode.data.country || '',
                 phone: '',
                 numberOfPartners: 0,
-                isSelected: false,
                 bloodline: false
+                // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
               };
 
               // Calculate position so the connecting handle is at the drop point
@@ -1963,8 +1973,8 @@ const FamilyTree = ({
               phone: '',
               gender: 'male',
               numberOfPartners: 0,
-              isSelected: false,
               bloodline: !isPartnerNode // Partner nodes have bloodline: false
+              // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
             };
             
             // Calculate position so the connecting handle is at the drop point

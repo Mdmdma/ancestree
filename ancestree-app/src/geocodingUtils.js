@@ -145,7 +145,7 @@ export const searchAddressSuggestions = async (query, limit = 3) => {
       const displayLabel = addressParts.join(', ') || 'Unknown location';
       
       return {
-        id: `${feature.properties.osm_id || index}`,
+        id: `${feature.properties.osm_id || 'unknown'}-${index}`, // Make ID unique by combining osm_id with index
         displayLabel,
         street,
         housenumber,

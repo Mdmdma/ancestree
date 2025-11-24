@@ -53,8 +53,8 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
       zip: formData.zip,
       country: formData.country,
       phone: formData.phone,
-      bloodline: formData.bloodline,
-      isSelected: editingNode.data.isSelected
+      bloodline: formData.bloodline
+      // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
     };
 
     const updatedPosition = {
