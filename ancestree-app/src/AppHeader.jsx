@@ -33,7 +33,7 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
           }}
         >
           <span>🚪</span>
-          Logout
+          {appConfig.header.logoutButton}
         </button>
       )}
 
@@ -82,7 +82,7 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
         fontSize: '2rem',
         lineHeight: '1.2'
       }}>
-        {appConfig.header.title}
+        {user?.displayName ? `${appConfig.header.familyPrefix} ${user.displayName}` : appConfig.header.title}
       </h1>
       <p className="mobile-hide-subtitle" style={{ 
         margin: '0 0 3px 0', 
