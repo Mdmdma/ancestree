@@ -32,6 +32,8 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
   const [showPhoneField, setShowPhoneField] = useState(true);
   const [showEmailField, setShowEmailField] = useState(true);
   const [addressAutocompleteValue, setAddressAutocompleteValue] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const updateTimeoutRef = useRef(null);
   const nameInputRef = useRef(null);
   const previousNodeIdRef = useRef(null);
@@ -102,6 +104,12 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
       // Check if this is a newly selected node (different from previous)
       const isNewlySelected = node.id !== previousNodeIdRef.current;
       
+      // Ensure phone number has + prefix if it has content
+      let phoneValue = node.data.phone || '';
+      if (phoneValue && !phoneValue.startsWith('+')) {
+        phoneValue = '+' + phoneValue;
+      }
+      
       setFormData({
         name: node.data.name || '',
         surname: node.data.surname || '',
@@ -113,13 +121,17 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         city: node.data.city || '',
         zip: node.data.zip || '',
         country: node.data.country || '',
-        phone: node.data.phone || '',
+        phone: phoneValue,
         email: node.data.email || '',
         bloodline: node.data.bloodline || false,
         preferredImageId: node.data.preferredImageId || null,
         positionX: node.position?.x || 0,
         positionY: node.position?.y || 0
       });
+      
+      // Clear validation errors when switching nodes
+      setEmailError('');
+      setPhoneError('');
       
       // Keep autocomplete field empty - it's only for searching
       setAddressAutocompleteValue('');
@@ -143,8 +155,44 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
   }, [node]);
 
   const handleInputChange = (field, value) => {
+    let isValid = true;
+    
+    // Special handling for phone field - enforce + prefix and only numbers
+    if (field === 'phone') {
+      // Always ensure the + is at the start
+      if (!value.startsWith('+')) {
+        value = '+' + value.replace(/\+/g, ''); // Add + at start and remove any other +
+      }
+      // Remove any non-digit characters except the leading +
+      value = '+' + value.substring(1).replace(/\D/g, '');
+      
+      // Validate phone format (+ followed by digits)
+      if (value.length > 1 && !/^\+\d*$/.test(value)) {
+        setPhoneError('Telefonnummer muss mit + beginnen und nur Zahlen enthalten');
+        isValid = false;
+      } else {
+        setPhoneError('');
+      }
+    }
+    
+    // Email validation
+    if (field === 'email') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (value && !emailRegex.test(value)) {
+        setEmailError('Bitte gib eine gültige E-Mail-Adresse ein');
+        isValid = false;
+      } else {
+        setEmailError('');
+      }
+    }
+    
     const newData = { ...formData, [field]: value };
     setFormData(newData);
+    
+    // Only save if validation passes
+    if (!isValid) {
+      return; // Don't save invalid data
+    }
     
     if (isDebugMode && (field === 'positionX' || field === 'positionY')) {
       // For debug mode, handle position updates separately
@@ -344,11 +392,19 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
           <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.phone}</label>
           <input
             type="tel"
-            value={formData.phone}
+            value={formData.phone || '+'}
             onChange={(e) => handleInputChange('phone', e.target.value)}
-            style={inputStyle}
+            style={{
+              ...inputStyle,
+              border: phoneError ? '2px solid #e74c3c' : inputStyle.border
+            }}
             placeholder={appConfig.ui.nodeEditor.placeholders.phone}
           />
+          {phoneError && (
+            <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '4px', marginBottom: '8px' }}>
+              {phoneError}
+            </div>
+          )}
         </>
       )}
 
@@ -360,9 +416,17 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
             type="email"
             value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
-            style={inputStyle}
+            style={{
+              ...inputStyle,
+              border: emailError ? '2px solid #e74c3c' : inputStyle.border
+            }}
             placeholder={appConfig.ui.nodeEditor.placeholders.email}
           />
+          {emailError && (
+            <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '4px', marginBottom: '8px' }}>
+              {emailError}
+            </div>
+          )}
         </>
       )}
 
