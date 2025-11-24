@@ -274,6 +274,10 @@ export const appConfig = {
       title: "Admin Panel",
       authPrompt: "Gib das Admin-Passwort ein, um auf die Einstellungen zuzugreifen.",
       defaultAdminNote: "Standard-Passwort: adminn",
+      contactAdmin: {
+        message: "Kontaktiere den Ersteller deines Familienstammbaums:",
+        noEmailSet: "Keine E-Mail-Adresse hinterlegt"
+      },
       menu: {
         familyParameters: "Familienparameter",
         passwords: "Passwörter",
@@ -285,6 +289,8 @@ export const appConfig = {
       familyParameters: {
         title: "Familienparameter",
         displayNameLabel: "Anzeigename",
+        adminEmailLabel: "Admin E-Mail",
+        adminEmailHint: "Wird für Kontoanfragen und wichtige Benachrichtigungen verwendet",
         purposeLabel: "Zweck / Beschreibung",
         saveButton: "Familienparameter speichern"
       },
@@ -430,6 +436,9 @@ export const appConfig = {
         displayNameLabel: 'Anzeigename:',
         displayNamePlaceholder: 'z.B. Die Familie Müller',
         displayNameHint: 'Wird in der App angezeigt (kann später geändert werden)',
+        adminEmailLabel: 'Admin E-Mail:',
+        adminEmailPlaceholder: 'admin@beispiel.de',
+        adminEmailHint: 'Wird für Kontoanfragen und wichtige Benachrichtigungen verwendet',
         passwordLabel: 'Passwort:',
         createPasswordLabel: 'Passwort erstellen:',
         passwordPlaceholder: 'Gib dein Passwort ein',

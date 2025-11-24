@@ -8,10 +8,12 @@ export default function Login({ onLoginSuccess }) {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [authStatus, setAuthStatus] = useState(null);
+  const [emailError, setEmailError] = useState('');
 
   // Check if family is already registered
   useEffect(() => {
@@ -39,11 +41,29 @@ export default function Login({ onLoginSuccess }) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setEmailError('');
+
+    // Validate email format if registering
+    if (isRegistering && adminEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(adminEmail)) {
+        setEmailError('Please enter a valid email address');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Require email for registration
+    if (isRegistering && !adminEmail) {
+      setEmailError('Admin email is required');
+      setLoading(false);
+      return;
+    }
 
     try {
       let result;
       if (isRegistering) {
-        result = await api.register(familyName, password, displayName, adminPassword);
+        result = await api.register(familyName, password, displayName, adminPassword, adminEmail);
       } else {
         result = await api.login(familyName, password);
       }
@@ -88,10 +108,12 @@ export default function Login({ onLoginSuccess }) {
   const toggleMode = () => {
     setIsRegistering(!isRegistering);
     setError('');
+    setEmailError('');
     setFamilyName('');
     setDisplayName('');
     setPassword('');
     setAdminPassword('');
+    setAdminEmail('');
   };
 
   return (
@@ -241,6 +263,48 @@ export default function Login({ onLoginSuccess }) {
                 color: 'var(--login-text-secondary)'
               }}>
                 {appConfig.ui.login.form.adminPasswordHint}
+              </small>
+            </div>
+          )}
+
+          {isRegistering && (
+            <div>
+              <label style={{
+                display: 'block',
+                marginBottom: '5px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: 'var(--login-text-primary)'
+              }}>
+                {appConfig.ui.login.form.adminEmailLabel}
+              </label>
+              <input
+                type="email"
+                value={adminEmail}
+                onChange={(e) => {
+                  setAdminEmail(e.target.value);
+                  setEmailError('');
+                }}
+                placeholder={appConfig.ui.login.form.adminEmailPlaceholder}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  border: emailError ? '2px solid #e74c3c' : '2px solid var(--login-input-border)',
+                  backgroundColor: 'var(--login-input-bg)',
+                  color: 'var(--login-input-text)',
+                  fontSize: '14px',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <small style={{
+                display: 'block',
+                marginTop: '5px',
+                fontSize: '12px',
+                color: emailError ? '#e74c3c' : 'var(--login-text-secondary)'
+              }}>
+                {emailError || appConfig.ui.login.form.adminEmailHint}
               </small>
             </div>
           )}

@@ -14,6 +14,8 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
   const [purposePreview, setPurposePreview] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [currentFamilyPassword, setCurrentFamilyPassword] = useState('');
   const [activeTab, setActiveTab] = useState('familyParameters');
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
@@ -57,6 +59,21 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   useEffect(() => {
     if (!isOpen) return;
 
+    // Fetch admin email for contact section (even when not authenticated)
+    const fetchAdminEmail = async () => {
+      try {
+        const { encryptedApi } = await import('./encryptedApi');
+        const adminSettings = await encryptedApi.getAdminSettings();
+        setAdminEmail(adminSettings.admin_email || '');
+      } catch (err) {
+        console.error('Failed to fetch admin email:', err);
+        // Silently fail - email might not be set yet
+      }
+    };
+
+    // Always fetch admin email when panel opens
+    fetchAdminEmail();
+
     // fetch protected settings if authenticated
     const fetchSettings = async () => {
       try {
@@ -74,6 +91,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
         const adminSettings = await encryptedApi.getAdminSettings();
         setDisplayName(adminSettings.display_name || '');
         setPurposePreview(adminSettings.purpose || '');
+        setAdminEmail(adminSettings.admin_email || '');
       } catch (err) {
         console.error('Failed to fetch settings:', err);
         // ignore if not authenticated
@@ -348,7 +366,48 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
           </div>
 
           {!isAuthenticated ? (
-            <form onSubmit={handleAdminLogin}>
+            <>
+              {/* Contact Administrator Section - shown before authentication */}
+              {adminEmail && (
+                <div style={{
+                  backgroundColor: 'var(--login-panel-bg)',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ 
+                    fontSize: '13px', 
+                    color: 'var(--login-text-secondary)', 
+                    marginBottom: '10px',
+                    marginTop: 0
+                  }}>
+                    {appConfig.ui.adminPanel.contactAdmin.message}
+                  </p>
+                  <a
+                    href={`mailto:${adminEmail}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block',
+                      padding: '10px 20px',
+                      backgroundColor: '#3498db',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#2980b9'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#3498db'}
+                  >
+                    📧 {adminEmail}
+                  </a>
+                </div>
+              )}
+
+              <form onSubmit={handleAdminLogin}>
               <div style={{
                 backgroundColor: 'var(--login-panel-bg)',
                 padding: '18px',
@@ -413,6 +472,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                 </button>
               </div>
             </form>
+            </>
           ) : null}
         </div>
 
@@ -463,16 +523,55 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   <h3 style={{ marginTop: 0 }}>{appConfig.ui.adminPanel.familyParameters.title}</h3>
                   <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.familyParameters.displayNameLabel}</label>
                   <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} />
+                  
+                  <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.familyParameters.adminEmailLabel}</label>
+                  <input 
+                    type="email" 
+                    value={adminEmail} 
+                    onChange={(e) => {
+                      setAdminEmail(e.target.value);
+                      setEmailError('');
+                    }} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px', 
+                      borderRadius: '6px', 
+                      border: emailError ? '2px solid #e74c3c' : 'none', 
+                      marginBottom: '5px' 
+                    }} 
+                  />
+                  {emailError && (
+                    <div style={{ color: '#e74c3c', fontSize: '12px', marginBottom: '10px' }}>
+                      {emailError}
+                    </div>
+                  )}
+                  {!emailError && (
+                    <small style={{ display: 'block', color: '#95a5a6', fontSize: '12px', marginBottom: '10px' }}>
+                      {appConfig.ui.adminPanel.familyParameters.adminEmailHint}
+                    </small>
+                  )}
+                  
                   <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.familyParameters.purposeLabel}</label>
                   <textarea value={purposePreview} onChange={(e) => setPurposePreview(e.target.value)} rows={4} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} />
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={async () => { 
+                    <button onClick={async () => {
+                      // Validate email format
+                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                      if (adminEmail && !emailRegex.test(adminEmail)) {
+                        setEmailError('Please enter a valid email address');
+                        return;
+                      }
+                      
                       setLoading(true); 
                       setError(''); 
                       setSuccess(''); 
+                      setEmailError('');
                       try { 
                         const { encryptedApi } = await import('./encryptedApi');
-                        await encryptedApi.updateDisplayName(displayName); 
+                        await encryptedApi.updateDisplayName(displayName);
+                        if (adminEmail) {
+                          await encryptedApi.updateAdminEmail(adminEmail);
+                        }
                         await encryptedApi.updatePurpose(purposePreview); 
                         setSuccess('Family parameters updated'); 
                       } catch (err) { 

@@ -416,6 +416,10 @@ export const encryptedApi = {
     return this.setAdminSetting('purpose', purpose);
   },
   
+  async updateAdminEmail(adminEmail) {
+    return this.setAdminSetting('admin_email', adminEmail);
+  },
+  
   // Load operations with decryption
   async loadNodes() {
     const nodes = await baseApi.loadNodes();

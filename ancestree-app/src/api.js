@@ -104,11 +104,11 @@ export const api = {
     return result;
   },
 
-  async register(familyName, password, displayName, adminPassword) {
+  async register(familyName, password, displayName, adminPassword, adminEmail) {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ familyName, password, displayName, adminPassword })
+      body: JSON.stringify({ familyName, password, displayName, adminPassword, adminEmail })
     });
     
     const result = await response.json();

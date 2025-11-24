@@ -402,7 +402,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Register endpoint (for family registration)
 app.post('/api/auth/register', async (req, res) => {
-  const { familyName, password, displayName, adminPassword } = req.body;
+  const { familyName, password, displayName, adminPassword, adminEmail } = req.body;
 
   if (!familyName || !password) {
     return res.status(400).json({ error: 'Family name and password are required' });
@@ -410,6 +410,16 @@ app.post('/api/auth/register', async (req, res) => {
 
   if (!adminPassword) {
     return res.status(400).json({ error: 'Admin password is required' });
+  }
+
+  if (!adminEmail) {
+    return res.status(400).json({ error: 'Admin email is required' });
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(adminEmail)) {
+    return res.status(400).json({ error: 'Please provide a valid email address' });
   }
 
   if (password.length < 6) {
@@ -457,6 +467,45 @@ app.post('/api/auth/register', async (req, res) => {
 
             // Create a default node for the new family
             insertDefaultNodeForFamily(familyId);
+
+            // Store display_name and admin_email in the family's admin table
+            // Use encryption helpers to encrypt these values
+            getFamilyDbById(familyId, (dbErr, familyDb, famName) => {
+              if (dbErr) {
+                console.error('Error accessing family database for admin settings:', dbErr);
+                // Continue anyway, admin settings can be set later
+              } else {
+                const { encryptField } = require('./encryption');
+                
+                // Encrypt display_name
+                const encryptedDisplayName = encryptField(finalDisplayName, password, encryptionSalt);
+                
+                // Encrypt admin_email
+                const encryptedAdminEmail = encryptField(adminEmail, password, encryptionSalt);
+                
+                // Insert display_name
+                familyDb.run(
+                  'INSERT INTO admin (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP',
+                  ['display_name', encryptedDisplayName, encryptedDisplayName],
+                  (insertErr) => {
+                    if (insertErr) {
+                      console.error('Error storing display_name in admin table:', insertErr);
+                    }
+                  }
+                );
+                
+                // Insert admin_email
+                familyDb.run(
+                  'INSERT INTO admin (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP',
+                  ['admin_email', encryptedAdminEmail, encryptedAdminEmail],
+                  (insertErr) => {
+                    if (insertErr) {
+                      console.error('Error storing admin_email in admin table:', insertErr);
+                    }
+                  }
+                );
+              }
+            });
 
             // Generate JWT token
             const token = jwt.sign(
