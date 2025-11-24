@@ -1,26 +1,65 @@
 import JSZip from 'jszip';
 import { encryptedApi } from './encryptedApi';
+import { api } from './api';
 
 /**
- * Load image using Image element (works with CORS, unlike fetch)
- * @param {string} imageUrl - URL of the image
- * @returns {Promise<HTMLImageElement>} - Loaded image element
+ * Convert blob to PNG using canvas with optional metadata
+ * @param {Blob} blob - Image blob
+ * @param {Object} metadata - Optional metadata to embed (description, taggedPeople, uploadDate)
+ * @returns {Promise<Blob>} - PNG blob with embedded metadata
  */
-async function loadImageElement(imageUrl) {
+async function convertBlobToPng(blob, metadata = null) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous'; // Try to enable CORS
+    const url = URL.createObjectURL(blob);
     
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      // If CORS fails, try without crossOrigin
-      const img2 = new Image();
-      img2.onload = () => resolve(img2);
-      img2.onerror = () => reject(new Error('Failed to load image'));
-      img2.src = imageUrl;
+    img.onload = async () => {
+      try {
+        // Create canvas with image dimensions
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width || img.naturalWidth;
+        canvas.height = img.height || img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw the image
+        ctx.drawImage(img, 0, 0);
+        
+        // Clean up object URL
+        URL.revokeObjectURL(url);
+        
+        // Convert to PNG blob
+        canvas.toBlob(async (pngBlob) => {
+          if (!pngBlob) {
+            reject(new Error('Failed to convert to PNG'));
+            return;
+          }
+          
+          try {
+            // If metadata provided, embed it into the PNG
+            if (metadata) {
+              const pngData = await pngBlob.arrayBuffer();
+              const modifiedPng = insertPngMetadata(pngData, metadata);
+              const finalBlob = new Blob([modifiedPng], { type: 'image/png' });
+              resolve(finalBlob);
+            } else {
+              resolve(pngBlob);
+            }
+          } catch (error) {
+            reject(error);
+          }
+        }, 'image/png');
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        reject(error);
+      }
     };
     
-    img.src = imageUrl;
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    
+    img.src = url;
   });
 }
 
@@ -127,39 +166,13 @@ function insertPngMetadata(pngData, metadata) {
   // Create metadata chunks
   const chunks = [];
   
-  // Combine description and tagged people into a single Description field
-  let descriptionText = '';
-  
+  // Use the description directly if provided
   if (metadata.description) {
-    descriptionText = metadata.description;
+    chunks.push(createTextChunk('Description', metadata.description));
   }
   
-  if (metadata.taggedPeople && metadata.taggedPeople.length > 0) {
-    const taggedNames = metadata.taggedPeople
-      .map(p => `${p.name || ''} ${p.surname || ''}`.trim())
-      .filter(name => name)
-      .join(', ');
-    
-    if (taggedNames) {
-      // Add tagged people on a new line after description
-      if (descriptionText) {
-        descriptionText += '\n' + taggedNames;
-      } else {
-        descriptionText = taggedNames;
-      }
-    }
-  }
-  
-  if (descriptionText) {
-    chunks.push(createTextChunk('Description', descriptionText));
-  }
-  
-  if (metadata.uploaded_at) {
-    chunks.push(createTextChunk('Upload Date', new Date(metadata.uploaded_at).toISOString()));
-  }
-  
-  if (metadata.uploaded_by) {
-    chunks.push(createTextChunk('Uploaded By', metadata.uploaded_by));
+  if (metadata.uploadDate) {
+    chunks.push(createTextChunk('Upload Date', new Date(metadata.uploadDate).toISOString()));
   }
   
   // Calculate total metadata size
@@ -264,7 +277,7 @@ function createMetadataText(metadata) {
 }
 
 /**
- * Convert nodes array to CSV
+ * Convert nodes array to CSV with all human-readable fields
  * @param {Array} nodes - Array of node objects
  * @returns {string} - CSV string
  */
@@ -275,7 +288,7 @@ function nodesToCsv(nodes) {
     return type === 'person';
   });
   
-  // Define CSV headers (removed ID, Typ, Blutlinie, Position X, Position Y)
+  // Define CSV headers (all human-readable fields including coordinates)
   const headers = [
     'Name',
     'Nachname',
@@ -288,12 +301,14 @@ function nodesToCsv(nodes) {
     'PLZ',
     'Land',
     'Telefon',
-    'E-Mail'
+    'E-Mail',
+    'Breitengrad',
+    'Längengrad'
   ];
   
   // Helper function to escape CSV values
   const escapeCsv = (value) => {
-    if (value === null || value === undefined) return '';
+    if (value === null || value === undefined || value === '') return '';
     const str = String(value);
     // Escape quotes and wrap in quotes if contains comma, quote, or newline
     if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -302,26 +317,187 @@ function nodesToCsv(nodes) {
     return str;
   };
   
-  // Create CSV rows (removed ID, type, bloodline, position columns)
+  // Create CSV rows
   const rows = personNodes.map(node => {
+    const data = node.data || node;
     return [
-      escapeCsv(node.data?.name || node.name),
-      escapeCsv(node.data?.surname || node.surname),
-      escapeCsv(node.data?.maiden_name || node.maiden_name),
-      escapeCsv(node.data?.birth_date || node.birth_date),
-      escapeCsv(node.data?.death_date || node.death_date),
-      escapeCsv(node.data?.street || node.street),
-      escapeCsv(node.data?.street_number || node.street_number),
-      escapeCsv(node.data?.city || node.city),
-      escapeCsv(node.data?.zip || node.zip),
-      escapeCsv(node.data?.country || node.country),
-      escapeCsv(node.data?.phone || node.phone),
-      escapeCsv(node.data?.email || node.email)
+      escapeCsv(data.name),
+      escapeCsv(data.surname),
+      escapeCsv(data.maidenName || data.maiden_name),
+      escapeCsv(data.birthDate || data.birth_date),
+      escapeCsv(data.deathDate || data.death_date),
+      escapeCsv(data.street),
+      escapeCsv(data.housenumber),
+      escapeCsv(data.city),
+      escapeCsv(data.zip),
+      escapeCsv(data.country),
+      escapeCsv(data.phone),
+      escapeCsv(data.email),
+      escapeCsv(data.latitude),
+      escapeCsv(data.longitude)
     ].join(',');
   });
   
   // Combine headers and rows
   return [headers.join(','), ...rows].join('\n');
+}
+
+/**
+ * Export all family data to a ZIP file with separate metadata files
+ * @param {Function} onProgress - Progress callback (percent, message)
+ * @param {string} familyName - Name of the family for file naming
+ * @returns {Promise<void>}
+ */
+export async function exportFamilyDataWithMetadata(onProgress, familyName = 'family') {
+  try {
+    const zip = new JSZip();
+    
+    // Step 1: Load all nodes (decrypted if encryption is enabled)
+    onProgress(10, 'Lade Personendaten...');
+    const nodes = await encryptedApi.loadNodes();
+    
+    if (!nodes || nodes.length === 0) {
+      throw new Error('Keine Personendaten zum Exportieren gefunden.');
+    }
+    
+    // Create a map of person IDs to person data for easy lookup
+    const personMap = new Map();
+    nodes.forEach(node => {
+      if (node.id) {
+        personMap.set(node.id, {
+          name: node.data?.name || '',
+          surname: node.data?.surname || ''
+        });
+      }
+    });
+    
+    // Step 2: Create CSV from nodes
+    onProgress(20, 'Erstelle CSV-Datei...');
+    const csv = nodesToCsv(nodes);
+    zip.file('personen.csv', csv);
+    
+    // Step 3: Load all images (decrypted if encryption is enabled)
+    onProgress(30, 'Lade Bildmetadaten...');
+    const images = await encryptedApi.loadImages();
+    
+    if (images && images.length > 0) {
+      // Create images folder in ZIP
+      const imagesFolder = zip.folder('bilder');
+      
+      // Step 4: Process each image
+      const totalImages = images.length;
+      // Sanitize family name for filename
+      const safeFamilyName = familyName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+      
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        const imageNumber = i + 1; // 1-based numbering
+        const progress = 30 + ((i / totalImages) * 60); // 30% to 90%
+        onProgress(progress, `Lade Bild ${imageNumber} von ${totalImages}...`);
+        
+        try {
+          // Use s3Url or url, preferring s3Url (these are DECRYPTED by encryptedApi)
+          const imageUrl = image.s3Url || image.url;
+          
+          if (!imageUrl) {
+            console.warn(`Skipping image ${image.id}: no URL found`);
+            continue;
+          }
+          
+          console.log(`[Export] Fetching image ${image.id} via proxy...`);
+          
+          // Fetch image via backend proxy (solves CORS issues)
+          const imageBlob = await api.fetchImageViaProxy(imageUrl);
+          
+          console.log(`[Export] Converting image ${image.id} to PNG with metadata...`);
+          
+          // Build tagged people list with actual names from personMap
+          const taggedPeople = [];
+          if (image.people && Array.isArray(image.people)) {
+            for (const taggedPerson of image.people) {
+              const personId = taggedPerson.personId || taggedPerson.person_id;
+              if (personId && personMap.has(personId)) {
+                const person = personMap.get(personId);
+                const fullName = `${person.name} ${person.surname}`.trim();
+                if (fullName) {
+                  taggedPeople.push(fullName);
+                }
+              }
+            }
+          }
+          
+          // Build description text with all metadata
+          let descriptionText = `Datei: family_${safeFamilyName}_image_${imageNumber}.png\n`;
+          descriptionText += `Bild-ID: ${image.id}\n`;
+          descriptionText += `Bildnummer: ${imageNumber}\n`;
+          descriptionText += `\n`;
+          
+          if (image.description) {
+            descriptionText += `Beschreibung:\n${image.description}\n\n`;
+          }
+          
+          if (taggedPeople.length > 0) {
+            descriptionText += `Markierte Personen:\n`;
+            taggedPeople.forEach(name => {
+              descriptionText += `  - ${name}\n`;
+            });
+            descriptionText += `\n`;
+          }
+          
+          if (image.uploadDate || image.upload_date) {
+            const date = new Date(image.uploadDate || image.upload_date);
+            descriptionText += `Hochgeladen am: ${date.toLocaleString('de-DE')}\n`;
+          }
+          
+          // Prepare metadata object for PNG embedding
+          const metadata = {
+            description: descriptionText,
+            taggedPeople: taggedPeople.map(name => ({ name })),
+            uploadDate: image.uploadDate || image.upload_date
+          };
+          
+          // Convert to PNG with embedded metadata
+          const pngBlob = await convertBlobToPng(imageBlob, metadata);
+          
+          // Create safe filename with family name and image number
+          const safeFilename = `family_${safeFamilyName}_image_${imageNumber}.png`;
+          
+          // Add image to ZIP
+          imagesFolder.file(safeFilename, pngBlob);
+          
+          console.log(`[Export] Successfully processed image ${image.id} with embedded metadata`);
+          
+        } catch (imgError) {
+          console.error(`Failed to process image ${image.id}:`, imgError);
+          // Continue with next image
+        }
+      }
+    }
+    
+    // Step 5: Generate ZIP file
+    onProgress(95, 'Erstelle ZIP-Datei...');
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+    
+    // Step 6: Download ZIP file
+    onProgress(100, 'Download wird gestartet...');
+    const url = URL.createObjectURL(zipBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `familienbaum_export_${new Date().toISOString().split('T')[0]}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Export error:', error);
+    throw error;
+  }
 }
 
 /**

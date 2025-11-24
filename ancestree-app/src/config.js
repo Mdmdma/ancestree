@@ -279,6 +279,7 @@ export const appConfig = {
         passwords: "Passwörter",
         security: "Sicherheit",
         visibleFields: "Sichtbare Felder",
+        dataExport: "Daten exportieren",
         dangerZone: "⚠️ Gefahrenzone"
       },
       familyParameters: {
@@ -342,6 +343,34 @@ export const appConfig = {
           encrypting: "Verschlüssele Daten...",
           decrypting: "Entschlüssele Daten...",
           complete: "Abgeschlossen!"
+        }
+      },
+      dataExport: {
+        title: "Daten exportieren",
+        description: "Lade alle Familiendaten und Bilder als ZIP-Datei herunter.",
+        downloadButton: "📥 Daten herunterladen",
+        downloadingButton: "⏳ Wird heruntergeladen...",
+        progress: {
+          loadingNodes: "Lade Personendaten...",
+          loadingImages: "Lade Bildmetadaten...",
+          generatingCSV: "Erstelle CSV-Datei...",
+          downloadingImages: "Lade Bilder herunter ({current}/{total})...",
+          creatingZip: "Erstelle ZIP-Archiv...",
+          complete: "Download abgeschlossen!"
+        },
+        whatWillBeExported: "Was wird exportiert:",
+        exportItems: {
+          personalData: "Alle Personendaten (entschlüsselt) als CSV",
+          images: "Alle Familienbilder",
+          imageMetadata: "Bildmetadaten (Beschreibungen und markierte Personen) als Textdateien"
+        },
+        hints: {
+          decrypted: "💡 Hinweis: Alle exportierten Daten sind entschlüsselt und lesbar.",
+          keepSafe: "🔒 Bewahre die heruntergeladene Datei sicher auf."
+        },
+        errors: {
+          noNodes: "Keine Personendaten zum Exportieren gefunden.",
+          downloadFailed: "Fehler beim Herunterladen der Daten: "
         }
       },
       dangerZone: {

@@ -2215,6 +2215,50 @@ app.put('/api/images/:id', authenticateToken, (req, res) => {
   }
 });
 
+// Image proxy endpoint for downloading images from S3 (solves CORS issues)
+app.post('/api/images/proxy', authenticateToken, async (req, res) => {
+  const { s3Url } = req.body;
+  
+  if (!s3Url) {
+    return res.status(400).json({ error: 'S3 URL is required' });
+  }
+  
+  try {
+    // Extract S3 key from URL
+    // URL format: https://bucket-name.s3.region.amazonaws.com/images/filename.jpg
+    const urlParts = new URL(s3Url);
+    const s3Key = urlParts.pathname.substring(1); // Remove leading slash
+    
+    console.log(`[Image Proxy] Fetching image from S3: ${s3Key}`);
+    
+    // Fetch from S3
+    const params = {
+      Bucket: S3_BUCKET_NAME,
+      Key: s3Key
+    };
+    
+    const data = await s3.getObject(params).promise();
+    
+    // Set appropriate headers
+    res.set('Content-Type', data.ContentType || 'image/jpeg');
+    res.set('Content-Length', data.ContentLength);
+    res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    res.set('Access-Control-Allow-Origin', '*'); // Allow CORS
+    
+    // Send image data as binary
+    res.send(data.Body);
+    
+  } catch (error) {
+    console.error('[Image Proxy] Error fetching image:', error);
+    
+    if (error.code === 'NoSuchKey') {
+      return res.status(404).json({ error: 'Image not found in S3' });
+    }
+    
+    res.status(500).json({ error: 'Failed to fetch image from S3' });
+  }
+});
+
 // Delete image (also removes from S3)
 app.delete('/api/images/:id', authenticateToken, (req, res) => {
   const { id } = req.params;

@@ -695,6 +695,22 @@ export const api = {
     return response.json();
   },
 
+  // Image proxy for downloading images (solves CORS issues)
+  async fetchImageViaProxy(s3Url) {
+    const response = await fetch(`${API_BASE_URL}/images/proxy`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ s3Url })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch image via proxy');
+    }
+    
+    // Return as blob for further processing
+    return response.blob();
+  },
+
   // Preferred image operations
   async setPreferredImage(personId, imageId) {
     const response = await fetch(`${API_BASE_URL}/nodes/${personId}/preferred-image`, {

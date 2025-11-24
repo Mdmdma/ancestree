@@ -4,6 +4,7 @@ import { appConfig } from './config';
 import { runEncryptionPerformanceTest, formatTestResults, getDatabaseFieldEstimates } from './encryptionPerformanceTest';
 import { enableEncryption, disableEncryption } from './encryptionBatchOperations';
 import { updateEncryptionStatus, updateSkipGeocoding as updateSessionSkipGeocoding, getFamilyPassword, updatePassword } from './encryptionSession';
+import { exportFamilyDataWithMetadata } from './exportUtils';
 
 const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName, onDataReload }) => {
   const [adminPassword, setAdminPassword] = useState('');
@@ -26,6 +27,11 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   const [success, setSuccess] = useState('');
   const [authError, setAuthError] = useState('');
   const [encryptionProgress, setEncryptionProgress] = useState(null);
+  
+  // Export state
+  const [exportProgress, setExportProgress] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState('');
   
   // Password confirmation dialog state
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -416,6 +422,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
               <button onClick={() => setActiveTab('passwords')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'passwords' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.passwords}</button>
               <button onClick={() => setActiveTab('security')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'security' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.security}</button>
               <button onClick={() => setActiveTab('visibleFields')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'visibleFields' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.visibleFields}</button>
+              <button onClick={() => setActiveTab('dataExport')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'dataExport' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.dataExport}</button>
               <button onClick={() => setActiveTab('test')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'test' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>🧪 Test</button>
               <button onClick={() => setActiveTab('dangerZone')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'dangerZone' ? '#c0392b' : 'transparent', color: activeTab === 'dangerZone' ? 'white' : '#e74c3c', border: '1px solid #e74c3c', textAlign: 'left', fontWeight: '600' }}>{appConfig.ui.adminPanel.menu.dangerZone}</button>
             </div>
@@ -846,6 +853,134 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       }} />
                     </button>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'dataExport' && (
+                <div style={{ backgroundColor: '#34495e', padding: '20px', borderRadius: '8px' }}>
+                  <h3 style={{ marginTop: 0 }}>{appConfig.ui.adminPanel.dataExport.title}</h3>
+                  <p style={{ color: '#bdc3c7', fontSize: '14px', marginBottom: '20px' }}>
+                    {appConfig.ui.adminPanel.dataExport.description}
+                  </p>
+
+                  {/* What will be exported */}
+                  <div style={{ backgroundColor: '#2c3e50', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '12px', fontSize: '16px' }}>
+                      {appConfig.ui.adminPanel.dataExport.whatWillBeExported}
+                    </h4>
+                    <ul style={{ margin: 0, paddingLeft: '20px', color: '#bdc3c7', fontSize: '14px' }}>
+                      <li style={{ marginBottom: '8px' }}>{appConfig.ui.adminPanel.dataExport.exportItems.personalData}</li>
+                      <li style={{ marginBottom: '8px' }}>{appConfig.ui.adminPanel.dataExport.exportItems.images}</li>
+                      <li style={{ marginBottom: '8px' }}>{appConfig.ui.adminPanel.dataExport.exportItems.imageMetadata}</li>
+                    </ul>
+                  </div>
+
+                  {/* Hints */}
+                  <div style={{ backgroundColor: '#2c3e50', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+                    <p style={{ margin: '0 0 8px 0', color: '#f39c12', fontSize: '14px' }}>
+                      {appConfig.ui.adminPanel.dataExport.hints.decrypted}
+                    </p>
+                    <p style={{ margin: 0, color: '#e67e22', fontSize: '14px' }}>
+                      {appConfig.ui.adminPanel.dataExport.hints.keepSafe}
+                    </p>
+                  </div>
+
+                  {/* Export error */}
+                  {exportError && (
+                    <div style={{
+                      backgroundColor: '#e74c3c',
+                      color: 'white',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      marginBottom: '15px',
+                      fontSize: '14px'
+                    }}>
+                      {exportError}
+                    </div>
+                  )}
+
+                  {/* Progress bar */}
+                  {exportProgress && (
+                    <div style={{ marginBottom: '20px' }}>
+                      <div style={{
+                        backgroundColor: '#2c3e50',
+                        borderRadius: '8px',
+                        padding: '15px',
+                        marginBottom: '10px'
+                      }}>
+                        <div style={{
+                          fontSize: '14px',
+                          color: '#ecf0f1',
+                          marginBottom: '10px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <span>{exportProgress.message}</span>
+                          <span style={{ fontWeight: 'bold' }}>{Math.round(exportProgress.percent)}%</span>
+                        </div>
+                        <div style={{
+                          width: '100%',
+                          height: '8px',
+                          backgroundColor: '#34495e',
+                          borderRadius: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            width: `${exportProgress.percent}%`,
+                            height: '100%',
+                            backgroundColor: '#3498db',
+                            transition: 'width 0.3s ease',
+                            borderRadius: '4px'
+                          }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Download button */}
+                  <button
+                    onClick={async () => {
+                      setExportLoading(true);
+                      setExportError('');
+                      setExportProgress({ percent: 0, message: 'Starte Export...' });
+                      
+                      try {
+                        await exportFamilyDataWithMetadata((percent, message) => {
+                          setExportProgress({ percent, message });
+                        }, familyName);
+                        
+                        // Clear progress after a short delay to show completion
+                        setTimeout(() => {
+                          setExportProgress(null);
+                        }, 2000);
+                      } catch (err) {
+                        console.error('Export failed:', err);
+                        setExportError(appConfig.ui.adminPanel.dataExport.errors.downloadFailed + err.message);
+                        setExportProgress(null);
+                      } finally {
+                        setExportLoading(false);
+                      }
+                    }}
+                    disabled={exportLoading}
+                    style={{
+                      width: '100%',
+                      padding: '15px',
+                      backgroundColor: exportLoading ? '#95a5a6' : '#27ae60',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      cursor: exportLoading ? 'not-allowed' : 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                  >
+                    {exportLoading 
+                      ? appConfig.ui.adminPanel.dataExport.downloadingButton
+                      : appConfig.ui.adminPanel.dataExport.downloadButton
+                    }
+                  </button>
                 </div>
               )}
 
