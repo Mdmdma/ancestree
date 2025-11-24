@@ -59,20 +59,21 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   useEffect(() => {
     if (!isOpen) return;
 
-    // Fetch admin email for contact section (even when not authenticated)
-    const fetchAdminEmail = async () => {
+    // Fetch admin settings for display before authentication (purpose, admin email)
+    const fetchPublicAdminSettings = async () => {
       try {
         const { encryptedApi } = await import('./encryptedApi');
         const adminSettings = await encryptedApi.getAdminSettings();
         setAdminEmail(adminSettings.admin_email || '');
+        setPurposePreview(adminSettings.purpose || '');
       } catch (err) {
-        console.error('Failed to fetch admin email:', err);
-        // Silently fail - email might not be set yet
+        console.error('Failed to fetch admin settings:', err);
+        // Silently fail - settings might not be set yet
       }
     };
 
-    // Always fetch admin email when panel opens
-    fetchAdminEmail();
+    // Always fetch admin settings when panel opens
+    fetchPublicAdminSettings();
 
     // fetch protected settings if authenticated
     const fetchSettings = async () => {
