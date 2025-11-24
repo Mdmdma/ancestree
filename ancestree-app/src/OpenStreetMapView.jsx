@@ -13,49 +13,64 @@ L.Icon.Default.mergeOptions({
   shadowUrl: null,
 });
 
-// Create custom marker icons
-const createMarkerIcon = (isSelected, size = 'normal') => {
-  const normalSize = size === 'normal' ? 24 : 28;
-  const selectedSize = 36;
-  const actualSize = isSelected ? selectedSize : normalSize;
+// Create custom marker icons - fixed size to prevent movement on zoom/selection
+const createMarkerIcon = (isSelected, isHovered = false, hasMultiplePeople = false) => {
+  // Fixed size to prevent marker position shifts
+  const size = 32;
+  const color = isSelected ? '#FF5722' : '#0da119ff';
+  const strokeColor = isSelected ? '#D32F2F' : '#22cc1cff';
+  const strokeWidth = isSelected ? 3 : 2;
+  const opacity = isHovered ? 1 : 0.9;
   
-  const color = isSelected ? '#FF5722' : '#4CAF50';
-  const strokeColor = isSelected ? '#D32F2F' : '#2E7D32';
-  const glowFilter = isSelected ? 'url(#glow)' : 'none';
+  const glowFilter = isSelected ? `
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+        <feMerge> 
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/> 
+        </feMerge>
+      </filter>
+    </defs>
+  ` : '<defs></defs>';
+  
+  const innerCircles = isSelected ? `
+    <circle cx="16" cy="11.33" r="2" fill="#FF5722"/>
+    <circle cx="16" cy="11.33" r="1" fill="white" opacity="0.8"/>
+  ` : '';
+
+  // Add a badge for multiple people at same location
+  const badge = hasMultiplePeople ? `
+    <circle cx="24" cy="6" r="5" fill="#2196F3" stroke="white" stroke-width="1"/>
+    <text x="24" y="8.5" text-anchor="middle" font-size="8" fill="white" font-weight="bold">+</text>
+  ` : '';
   
   const svgIcon = `
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-          <feMerge> 
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/> 
-          </feMerge>
-        </filter>
-      </defs>
+      ${glowFilter}
       <path d="M16 2C10.84 2 6.67 6.17 6.67 11.33c0 7 9.33 17.33 9.33 17.33s9.33-10.33 9.33-17.33C25.33 6.17 21.16 2 16 2z" 
             fill="${color}" 
             stroke="${strokeColor}" 
-            stroke-width="2"
-            filter="${glowFilter}"/>
+            stroke-width="${strokeWidth}"
+            opacity="${opacity}"
+            filter="${isSelected ? 'url(#glow)' : 'none'}"/>
       <circle cx="16" cy="11.33" r="3.33" fill="white"/>
-      ${isSelected ? '<circle cx="16" cy="11.33" r="2" fill="#FF5722"/>' : ''}
-      ${isSelected ? '<circle cx="16" cy="11.33" r="1" fill="white" opacity="0.8"/>' : ''}
+      ${innerCircles}
+      ${badge}
     </svg>
   `;
   
   return L.divIcon({
     html: svgIcon,
     className: 'custom-leaflet-marker',
-    iconSize: [actualSize, actualSize],
-    iconAnchor: [actualSize / 2, actualSize],
-    popupAnchor: [0, -actualSize]
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size]
   });
 };
 
 // Component to handle map animations and updates
-const MapController = ({ locations, selectedNode, onAnimationComplete }) => {
+const MapController = ({ locations, selectedNode }) => {
   const map = useMap();
   const previousSelectedRef = useRef(null);
   const isInitializedRef = useRef(false);
@@ -87,7 +102,7 @@ const MapController = ({ locations, selectedNode, onAnimationComplete }) => {
 
     // Handle selection changes - pan and zoom map to selected marker
     const selectedLocation = selectedNode 
-      ? locations.find(loc => loc.nodeId === selectedNode.id)
+      ? locations.find(loc => loc.people.some(p => p.nodeId === selectedNode.id))
       : null;
 
     // Only pan/zoom if selection actually changed
@@ -97,115 +112,121 @@ const MapController = ({ locations, selectedNode, onAnimationComplete }) => {
       // Smooth fly to selected location with moderate zoom
       map.flyTo(
         [selectedLocation.latitude, selectedLocation.longitude],
-        15, // Zoom level for individual marker view
+        Math.max(map.getZoom(), 13), // At least zoom 13, but don't zoom out if already closer
         {
           duration: 0.8,
           easeLinearity: 0.25
         }
       );
-
-      if (onAnimationComplete) {
-        setTimeout(() => onAnimationComplete(selectedLocation), 800);
-      }
     }
 
     previousSelectedRef.current = selectedNode?.id;
-  }, [map, locations, selectedNode, onAnimationComplete]);
+  }, [map, locations, selectedNode]);
 
   return null;
 };
 
-// Custom marker component with animations
+// Custom marker component with popup behavior
 const AnimatedMarker = ({ 
   location, 
-  isSelected, 
-  onMarkerClick, 
-  shouldBounce,
-  onBounceComplete 
+  selectedNode,
+  onPersonSelect
 }) => {
-  const [icon, setIcon] = useState(() => createMarkerIcon(isSelected));
-  const [isHovered, setIsHovered] = useState(false);
   const markerRef = useRef(null);
-  const bounceTimeoutRef = useRef(null);
+  const hoverTimeoutRef = useRef(null);
+  const clickedRef = useRef(false);
+  const [isHovered, setIsHovered] = useState(false);
 
-  // Update icon when selection changes
+  // Determine if this location has the selected person
+  const hasSelectedPerson = selectedNode && location.people.some(p => p.nodeId === selectedNode.id);
+  const hasMultiplePeople = location.people.length > 1;
+
+  // Cleanup timeout on unmount
   useEffect(() => {
-    if (isSelected) {
-      // Animate to selected state with intermediate size
-      setIcon(createMarkerIcon(false, 'hover'));
-      setTimeout(() => {
-        setIcon(createMarkerIcon(true));
-      }, 100);
-    } else {
-      setIcon(createMarkerIcon(false));
-    }
-  }, [isSelected]);
-
-  // Handle bounce animation
-  useEffect(() => {
-    if (shouldBounce && markerRef.current) {
-      const marker = markerRef.current;
-      let bounces = 0;
-      const maxBounces = 2;
-
-      const doBounce = () => {
-        if (bounces < maxBounces && marker) {
-          const element = marker._icon;
-          if (element) {
-            element.style.transition = 'transform 0.3s ease-out';
-            element.style.transform = 'translateY(-15px)';
-            
-            setTimeout(() => {
-              if (element) {
-                element.style.transform = 'translateY(0)';
-              }
-            }, 300);
-            
-            bounces++;
-            if (bounces < maxBounces) {
-              bounceTimeoutRef.current = setTimeout(doBounce, 600);
-            } else if (onBounceComplete) {
-              onBounceComplete();
-            }
-          }
-        }
-      };
-
-      doBounce();
-    }
-
     return () => {
-      if (bounceTimeoutRef.current) {
-        clearTimeout(bounceTimeoutRef.current);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
       }
     };
-  }, [shouldBounce, onBounceComplete]);
+  }, []);
 
-  // Stable callback references for event handlers
-  const handleMouseOver = useCallback(() => {
-    if (!isSelected) {
-      setIsHovered(true);
-      setIcon(createMarkerIcon(false, 'hover'));
+  // Reset clicked state when selection changes away from this marker
+  useEffect(() => {
+    if (!hasSelectedPerson) {
+      clickedRef.current = false;
     }
-  }, [isSelected]);
+  }, [hasSelectedPerson]);
+
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+    const marker = markerRef.current;
+    
+    if (marker && !clickedRef.current) {
+      marker.openPopup();
+      
+      // Clear existing timeout
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+      
+      // Close popup after 3 seconds if not clicked
+      hoverTimeoutRef.current = setTimeout(() => {
+        if (marker && !clickedRef.current) {
+          marker.closePopup();
+        }
+      }, 3000);
+    }
+  }, []);
 
   const handleMouseOut = useCallback(() => {
-    if (!isSelected) {
-      setIsHovered(false);
-      setIcon(createMarkerIcon(false));
-    }
-  }, [isSelected]);
+    setIsHovered(false);
+    // Don't clear the timeout - let the popup stay open for 3 seconds
+    // Only if it wasn't clicked (clicking sets its own behavior)
+  }, []);
 
   const handleClick = useCallback(() => {
-    console.log('[AnimatedMarker] Marker clicked:', location.nodeId);
-    onMarkerClick(location.nodeId);
-  }, [location.nodeId, onMarkerClick]);
+    const marker = markerRef.current;
+    clickedRef.current = true;
+    
+    // Clear hover timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    
+    // Open and keep popup open
+    if (marker) {
+      marker.openPopup();
+    }
+    
+    // If single person, select them immediately
+    if (location.people.length === 1 && onPersonSelect) {
+      console.log('[OpenStreetMapView] Marker clicked, selecting person:', location.people[0].nodeId);
+      onPersonSelect(location.people[0].nodeId);
+    }
+  }, [location.people, onPersonSelect]);
+
+  const handlePopupClose = useCallback(() => {
+    clickedRef.current = false;
+    // Clear timeout when popup closes
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  }, []);
 
   const eventHandlers = useMemo(() => ({
     click: handleClick,
     mouseover: handleMouseOver,
-    mouseout: handleMouseOut
-  }), [handleClick, handleMouseOver, handleMouseOut]);
+    mouseout: handleMouseOut,
+    popupclose: handlePopupClose
+  }), [handleClick, handleMouseOver, handleMouseOut, handlePopupClose]);
+
+  // Create icon based on state
+  const icon = useMemo(() => 
+    createMarkerIcon(hasSelectedPerson, isHovered, hasMultiplePeople),
+    [hasSelectedPerson, isHovered, hasMultiplePeople]
+  );
 
   return (
     <Marker
@@ -213,38 +234,93 @@ const AnimatedMarker = ({
       position={[location.latitude, location.longitude]}
       icon={icon}
       eventHandlers={eventHandlers}
-      zIndexOffset={isSelected ? 1000 : 100}
+      zIndexOffset={hasSelectedPerson ? 1000 : 100}
     >
-      {isSelected && (
-        <Popup 
-          autoClose={true}
-          closeOnClick={false}
-          closeButton={false}
-          autoPan={false}
-          className="custom-popup"
-        >
+      <Popup 
+        closeButton={true}
+        autoClose={false}
+        closeOnClick={false}
+        className="custom-popup"
+        maxWidth={300}
+      >
+        <div style={{
+          padding: '8px',
+          fontFamily: 'Arial, sans-serif',
+          minWidth: '180px',
+          maxWidth: '280px'
+        }}>
           <div style={{
-            padding: '10px',
-            fontFamily: 'Arial, sans-serif',
-            textAlign: 'center'
+            fontSize: '12px',
+            color: '#666',
+            marginBottom: '8px',
+            borderBottom: '1px solid #eee',
+            paddingBottom: '6px',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
+            overflow: 'hidden'
           }}>
-            <div style={{
-              fontWeight: 'bold',
-              color: '#FF5722',
-              fontSize: '14px',
-              marginBottom: '5px'
-            }}>
-              {appConfig.ui.mapView.selectedPersonAddress} {location.name} {location.surname}
-            </div>
-            <div style={{
-              fontSize: '12px',
-              color: '#666'
-            }}>
-              {location.address}
-            </div>
+            📍 {location.address}
           </div>
-        </Popup>
-      )}
+          {location.people.map((person) => {
+            const isPersonSelected = selectedNode && selectedNode.id === person.nodeId;
+            return (
+              <div
+                key={person.nodeId}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('[OpenStreetMapView] Person card clicked:', person.nodeId, person.name, person.surname);
+                  if (onPersonSelect) {
+                    onPersonSelect(person.nodeId);
+                  }
+                }}
+                style={{
+                  padding: '6px 8px',
+                  margin: '4px 0',
+                  backgroundColor: isPersonSelected ? '#FF572220' : '#f5f5f5',
+                  border: isPersonSelected ? '2px solid #FF5722' : '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontWeight: isPersonSelected ? 'bold' : 'normal',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isPersonSelected) {
+                    e.currentTarget.style.backgroundColor = '#e8f5e9';
+                    e.currentTarget.style.borderColor = '#4CAF50';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isPersonSelected) {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }
+                }}
+              >
+                <div style={{
+                  color: isPersonSelected ? '#FF5722' : '#333',
+                  fontSize: '14px'
+                }}>
+                  {isPersonSelected && '👤 '}{person.name} {person.surname}
+                </div>
+              </div>
+            );
+          })}
+          {hasMultiplePeople && (
+            <div style={{
+              fontSize: '11px',
+              color: '#999',
+              marginTop: '8px',
+              textAlign: 'center',
+              fontStyle: 'italic'
+            }}>
+              Click a name to select in tree
+            </div>
+          )}
+        </div>
+      </Popup>
     </Marker>
   );
 };
@@ -253,8 +329,9 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [bouncingMarkerId, setBouncingMarkerId] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const mapRef = useRef(null);
+  const containerRef = useRef(null);
 
   // Notify parent when map mode is active
   useEffect(() => {
@@ -274,47 +351,59 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
     setError(null);
 
     try {
-      const validLocations = nodes
-        .filter(node => 
-          node.data.city && 
-          node.data.city.trim() !== '' &&
-          node.data.latitude !== null && 
-          node.data.latitude !== undefined &&
-          node.data.longitude !== null &&
-          node.data.longitude !== undefined
-        )
-        .map(node => ({
+      const nodesWithLocations = nodes.filter(node =>
+        node.type === 'person' && // Only include person nodes, not family nodes
+        node.data.city &&
+        node.data.city.trim() !== '' &&
+        node.data.latitude !== null &&
+        node.data.latitude !== undefined &&
+        node.data.longitude !== null &&
+        node.data.longitude !== undefined &&
+        !isNaN(parseFloat(node.data.latitude)) &&
+        !isNaN(parseFloat(node.data.longitude)) &&
+        isFinite(parseFloat(node.data.latitude)) &&
+        isFinite(parseFloat(node.data.longitude))
+      );
+
+      if (nodesWithLocations.length === 0) {
+        setLocations([]);
+        setLoading(false);
+        return;
+      }
+
+      // Group people by coordinates (same location)
+      const locationMap = new Map();
+
+      nodesWithLocations.forEach(node => {
+        const lat = parseFloat(node.data.latitude).toFixed(6); // ~11cm precision
+        const lng = parseFloat(node.data.longitude).toFixed(6);
+        const key = `${lat},${lng}`;
+        const address = [node.data.city, node.data.zip, node.data.country]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+
+        if (!locationMap.has(key)) {
+          locationMap.set(key, {
+            key,
+            latitude: parseFloat(node.data.latitude),
+            longitude: parseFloat(node.data.longitude),
+            address,
+            people: []
+          });
+        }
+
+        locationMap.get(key).people.push({
           nodeId: node.id,
           name: node.data.name || appConfig.ui.mapView.unknownName,
-          surname: node.data.surname || '',
-          address: [node.data.city, node.data.zip, node.data.country]
-            .filter(Boolean)
-            .join(' ')
-            .trim(),
-          latitude: parseFloat(node.data.latitude),
-          longitude: parseFloat(node.data.longitude)
-        }))
-        .filter(location => {
-          // Filter out locations with invalid coordinates (NaN)
-          // This can happen during encryption/decryption when data is temporarily in invalid state
-          const isValid = !isNaN(location.latitude) && 
-                         !isNaN(location.longitude) &&
-                         isFinite(location.latitude) && 
-                         isFinite(location.longitude);
-          
-          if (!isValid) {
-            console.warn(`[OpenStreetMapView] Skipping location with invalid coordinates:`, {
-              nodeId: location.nodeId,
-              latitude: location.latitude,
-              longitude: location.longitude
-            });
-          }
-          
-          return isValid;
+          surname: node.data.surname || ''
         });
+      });
 
-      console.log(`[OpenStreetMapView] Loaded ${validLocations.length} valid locations`);
-      setLocations(validLocations);
+      const groupedLocations = Array.from(locationMap.values());
+
+      console.log(`[OpenStreetMapView] Loaded ${groupedLocations.length} unique locations with ${nodesWithLocations.length} people`);
+      setLocations(groupedLocations);
     } catch (err) {
       setError(appConfig.ui.mapView.errors.failedToLoad);
       console.error('Error loading locations:', err);
@@ -345,33 +434,65 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
     loadLocations();
   }, [loadLocations]);
 
-  // Handle animation completion
-  const handleAnimationComplete = useCallback((selectedLocation) => {
-    setBouncingMarkerId(selectedLocation.nodeId);
-    
-    // Reset bouncing state after animation completes
-    setTimeout(() => {
-      setBouncingMarkerId(null);
-    }, 2000);
-  }, []);
-
-  // Handle marker click
-  const handleMarkerClick = useCallback((nodeId) => {
-    // Prevent action if clicking already selected marker
-    if (selectedNode && selectedNode.id === nodeId) {
-      console.log('[OpenStreetMapView] Marker already selected, ignoring click');
-      return;
-    }
-    
-    console.log('[OpenStreetMapView] Marker clicked, selecting node:', nodeId);
-    if (onPersonSelect) {
-      onPersonSelect(nodeId);
-    }
-  }, [selectedNode, onPersonSelect]);
-
   const handleRefresh = () => {
     loadLocations();
   };
+
+  // Fullscreen functionality
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      } else if (containerRef.current.webkitRequestFullscreen) {
+        containerRef.current.webkitRequestFullscreen();
+      } else if (containerRef.current.mozRequestFullScreen) {
+        containerRef.current.mozRequestFullScreen();
+      } else if (containerRef.current.msRequestFullscreen) {
+        containerRef.current.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+      setIsFullscreen(false);
+    }
+  }, [isFullscreen]);
+
+  // Listen for fullscreen changes (e.g., user pressing ESC)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFullscreen);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   // Calculate center and zoom for initial map view
   const mapCenter = useMemo(() => {
@@ -386,13 +507,23 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
   }, [locations]);
 
   return (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      backgroundColor: '#09380dff',
-      color: 'white'
-    }}>
+    <div 
+      ref={containerRef}
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        backgroundColor: '#09380dff',
+        color: 'white',
+        position: isFullscreen ? 'fixed' : 'relative',
+        top: isFullscreen ? 0 : 'auto',
+        left: isFullscreen ? 0 : 'auto',
+        right: isFullscreen ? 0 : 'auto',
+        bottom: isFullscreen ? 0 : 'auto',
+        zIndex: isFullscreen ? 9999 : 'auto',
+        width: isFullscreen ? '100vw' : '100%',
+        height: isFullscreen ? '100vh' : '100%'
+      }}
+    >
       {/* Header */}
       <div className="mobile-hide-map-header" style={{ 
         padding: '20px', 
@@ -401,21 +532,41 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0 }}>{appConfig.ui.mapView.title}</h3>
-          <button 
-            onClick={handleRefresh}
-            disabled={loading}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            {loading ? '🔄' : '↻'} {appConfig.ui.mapView.refreshButton}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={handleRefresh}
+              disabled={loading}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              {loading ? '🔄' : '↻'} {appConfig.ui.mapView.refreshButton}
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullscreen ? '⊗' : '⛶'}
+            </button>
+          </div>
         </div>
         
         {/* Selected person display */}
@@ -425,13 +576,27 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
             padding: '12px', 
             backgroundColor: '#09380dff', 
             borderRadius: '6px',
-            border: '2px solid #4CAF50'
+            border: '2px solid #4CAF50',
+            overflow: 'hidden',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word'
           }}>
-            <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+            <div style={{ 
+              fontWeight: 'bold', 
+              fontSize: '16px', 
+              marginBottom: '8px',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word'
+            }}>
               {appConfig.ui.mapView.selectedPersonAddress} {selectedNode.data.name} {selectedNode.data.surname}
             </div>
             {selectedNode.data.city ? (
-              <div style={{ fontSize: '14px', opacity: 0.9 }}>
+              <div style={{ 
+                fontSize: '14px', 
+                opacity: 0.9,
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word'
+              }}>
                 {selectedNode.data.city}
                 {selectedNode.data.zip && ` ${selectedNode.data.zip}`}
                 {selectedNode.data.country && `, ${selectedNode.data.country}`}
@@ -526,17 +691,14 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
             <MapController 
               locations={locations}
               selectedNode={selectedNode}
-              onAnimationComplete={handleAnimationComplete}
             />
             
             {locations.map(location => (
               <AnimatedMarker
-                key={location.nodeId}
+                key={location.key}
                 location={location}
-                isSelected={selectedNode?.id === location.nodeId}
-                onMarkerClick={handleMarkerClick}
-                shouldBounce={bouncingMarkerId === location.nodeId}
-                onBounceComplete={() => setBouncingMarkerId(null)}
+                selectedNode={selectedNode}
+                onPersonSelect={onPersonSelect}
               />
             ))}
           </MapContainer>
@@ -565,10 +727,16 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
           background-color: white;
           border-radius: 8px;
           box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+          max-width: 300px;
+          overflow: hidden;
         }
         
         .custom-popup .leaflet-popup-content {
           margin: 0;
+          max-width: 300px;
+          overflow: hidden;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
         
         .custom-popup .leaflet-popup-tip {
