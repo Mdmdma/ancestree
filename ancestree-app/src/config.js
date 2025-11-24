@@ -271,6 +271,18 @@ export const appConfig = {
       close: "Schließen"
     },
 
+    // Contact information
+    contact: {
+      buttonText: "📧 Kontakt",
+      dialogTitle: "Kontaktiere den Entwickler",
+      description: "Hallo! Ich bin Mathis, der Entwickler von AncesTree. Falls du Fragen, Anregungen oder technische Probleme hast, kannst du mich gerne kontaktieren. Ich helfe dir gerne weiter!",
+      emailButtonText: "📧 E-Mail senden",
+      emailAddress: "m.erler@gmx.ch",
+      githubButtonText: "💻 GitHub",
+      githubUrl: "https://github.com/Mdmdma/ancestree",
+      closeButton: "Schließen"
+    },
+
     // Admin Panel texts (German for UI elements)
     adminPanel: {
       title: "Admin Panel",

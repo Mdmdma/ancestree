@@ -5,6 +5,7 @@ import AppHeader from './AppHeader';
 import Sidebar from './Sidebar';
 import Login from './Login';
 import AdminPanel from './AdminPanel';
+import ContactButton from './ContactButton';
 import { api, getAuthToken, getSocketServerUrl, setLogoutCallback, setLastFamilyName } from './api';
 import { encryptedApi } from './encryptedApi';
 import { clearSession, isEncryptionEnabled, getDerivedKey, shouldPauseKeyCheck } from './encryptionSession';
@@ -471,6 +472,9 @@ const AddNodeOnEdgeDrop = () => {
           onDataReload={() => treeOperations?.refreshData()}
         />
       )}
+
+      {/* Contact Button - Only shown when authenticated */}
+      {isAuthenticated && <ContactButton />}
     </div>
   );
 };
