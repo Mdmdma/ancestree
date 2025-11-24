@@ -73,6 +73,30 @@ const closeAllFamilyDatabases = () => {
 };
 
 /**
+ * Close a specific family database connection
+ * @param {string} familyName - The family name to close the database for
+ * @param {Function} callback - Callback with (err)
+ */
+const closeFamilyDatabase = (familyName, callback) => {
+  if (familyDatabases.has(familyName)) {
+    const db = familyDatabases.get(familyName);
+    db.close((err) => {
+      if (err) {
+        console.error(`Error closing database for family ${familyName}:`, err);
+        if (callback) callback(err);
+      } else {
+        familyDatabases.delete(familyName);
+        console.log(`Closed database connection for family ${familyName}`);
+        if (callback) callback(null);
+      }
+    });
+  } else {
+    // Database not in cache, nothing to close
+    if (callback) callback(null);
+  }
+};
+
+/**
  * Initialize the authentication database schema
  */
 const initializeAuthDb = () => {
@@ -159,13 +183,46 @@ const initializeAuthDb = () => {
             });
           }
           
-          // Check and add skip_geocoding
-          if (!columnNames.includes('skip_geocoding')) {
-            authDb.run("ALTER TABLE users ADD COLUMN skip_geocoding BOOLEAN DEFAULT 0", (err) => {
+          // Check and add show_street_fields
+          if (!columnNames.includes('show_street_fields')) {
+            authDb.run("ALTER TABLE users ADD COLUMN show_street_fields BOOLEAN DEFAULT 1", (err) => {
               if (err) {
-                console.error('Error adding skip_geocoding column:', err);
+                console.error('Error adding show_street_fields column:', err);
               } else {
-                console.log('Added skip_geocoding column to users table');
+                console.log('Added show_street_fields column to users table');
+              }
+            });
+          }
+          
+          // Check and add show_phone_field
+          if (!columnNames.includes('show_phone_field')) {
+            authDb.run("ALTER TABLE users ADD COLUMN show_phone_field BOOLEAN DEFAULT 1", (err) => {
+              if (err) {
+                console.error('Error adding show_phone_field column:', err);
+              } else {
+                console.log('Added show_phone_field column to users table');
+              }
+            });
+          }
+          
+          // Check and add show_email_field
+          if (!columnNames.includes('show_email_field')) {
+            authDb.run("ALTER TABLE users ADD COLUMN show_email_field BOOLEAN DEFAULT 1", (err) => {
+              if (err) {
+                console.error('Error adding show_email_field column:', err);
+              } else {
+                console.log('Added show_email_field column to users table');
+              }
+            });
+          }
+          
+          // Check and add node_creation_locked
+          if (!columnNames.includes('node_creation_locked')) {
+            authDb.run("ALTER TABLE users ADD COLUMN node_creation_locked BOOLEAN DEFAULT 0", (err) => {
+              if (err) {
+                console.error('Error adding node_creation_locked column:', err);
+              } else {
+                console.log('Added node_creation_locked column to users table');
               }
             });
           }
@@ -192,6 +249,8 @@ const initializeFamilyDb = (familyDb) => {
       maiden_name TEXT,
       birth_date TEXT,
       death_date TEXT,
+      street TEXT,
+      housenumber TEXT,
       city TEXT,
       zip TEXT,
       country TEXT,
@@ -262,6 +321,21 @@ const initializeFamilyDb = (familyDb) => {
       FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
     )`);
 
+    // Admin table for UI key-value settings (purpose, display_name, etc.)
+    familyDb.run(`CREATE TABLE IF NOT EXISTS admin (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      value TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating admin table:', err);
+      } else {
+        console.log('Admin table initialized');
+      }
+    });
+
     // Migration: Add last_geocoded column to nodes table if it doesn't exist
     familyDb.all("PRAGMA table_info(nodes)", (err, columns) => {
       if (err) {
@@ -277,6 +351,28 @@ const initializeFamilyDb = (familyDb) => {
             console.error('Error adding last_geocoded column to nodes:', err);
           } else {
             console.log('Added last_geocoded column to nodes table');
+          }
+        });
+      }
+      
+      // Migration: Add street column to nodes table if it doesn't exist
+      if (!columnNames.includes('street')) {
+        familyDb.run("ALTER TABLE nodes ADD COLUMN street TEXT", (err) => {
+          if (err) {
+            console.error('Error adding street column to nodes:', err);
+          } else {
+            console.log('Added street column to nodes table');
+          }
+        });
+      }
+      
+      // Migration: Add housenumber column to nodes table if it doesn't exist
+      if (!columnNames.includes('housenumber')) {
+        familyDb.run("ALTER TABLE nodes ADD COLUMN housenumber TEXT", (err) => {
+          if (err) {
+            console.error('Error adding housenumber column to nodes:', err);
+          } else {
+            console.log('Added housenumber column to nodes table');
           }
         });
       }
@@ -354,6 +450,7 @@ module.exports = {
   getFamilyDb,
   getFamilyDbById,
   closeAllFamilyDatabases,
+  closeFamilyDatabase,
   insertDefaultNodeForFamily,
   ensureFamilyHasNodes
 };

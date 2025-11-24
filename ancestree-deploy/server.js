@@ -10,7 +10,7 @@ const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
-const { authDb, getFamilyDb, getFamilyDbById, insertDefaultNodeForFamily, ensureFamilyHasNodes } = require('./database');
+const { authDb, getFamilyDb, getFamilyDbById, insertDefaultNodeForFamily, ensureFamilyHasNodes, closeFamilyDatabase } = require('./database');
 const axios = require('axios'); // Add axios for API calls
 const http = require('http');
 const { Server } = require('socket.io');
@@ -402,7 +402,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Register endpoint (for family registration)
 app.post('/api/auth/register', async (req, res) => {
-  const { familyName, password, displayName, adminPassword } = req.body;
+  const { familyName, password, displayName, adminPassword, adminEmail } = req.body;
 
   if (!familyName || !password) {
     return res.status(400).json({ error: 'Family name and password are required' });
@@ -410,6 +410,16 @@ app.post('/api/auth/register', async (req, res) => {
 
   if (!adminPassword) {
     return res.status(400).json({ error: 'Admin password is required' });
+  }
+
+  if (!adminEmail) {
+    return res.status(400).json({ error: 'Admin email is required' });
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(adminEmail)) {
+    return res.status(400).json({ error: 'Please provide a valid email address' });
   }
 
   if (password.length < 6) {
@@ -457,6 +467,45 @@ app.post('/api/auth/register', async (req, res) => {
 
             // Create a default node for the new family
             insertDefaultNodeForFamily(familyId);
+
+            // Store display_name and admin_email in the family's admin table
+            // Use encryption helpers to encrypt these values
+            getFamilyDbById(familyId, (dbErr, familyDb, famName) => {
+              if (dbErr) {
+                console.error('Error accessing family database for admin settings:', dbErr);
+                // Continue anyway, admin settings can be set later
+              } else {
+                const { encryptField } = require('./encryption');
+                
+                // Encrypt display_name
+                const encryptedDisplayName = encryptField(finalDisplayName, password, encryptionSalt);
+                
+                // Encrypt admin_email
+                const encryptedAdminEmail = encryptField(adminEmail, password, encryptionSalt);
+                
+                // Insert display_name
+                familyDb.run(
+                  'INSERT INTO admin (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP',
+                  ['display_name', encryptedDisplayName, encryptedDisplayName],
+                  (insertErr) => {
+                    if (insertErr) {
+                      console.error('Error storing display_name in admin table:', insertErr);
+                    }
+                  }
+                );
+                
+                // Insert admin_email
+                familyDb.run(
+                  'INSERT INTO admin (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP',
+                  ['admin_email', encryptedAdminEmail, encryptedAdminEmail],
+                  (insertErr) => {
+                    if (insertErr) {
+                      console.error('Error storing admin_email in admin table:', insertErr);
+                    }
+                  }
+                );
+              }
+            });
 
             // Generate JWT token
             const token = jwt.sign(
@@ -651,9 +700,79 @@ app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) 
   }
 });
 
-// Get family settings (display name, purpose, encryption status, skip_geocoding)
+// Delete family database and auth entry (admin only)
+app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
+  const { adminPassword } = req.body;
+
+  if (!adminPassword) {
+    return res.status(400).json({ error: 'Admin password is required to delete family' });
+  }
+
+  try {
+    // First verify admin password
+    authDb.get('SELECT family_name, admin_password_hash FROM users WHERE id = ?', [req.user.id], async (err, user) => {
+      if (err) {
+        console.error('Database error during family deletion:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify admin password
+      const passwordMatch = await bcrypt.compare(adminPassword, user.admin_password_hash);
+      if (!passwordMatch) {
+        return res.status(401).json({ error: 'Invalid admin password' });
+      }
+
+      const familyName = user.family_name;
+      const familyDbPath = path.join(__dirname, 'databases', `database_family_${familyName}.db`);
+
+      // Close the database connection if it's in the cache
+      closeFamilyDatabase(familyName, (closeErr) => {
+        if (closeErr) {
+          console.error(`Error closing database for ${familyName}:`, closeErr);
+          return res.status(500).json({ error: 'Failed to close database connection' });
+        }
+
+        // Delete the family database file
+        try {
+          if (fs.existsSync(familyDbPath)) {
+            fs.unlinkSync(familyDbPath);
+            console.log(`Deleted family database: ${familyDbPath}`);
+          } else {
+            console.log(`Family database file not found: ${familyDbPath}`);
+          }
+        } catch (fsError) {
+          console.error('Error deleting family database file:', fsError);
+          return res.status(500).json({ error: 'Failed to delete family database file' });
+        }
+
+        // Delete the user from auth database
+        authDb.run('DELETE FROM users WHERE id = ?', [req.user.id], function(deleteErr) {
+          if (deleteErr) {
+            console.error('Database error during user deletion:', deleteErr);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+
+          console.log(`Deleted family "${familyName}" from auth database`);
+          res.json({ 
+            success: true, 
+            message: `Family "${familyName}" and all associated data have been permanently deleted` 
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Family deletion error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get family settings (encryption status, show_street_fields, show_phone_field, show_email_field)
 app.get('/api/family/settings', authenticateToken, (req, res) => {
-  authDb.get('SELECT display_name, purpose, encryption_enabled, encryption_salt, skip_geocoding FROM users WHERE id = ?', 
+  authDb.get('SELECT encryption_enabled, encryption_salt, show_street_fields, show_phone_field, show_email_field, node_creation_locked FROM users WHERE id = ?', 
     [req.user.id], 
     (err, settings) => {
       if (err) {
@@ -666,88 +785,161 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
       }
 
       res.json({
-        displayName: settings.display_name,
-        purpose: settings.purpose,
         encryptionEnabled: Boolean(settings.encryption_enabled),
         encryptionSalt: settings.encryption_salt,
-        skipGeocoding: Boolean(settings.skip_geocoding)
+        showStreetFields: Boolean(settings.show_street_fields),
+        showPhoneField: Boolean(settings.show_phone_field),
+        showEmailField: Boolean(settings.show_email_field),
+        nodeCreationLocked: Boolean(settings.node_creation_locked)
       });
     }
   );
 });
 
-// Get family purpose (public, no auth required for admin panel preview)
-app.get('/api/family/purpose/:familyName', (req, res) => {
-  const { familyName } = req.params;
-  
-  authDb.get('SELECT purpose FROM users WHERE family_name = ?', 
-    [familyName], 
-    (err, result) => {
+// Get all admin settings (key-value pairs from family database)
+app.get('/api/admin/settings', authenticateToken, (req, res) => {
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    familyDb.all('SELECT key, value FROM admin', [], (err, rows) => {
       if (err) {
-        console.error('Database error fetching family purpose:', err);
+        console.error('Database error fetching admin settings:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      if (!result) {
-        return res.status(404).json({ error: 'Family not found' });
+      // Convert array of {key, value} to object
+      const settings = {};
+      if (rows) {
+        rows.forEach(row => {
+          settings[row.key] = row.value || '';
+        });
       }
 
-      res.json({ purpose: result.purpose || '' });
-    }
-  );
+      res.json(settings);
+    });
+  });
 });
 
-// Update display name
-app.post('/api/family/display-name', authenticateToken, (req, res) => {
-  const { displayName } = req.body;
+// Get a specific admin setting by key
+app.get('/api/admin/setting/:key', authenticateToken, (req, res) => {
+  const { key } = req.params;
 
-  if (!displayName) {
-    return res.status(400).json({ error: 'Display name is required' });
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    familyDb.get('SELECT value FROM admin WHERE key = ?', [key], (err, row) => {
+      if (err) {
+        console.error('Database error fetching admin setting:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ value: row ? row.value || '' : '' });
+    });
+  });
+});
+
+// Set an admin setting (upsert)
+app.post('/api/admin/setting', authenticateToken, (req, res) => {
+  const { key, value } = req.body;
+
+  if (!key) {
+    return res.status(400).json({ error: 'Key is required' });
   }
 
-  authDb.run('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-    [displayName, req.user.id], 
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    // Use INSERT OR REPLACE to handle upsert
+    familyDb.run(
+      `INSERT INTO admin (key, value, updated_at) 
+       VALUES (?, ?, CURRENT_TIMESTAMP) 
+       ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP`,
+      [key, value || '', value || ''],
+      function(err) {
+        if (err) {
+          console.error('Database error updating admin setting:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        res.json({ success: true, message: 'Admin setting updated successfully' });
+      }
+    );
+  });
+});
+
+// Update show_street_fields setting
+app.post('/api/family/street-fields-visibility', authenticateToken, (req, res) => {
+  const { showStreetFields } = req.body;
+
+  authDb.run('UPDATE users SET show_street_fields = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [showStreetFields ? 1 : 0, req.user.id], 
     function(err) {
       if (err) {
-        console.error('Database error updating display name:', err);
+        console.error('Database error updating show_street_fields:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      res.json({ success: true, message: 'Display name updated successfully' });
+      res.json({ success: true, message: 'Street fields visibility updated successfully' });
     }
   );
 });
 
-// Update purpose
-app.post('/api/family/purpose', authenticateToken, (req, res) => {
-  const { purpose } = req.body;
+// Update show_phone_field setting
+app.post('/api/family/phone-field-visibility', authenticateToken, (req, res) => {
+  const { showPhoneField } = req.body;
 
-  authDb.run('UPDATE users SET purpose = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-    [purpose || '', req.user.id], 
+  authDb.run('UPDATE users SET show_phone_field = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [showPhoneField ? 1 : 0, req.user.id], 
     function(err) {
       if (err) {
-        console.error('Database error updating purpose:', err);
+        console.error('Database error updating show_phone_field:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      res.json({ success: true, message: 'Purpose updated successfully' });
+      res.json({ success: true, message: 'Phone field visibility updated successfully' });
     }
   );
 });
 
-// Update skip_geocoding setting
-app.post('/api/family/skip-geocoding', authenticateToken, (req, res) => {
-  const { skipGeocoding } = req.body;
+// Update show_email_field setting
+app.post('/api/family/email-field-visibility', authenticateToken, (req, res) => {
+  const { showEmailField } = req.body;
 
-  authDb.run('UPDATE users SET skip_geocoding = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-    [skipGeocoding ? 1 : 0, req.user.id], 
+  authDb.run('UPDATE users SET show_email_field = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [showEmailField ? 1 : 0, req.user.id], 
     function(err) {
       if (err) {
-        console.error('Database error updating skip_geocoding:', err);
+        console.error('Database error updating show_email_field:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      res.json({ success: true, message: 'Skip geocoding setting updated successfully' });
+      res.json({ success: true, message: 'Email field visibility updated successfully' });
+    }
+  );
+});
+
+// Update node_creation_locked setting
+app.post('/api/family/node-creation-lock', authenticateToken, (req, res) => {
+  const { nodeCreationLocked } = req.body;
+
+  authDb.run('UPDATE users SET node_creation_locked = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+    [nodeCreationLocked ? 1 : 0, req.user.id], 
+    function(err) {
+      if (err) {
+        console.error('Database error updating node_creation_locked:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ success: true, message: 'Node creation lock updated successfully' });
     }
   );
 });
@@ -887,6 +1079,8 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
           maidenName: row.maiden_name,
           birthDate: row.birth_date,
           deathDate: row.death_date,
+          street: row.street,
+          housenumber: row.housenumber,
           city: row.city,
           zip: row.zip,
           country: row.country,
@@ -897,8 +1091,8 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
           addressHash: row.address_hash,  // Convert to camelCase
           lastGeocoded: row.last_geocoded,  // Add missing field
           bloodline: Boolean(row.bloodline),
-          preferredImageId: row.preferred_image_id,
-          isSelected: false
+          preferredImageId: row.preferred_image_id
+          // isSelected removed - this is client-only UI state
       }
     }));
     
@@ -948,17 +1142,32 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
   const socketId = req.headers['x-socket-id']; // Get socket ID from request header
   
   try {
+    // Check if node creation is locked
+    const lockStatus = await new Promise((resolve, reject) => {
+      authDb.get('SELECT node_creation_locked FROM users WHERE id = ?', [familyId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    
+    if (lockStatus && lockStatus.node_creation_locked) {
+      return res.status(403).json({ 
+        error: 'Node creation is currently locked by the administrator. Please contact the admin to unlock node creation.',
+        locked: true 
+      });
+    }
+    
     const familyDb = getFamilyDb(familyName);
     
     // Note: Geocoding is now handled client-side
     // Accept latitude, longitude, addressHash, and lastGeocoded from client
     familyDb.run(`INSERT INTO nodes (
       id, type, position_x, position_y, name, surname, maiden_name, birth_date, death_date,
-      city, zip, country, phone, email, latitude, longitude, address_hash, last_geocoded,
+      street, housenumber, city, zip, country, phone, email, latitude, longitude, address_hash, last_geocoded,
       bloodline, preferred_image_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       id, type, position.x, position.y, data.name, data.surname, data.maidenName,
-      data.birthDate, data.deathDate, data.city, data.zip, data.country, data.phone,
+      data.birthDate, data.deathDate, data.street, data.housenumber, data.city, data.zip, data.country, data.phone,
       data.email, data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
       data.bloodline ? 1 : 0, data.preferredImageId || null
     ], function(err) {
@@ -1025,13 +1234,13 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
       // Full update with data object
       updateQuery = `UPDATE nodes SET 
         position_x = ?, position_y = ?, name = ?, surname = ?, maiden_name = ?, birth_date = ?,
-        death_date = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
+        death_date = ?, street = ?, housenumber = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
         latitude = ?, longitude = ?, address_hash = ?, last_geocoded = ?,
         bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?`;
       updateParams = [
         position?.x, position?.y, data.name, data.surname, data.maidenName, data.birthDate,
-        data.deathDate, data.city, data.zip, data.country, data.phone, data.email,
+        data.deathDate, data.street, data.housenumber, data.city, data.zip, data.country, data.phone, data.email,
         data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
         data.bloodline ? 1 : 0, data.preferredImageId || null, id
       ];
@@ -1087,24 +1296,56 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
         return;
       }
       
-      // Broadcast the update to other users in the family room (exclude the sender)
-      const updatedNode = {
-        id,
-        position,
-        data: data,
-        type: req.body.type // Include if provided
-      };
-    
-      const ioInstance = req.app.get('io');
-      if (socketId) {
-        // Exclude the sender from receiving this event
-        ioInstance.to(`family-${familyId}`).except(socketId).emit('node:updated', updatedNode);
-      } else {
-        // Fallback: broadcast to all (for backwards compatibility)
-        ioInstance.to(`family-${familyId}`).emit('node:updated', updatedNode);
-      }
-      
-      res.json({ success: true, changes: this.changes });
+      // After update, fetch the complete node from database to broadcast
+      // This ensures all fields including geocoding data are included
+      familyDb.get('SELECT * FROM nodes WHERE id = ?', [id], (fetchErr, updatedRow) => {
+        if (fetchErr) {
+          console.error('Error fetching updated node for broadcast:', fetchErr);
+          // Still send response even if broadcast fails
+          res.json({ success: true, changes: this.changes });
+          return;
+        }
+        
+        // Build complete updated node object from DB row
+        const updatedNode = {
+          id: updatedRow.id,
+          type: updatedRow.type,
+          position: { x: updatedRow.position_x, y: updatedRow.position_y },
+          data: {
+            name: updatedRow.name,
+            surname: updatedRow.surname,
+            maidenName: updatedRow.maiden_name,
+            birthDate: updatedRow.birth_date,
+            deathDate: updatedRow.death_date,
+            city: updatedRow.city,
+            zip: updatedRow.zip,
+            country: updatedRow.country,
+            phone: updatedRow.phone,
+            email: updatedRow.email,
+            latitude: updatedRow.latitude,
+            longitude: updatedRow.longitude,
+            addressHash: updatedRow.address_hash,
+            lastGeocoded: updatedRow.last_geocoded,
+            bloodline: Boolean(updatedRow.bloodline),
+            preferredImageId: updatedRow.preferred_image_id
+            // isSelected removed - this is client-only UI state
+          }
+        };
+        
+        // Broadcast the complete updated node to other users in the family room
+        const ioInstance = req.app.get('io');
+        if (socketId) {
+          // Exclude the sender from receiving this event
+          console.log(`[UPDATE NODE] Broadcasting node:updated to family-${familyId}, Node ID: ${id}, excluding socket: ${socketId}`);
+          ioInstance.to(`family-${familyId}`).except(socketId).emit('node:updated', updatedNode);
+        } else {
+          // Fallback: broadcast to all (for backwards compatibility)
+          console.log(`[UPDATE NODE] Broadcasting node:updated to family-${familyId}, Node ID: ${id} (no socket ID)`);
+          ioInstance.to(`family-${familyId}`).emit('node:updated', updatedNode);
+        }
+        
+        res.json({ success: true, changes: this.changes });
+      });
     });
   } catch (error) {
     console.error('Error updating node:', error);
@@ -2062,6 +2303,50 @@ app.put('/api/images/:id', authenticateToken, (req, res) => {
   }
 });
 
+// Image proxy endpoint for downloading images from S3 (solves CORS issues)
+app.post('/api/images/proxy', authenticateToken, async (req, res) => {
+  const { s3Url } = req.body;
+  
+  if (!s3Url) {
+    return res.status(400).json({ error: 'S3 URL is required' });
+  }
+  
+  try {
+    // Extract S3 key from URL
+    // URL format: https://bucket-name.s3.region.amazonaws.com/images/filename.jpg
+    const urlParts = new URL(s3Url);
+    const s3Key = urlParts.pathname.substring(1); // Remove leading slash
+    
+    console.log(`[Image Proxy] Fetching image from S3: ${s3Key}`);
+    
+    // Fetch from S3
+    const params = {
+      Bucket: S3_BUCKET_NAME,
+      Key: s3Key
+    };
+    
+    const data = await s3.getObject(params).promise();
+    
+    // Set appropriate headers
+    res.set('Content-Type', data.ContentType || 'image/jpeg');
+    res.set('Content-Length', data.ContentLength);
+    res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    res.set('Access-Control-Allow-Origin', '*'); // Allow CORS
+    
+    // Send image data as binary
+    res.send(data.Body);
+    
+  } catch (error) {
+    console.error('[Image Proxy] Error fetching image:', error);
+    
+    if (error.code === 'NoSuchKey') {
+      return res.status(404).json({ error: 'Image not found in S3' });
+    }
+    
+    res.status(500).json({ error: 'Failed to fetch image from S3' });
+  }
+});
+
 // Delete image (also removes from S3)
 app.delete('/api/images/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
@@ -2457,6 +2742,81 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(indexPath);
   });
 }
+
+// Migration: Move purpose and display_name from auth DB to family DB admin table
+function migrateAdminSettingsToFamilyDb() {
+  console.log('[Migration] Starting admin settings migration...');
+  
+  authDb.all('SELECT id, family_name, display_name, purpose FROM users', [], (err, families) => {
+    if (err) {
+      console.error('[Migration] Error fetching families for migration:', err);
+      return;
+    }
+    
+    if (!families || families.length === 0) {
+      console.log('[Migration] No families to migrate');
+      return;
+    }
+    
+    let migratedCount = 0;
+    
+    families.forEach((family) => {
+      try {
+        const familyDb = getFamilyDb(family.family_name);
+        
+        // Check if admin table exists and has data
+        familyDb.all('SELECT key FROM admin', [], (err, rows) => {
+          if (err) {
+            console.error(`[Migration] Error checking admin table for family ${family.family_name}:`, err);
+            return;
+          }
+          
+          const existingKeys = rows ? rows.map(r => r.key) : [];
+          
+          // Migrate display_name if it exists and is not already migrated
+          if (family.display_name && !existingKeys.includes('display_name')) {
+            familyDb.run(
+              'INSERT INTO admin (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+              ['display_name', family.display_name],
+              (err) => {
+                if (err) {
+                  console.error(`[Migration] Error migrating display_name for family ${family.family_name}:`, err);
+                } else {
+                  console.log(`[Migration] Migrated display_name for family ${family.family_name}`);
+                }
+              }
+            );
+          }
+          
+          // Migrate purpose if it exists and is not already migrated
+          if (family.purpose && !existingKeys.includes('purpose')) {
+            familyDb.run(
+              'INSERT INTO admin (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+              ['purpose', family.purpose],
+              (err) => {
+                if (err) {
+                  console.error(`[Migration] Error migrating purpose for family ${family.family_name}:`, err);
+                } else {
+                  console.log(`[Migration] Migrated purpose for family ${family.family_name}`);
+                }
+              }
+            );
+          }
+          
+          migratedCount++;
+          if (migratedCount === families.length) {
+            console.log(`[Migration] Admin settings migration completed for ${families.length} families`);
+          }
+        });
+      } catch (error) {
+        console.error(`[Migration] Error migrating family ${family.family_name}:`, error);
+      }
+    });
+  });
+}
+
+// Run migration on startup
+migrateAdminSettingsToFamilyDb();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
