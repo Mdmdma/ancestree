@@ -67,6 +67,9 @@ build/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+/playwright-mcp/
+/.playwright-mcp/
+*.png
 playwright.config.ts
 package.json
 package-lock.json

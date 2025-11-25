@@ -591,9 +591,10 @@ export const encryptedApi = {
   },
   
   // Image operations with encryption
-  async uploadImage(formData) {
+  async uploadImage(file, description, uploadedBy = 'user', onProgress = null) {
     // Upload the image first (multipart/form-data cannot be encrypted)
-    const result = await baseApi.uploadImage(formData);
+    // Pass all parameters to baseApi including the progress callback
+    const result = await baseApi.uploadImage(file, description, uploadedBy, onProgress);
     
     // If encryption is enabled, immediately encrypt the metadata
     if (isEncryptionEnabled() && result.success && result.image) {

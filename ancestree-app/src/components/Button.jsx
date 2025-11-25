@@ -108,6 +108,24 @@ const Button = ({
     width: '100%' // Ensure button fills its container
   };
 
+  // Ensure icon inherits button font size but can be slightly larger for better visibility
+  const iconStyle = {
+    fontSize: 'inherit',
+    lineHeight: '1',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  };
+
+  const textStyle = {
+    fontSize: 'inherit',
+    fontFamily: 'inherit',
+    fontWeight: 'inherit',
+    lineHeight: '1',
+    display: 'inline-flex',
+    alignItems: 'center'
+  };
+
   return (
     <button
       onClick={disabled ? undefined : onClick}
@@ -123,8 +141,8 @@ const Button = ({
       className={className}
       {...props}
     >
-      {icon && <span style={{ fontSize: '16px', lineHeight: '1' }}>{icon}</span>}
-      <span style={{ lineHeight: '1' }}>{children}</span>
+      {icon && <span style={iconStyle}>{icon}</span>}
+      <span style={textStyle}>{children}</span>
     </button>
   );
 };

@@ -4,6 +4,7 @@ import { api } from './api';
 import { appConfig } from './config';
 import PictureSlideshow from './PictureSlideshow';
 import DescriptionTextarea from './components/DescriptionTextarea';
+import Button from './components/Button';
 
 const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
   const [images, setImages] = useState([]);
@@ -257,7 +258,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       const isAlreadyTagged = selectedImage?.people?.some(p => p.personId === selectedNode.id);
       
       if (!isAlreadyTagged) {
-        // Small delay to make the selection visible before auto-tagging
+        // medium delay to make the selection visible before auto-tagging
         const timeoutId = setTimeout(() => {
           handlePersonTag(selectedNode.id);
         }, 500);
@@ -344,57 +345,39 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     <div>
       {/* Gallery buttons - Album and Upload side by side on mobile */}
       <div className="gallery-buttons-container" style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexDirection: 'column' }}>
-        <button
+        <Button
           onClick={() => {
             console.log('Family Gallery button clicked! Current showFamilyGallery state:', showFamilyGallery);
             setShowFamilyGallery(true);
             console.log('Set showFamilyGallery to true');
           }}
+          variant="secondary"
+          size="medium"
           style={{
-            padding: '12px 20px',
-            backgroundColor: '#9C27B0',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            width: '100%'
+            backgroundColor: '#9C27B0'
           }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7B1FA2'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#9C27B0'}
         >
           {appConfig.ui.familyGallery.galleryButton}
-        </button>
+        </Button>
         
-        <button
+        <Button
           onClick={() => setViewMode('upload')}
-          style={{
-            flex: 1,
-            padding: '12px 20px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant="success"
+          size="medium"
         >
           {appConfig.ui.imageGallery.gallery.uploadButton}
-        </button>
-        <button
+        </Button>
+        
+        <Button
           onClick={loadImages}
           className="mobile-hide-refresh-button"
-          style={{
-            flex: 1,
-            padding: '12px 20px',
-            backgroundColor: '#2196F3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant="primary"
+          size="medium"
         >
           {appConfig.ui.imageGallery.gallery.refreshButton}
-        </button>
+        </Button>
       </div>
 
       {images.length === 0 ? (
@@ -501,20 +484,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       )}
 
       <div style={{ marginBottom: '20px' }}>
-        <button
+        <Button
           onClick={() => setViewMode('gallery')}
-          style={{
-            padding: '8px 15px',
-            backgroundColor: '#666',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant="secondary"
+          size="medium"
         >
           {appConfig.ui.imageGallery.upload.backButton}
-        </button>
+        </Button>
       </div>
 
       {/* Main Upload Area - Large invisible drop zone */}
@@ -537,7 +513,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {/* Visual upload box - smaller and centered */}
+        {/* Visual upload box - mediumer and centered */}
         <div
           className="upload-box"
           style={{
@@ -616,37 +592,23 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const renderConfirm = () => (
     <div className="confirm-container">
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-        <button
+        <Button
           onClick={() => {
             resetUploadState();
             setViewMode('upload');
           }}
-          style={{
-            padding: '8px 15px',
-            backgroundColor: '#666',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant="secondary"
+          size="medium"
         >
           {appConfig.ui.imageGallery.confirm.backButton}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={resetUploadState}
-          style={{
-            padding: '8px 15px',
-            backgroundColor: '#f44336',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant="danger"
+          size="medium"
         >
           {appConfig.ui.imageGallery.confirm.cancelButton}
-        </button>
+        </Button>
       </div>
 
       <h4 className="confirm-title" style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
@@ -712,35 +674,18 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
 
       {/* Upload Button */}
       <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-        <button
+        <Button
           onClick={confirmUpload}
           disabled={uploadingImage}
-          style={{
-            padding: '15px 30px',
-            backgroundColor: uploadingImage ? '#ccc' : '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: uploadingImage ? 'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}
+          variant="success"
+          size="large"
+          icon={uploadingImage ? '⏳' : '📤'}
         >
-          {uploadingImage ? (
-            <>
-              <span>⏳</span>
-              {appConfig.ui.imageGallery.confirm.uploadingButton}
-            </>
-          ) : (
-            <>
-              <span>📤</span>
-              {appConfig.ui.imageGallery.confirm.uploadButton}
-            </>
-          )}
-        </button>
+          {uploadingImage 
+            ? appConfig.ui.imageGallery.confirm.uploadingButton
+            : appConfig.ui.imageGallery.confirm.uploadButton
+          }
+        </Button>
       </div>
 
       {uploadingImage && (
@@ -812,21 +757,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           <div style={{ fontSize: '14px', color: '#f44336', marginBottom: '10px' }}>
             <strong>Upload Failed:</strong> {uploadError}
           </div>
-          <button
+          <Button
             onClick={confirmUpload}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
+            variant="success"
+            size="medium"
           >
             Retry Upload
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -834,48 +771,27 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const renderImageView = () => (
     <div>
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button
+        <Button
           onClick={() => setViewMode('gallery')}
-          style={{
-            padding: '8px 15px',
-            backgroundColor: '#666',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant="secondary"
+          size="medium"
         >
           {appConfig.ui.imageGallery.view.backButton}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setTaggingMode(!taggingMode)}
-          style={{
-            padding: '8px 15px',
-            backgroundColor: taggingMode ? '#FF5722' : '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant={taggingMode ? 'danger' : 'success'}
+          size="medium"
         >
           {taggingMode ? appConfig.ui.imageGallery.view.cancelTaggingButton : appConfig.ui.imageGallery.view.tagPeopleButton}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => handleDeleteImage(selectedImage.id)}
-          style={{
-            padding: '8px 15px',
-            backgroundColor: '#f44336',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
+          variant="danger"
+          size="medium"
         >
           {appConfig.ui.imageGallery.view.deleteButton}
-        </button>
+        </Button>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
@@ -902,20 +818,14 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           }}>
             <h4 style={{ margin: 0, color: '#ffffff' }}>{appConfig.ui.imageGallery.view.descriptionTitle}</h4>
             {!editingDescription && (
-              <button
+              <Button
                 onClick={startEditingDescription}
-                style={{
-                  padding: '4px 8px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}
+                variant="success"
+                size="medium"
+                style={{ width: 'auto', minWidth: '60px' }}
               >
                 Edit
-              </button>
+              </Button>
             )}
           </div>
           
@@ -957,20 +867,14 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             marginBottom: '10px' 
           }}>
             <h4 style={{ margin: 0, color: '#ffffff' }}>{appConfig.ui.imageGallery.view.descriptionTitle}</h4>
-            <button
+            <Button
               onClick={startEditingDescription}
-              style={{
-                padding: '4px 8px',
-                backgroundColor: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
+              variant="success"
+              size="medium"
+              style={{ width: 'auto', minWidth: '120px' }}
             >
               Add Description
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1006,21 +910,19 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
                     {((person.personName || person.person_name || '') + ' ' + (person.personSurname || person.person_surname || '')).trim() || 'Unnamed Person'}
                   </strong>
                 </div>
-                <button
+                <Button
                   onClick={() => handleRemovePersonTag(person.personId)}
-                  style={{
+                  variant="danger"
+                  size="medium"
+                  style={{ 
+                    width: 'auto', 
+                    minWidth: '32px',
                     padding: '5px 8px',
-                    backgroundColor: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '11px',
                     marginLeft: '8px'
                   }}
                 >
                   ✖
-                </button>
+                </Button>
               </div>
             ))}
           </div>
