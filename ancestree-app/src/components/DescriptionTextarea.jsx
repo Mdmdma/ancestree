@@ -116,7 +116,6 @@ const DescriptionTextarea = ({
               disabled={!onSave}
               variant="success"
               size="medium"
-              icon="✓"
             >
               {saveButtonText}
             </Button>
@@ -128,17 +127,10 @@ const DescriptionTextarea = ({
               disabled={!onCancel}
               variant="danger"
               size="medium"
-              icon="✕"
             >
               {cancelButtonText}
             </Button>
           </div>
-        </div>
-      )}
-      
-      {showButtons && (
-        <div className="mt-2 text-xs text-gray-400 italic text-center">
-          💡 Tip: Press Cmd/Ctrl+Enter to save, Escape to cancel
         </div>
       )}
     </div>

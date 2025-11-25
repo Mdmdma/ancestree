@@ -4,6 +4,7 @@ import { appConfig } from './config';
 import { api } from './api';
 import ChatComponent from './ChatComponent';
 import DescriptionTextarea from './components/DescriptionTextarea';
+import Button from './components/Button';
 
 // Optimized PersonTag component to prevent re-renders
 const PersonTag = React.memo(({ person, index, onPersonSelect }) => {
@@ -430,7 +431,11 @@ const PictureSlideshow = ({
         <div style={modalStyle}>
           <div style={headerStyle}>
             <h3 style={{ margin: 0, color: '#ffffff' }}>{config.loadingTitle}</h3>
-            <button onClick={onClose} style={closeButtonStyle}>✖</button>
+            <div style={{ width: '80px' }}>
+              <Button onClick={onClose} variant="danger" size="medium" icon="✖">
+                {/* Close button */}
+              </Button>
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
             <div style={{ color: '#cccccc' }}>{config.loadingMessage}</div>
@@ -446,7 +451,11 @@ const PictureSlideshow = ({
         <div style={modalStyle}>
           <div style={headerStyle}>
             <h3 style={{ margin: 0, color: '#ffffff' }}>{config.errorTitle}</h3>
-            <button onClick={onClose} style={closeButtonStyle}>✖</button>
+            <div style={{ width: '80px' }}>
+              <Button onClick={onClose} variant="danger" size="medium" icon="✖">
+                {/* Close button */}
+              </Button>
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
             <div style={{ color: '#ff6b6b' }}>{config.errorMessage}{error}</div>
@@ -469,7 +478,11 @@ const PictureSlideshow = ({
         <div style={modalStyle}>
           <div style={headerStyle}>
             <h3 style={{ margin: 0, color: '#ffffff' }}>{emptyTitle}</h3>
-            <button onClick={onClose} style={closeButtonStyle}>✖</button>
+            <div style={{ width: '80px' }}>
+              <Button onClick={onClose} variant="danger" size="medium" icon="✖">
+                {/* Close button */}
+              </Button>
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
             <div style={{ color: '#cccccc', textAlign: 'center' }}>
@@ -496,15 +509,23 @@ const PictureSlideshow = ({
           </h3>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {isFullscreen ? (
-              <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
-                {config.exitFullscreenButton}
-              </button>
+              <div style={{ width: '200px' }}>
+                <Button onClick={toggleFullscreen} variant="success" size="medium">
+                  {config.exitFullscreenButton}
+                </Button>
+              </div>
             ) : (
               <>
-                <button onClick={toggleFullscreen} style={fullscreenButtonStyle}>
-                  {config.fullscreenButton}
-                </button>
-                <button onClick={onClose} style={closeButtonStyle}>✖</button>
+                <div style={{ width: '150px' }}>
+                  <Button onClick={toggleFullscreen} variant="success" size="medium">
+                    {config.fullscreenButton}
+                  </Button>
+                </div>
+                <div style={{ width: '80px' }}>
+                  <Button onClick={onClose} variant="danger" size="medium" icon="✖">
+                    {/* Close button */}
+                  </Button>
+                </div>
               </>
             )}
           </div>
@@ -514,13 +535,34 @@ const PictureSlideshow = ({
           {/* Main Image Display */}
           <div className="slideshow-image-container" style={imageContainerStyle}>
             {images.length > 1 && (
-              <button 
-                onClick={prevImage} 
-                style={navButtonStyle('left')}
-                onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+              <button
+                onClick={prevImage}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '20px',
+                  transform: 'translateY(-50%)',
+                  width: '50px',
+                  height: '50px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background-color 0.2s ease, transform 0.1s ease',
+                  zIndex: 10,
+                  fontWeight: 'bold'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'}
+                onMouseDown={(e) => e.target.style.transform = 'translateY(-50%) scale(0.95)'}
+                onMouseUp={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
               >
-                ◀
+                {config.previousButton}
               </button>
             )}
             
@@ -537,13 +579,34 @@ const PictureSlideshow = ({
             )}
             
             {images.length > 1 && (
-              <button 
-                onClick={nextImage} 
-                style={navButtonStyle('right')}
-                onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+              <button
+                onClick={nextImage}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '20px',
+                  transform: 'translateY(-50%)',
+                  width: '50px',
+                  height: '50px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background-color 0.2s ease, transform 0.1s ease',
+                  zIndex: 10,
+                  fontWeight: 'bold'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'}
+                onMouseDown={(e) => e.target.style.transform = 'translateY(-50%) scale(0.95)'}
+                onMouseUp={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
               >
-                ▶
+                {config.nextButton}
               </button>
             )}
           </div>
@@ -583,20 +646,13 @@ const PictureSlideshow = ({
                   >
                     {currentImage?.description || config.noDescription}
                   </p>
-                  <button
+                  <Button
                     onClick={() => setEditingDescription(true)}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#2196F3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
+                    variant="primary"
+                  size="medium"
                   >
                     {config.editButton}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -637,37 +693,27 @@ const PictureSlideshow = ({
                   
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {currentImage?.id === preferredImageId ? (
-                      <button
-                        onClick={removeAsPreferredImage}
-                        disabled={settingPreferred}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: settingPreferred ? '#666' : '#ff6b6b',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: settingPreferred ? 'not-allowed' : 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        {settingPreferred ? 'Wird entfernt...' : 'Entfernen'}
-                      </button>
+                      <div style={{ width: '140px' }}>
+                        <Button
+                          onClick={removeAsPreferredImage}
+                          disabled={settingPreferred}
+                          variant="danger"
+                          size="medium"
+                        >
+                          {settingPreferred ? 'Wird entfernt...' : 'Entfernen'}
+                        </Button>
+                      </div>
                     ) : (
-                      <button
-                        onClick={setAsPreferredImage}
-                        disabled={settingPreferred}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: settingPreferred ? '#666' : '#4CAF50',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: settingPreferred ? 'not-allowed' : 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        {settingPreferred ? 'Wird gesetzt...' : 'Als Profilbild setzen'}
-                      </button>
+                      <div style={{ width: '180px' }}>
+                        <Button
+                          onClick={setAsPreferredImage}
+                          disabled={settingPreferred}
+                          variant="success"
+                          size="medium"
+                        >
+                          {settingPreferred ? 'Wird gesetzt...' : 'Als Profilbild setzen'}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>

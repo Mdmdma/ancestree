@@ -200,7 +200,9 @@ export const appConfig = {
       descriptionPlaceholder: "Beschreibung eingeben...",
       noDescription: "Keine Beschreibung vorhanden",
       fullscreenButton: "⛶ Vollbild",
-      exitFullscreenButton: "⛶ Vollbild verlassen"
+      exitFullscreenButton: "⛶ Vollbild verlassen",
+      previousButton: "‹",
+      nextButton: "›"
     },
     
     // Node Editor configuration
@@ -534,7 +536,9 @@ export const appConfig = {
       noDescription: "Keine Beschreibung vorhanden",
       galleryButton: "🖼️ Familien-Album",
       fullscreenButton: "⛶ Vollbild",
-      exitFullscreenButton: "⛶ Vollbild verlassen"
+      exitFullscreenButton: "⛶ Vollbild verlassen",
+      previousButton: "‹",
+      nextButton: "›"
     },
 
     // Alerts and notifications
@@ -552,13 +556,16 @@ export const appConfig = {
       namePlaceholder: "Dein Name...",
       messagePlaceholder: "Schreibe einen Kommentar zu diesem Bild... (Strg+Enter zum Senden)",
       sendButton: "Senden",
+      sendingButton: "Wird gesendet...",
+      deleteButton: "Löschen",
       nameRequired: "Bitte gib deinen Namen ein",
       messageRequired: "Bitte schreibe eine Nachricht",
+      messageTooLong: "Die Nachricht darf maximal 300 Zeichen enthalten",
       loadingMessages: "Lade Nachrichten...",
       errorLoading: "Fehler beim Laden der Nachrichten",
       errorSending: "Fehler beim Senden der Nachricht",
+      errorDeleting: "Fehler beim Löschen der Nachricht",
       deleteConfirm: "Möchtest du diese Nachricht wirklich löschen?",
-      deleteButton: "🗑️",
       timeFormat: {
         justNow: "gerade eben",
         minutesAgo: "vor {minutes} Min.",

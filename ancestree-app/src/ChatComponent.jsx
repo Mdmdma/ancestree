@@ -5,6 +5,7 @@ import { appConfig } from './config';
 import { isEncryptionEnabled, getDerivedKey } from './encryptionSession';
 import { decryptValueFast } from './encryptionUtilsOptimized';
 import { CHAT_MESSAGE_ENCRYPTED_FIELDS } from './encryptionFieldDefinitions';
+import Button from './components/Button';
 
 const ChatComponent = ({ imageId, onError, socket }) => {
   const [messages, setMessages] = useState([]);
@@ -154,7 +155,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     
     // Validate message length (max 300 characters)
     if (message.trim().length > 300) {
-      alert('Message cannot exceed 300 characters');
+      alert(appConfig.ui.chat.messageTooLong);
       return;
     }
 
@@ -185,6 +186,11 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSubmit(e);
+    }
+    // Escape to clear message
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setMessage('');
     }
   }, [handleSubmit]);
 
@@ -239,112 +245,130 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     } catch (error) {
       console.error('Error deleting message:', error);
       if (onError) {
-        onError('Fehler beim Löschen der Nachricht: ' + error.message);
+        onError(appConfig.ui.chat.errorDeleting + ': ' + error.message);
       }
     }
   }, [imageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Styles
+  // Styles - matching DescriptionTextarea design language
+  // Dynamic container height: min when empty, grows up to 600px max, then scrolls
   const containerStyle = {
     display: 'flex',
     flexDirection: 'column',
-    height: '450px',
-    backgroundColor: '#1a1a1a',
-    border: '1px solid #333',
+    minHeight: messages.length === 0 ? '200px' : '300px', // Smaller when empty
+    maxHeight: '600px', // Maximum height before scrolling
+    height: messages.length === 0 ? 'auto' : 'auto',
+    backgroundColor: '#27272a', // zinc-800
+    border: '1px solid #52525b', // zinc-600
     borderRadius: '8px',
     overflow: 'hidden'
   };
 
   const headerStyle = {
-    padding: '12px 16px',
-    backgroundColor: '#262626',
-    borderBottom: '1px solid #333',
+    padding: '8px 12px', // Tighter padding
+    backgroundColor: '#3f3f46', // zinc-700
+    borderBottom: '1px solid #52525b', // zinc-600
     color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: '14px'
+    fontWeight: '600',
+    fontSize: '13px', // Slightly smaller
+    flexShrink: 0 // Prevent header from shrinking
   };
 
   const messagesContainerStyle = {
     flex: 1,
     overflowY: 'auto',
-    padding: '8px',
+    padding: messages.length === 0 ? '16px' : '8px', // Less padding when there are messages
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: '8px', // Tighter gap between messages
+    backgroundColor: '#1a1a1a',
+    minHeight: messages.length === 0 ? '80px' : 'auto', // Minimum height for empty state
+    maxHeight: '600px' // Allow messages area to grow
   };
 
   const messageStyle = {
-    backgroundColor: '#2a2a2a',
-    padding: '8px 12px',
-    borderRadius: '6px',
-    border: '1px solid #333'
+    backgroundColor: '#27272a', // zinc-800
+    padding: '8px 10px', // Tighter padding
+    borderRadius: '6px', // Slightly smaller radius
+    border: '1px solid #52525b', // zinc-600
+    transition: 'border-color 0.2s ease'
   };
 
   const messageHeaderStyle = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '4px'
+    marginBottom: '6px', // Tighter spacing
+    gap: '8px'
   };
 
   const messageNameStyle = {
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    fontSize: '12px'
+    fontWeight: '600',
+    color: '#10b981', // success green
+    fontSize: '12px' // Slightly smaller
   };
 
   const messageTimeStyle = {
-    color: '#888',
-    fontSize: '11px'
+    color: '#9ca3af', // gray-400
+    fontSize: '10px' // Smaller timestamp
   };
 
   const messageTextStyle = {
     color: '#ffffff',
-    fontSize: '13px',
+    fontSize: '13px', // Slightly smaller
     lineHeight: '1.4',
     wordBreak: 'break-word'
   };
 
   const formStyle = {
-    padding: '12px',
-    backgroundColor: '#262626',
-    borderTop: '1px solid #333',
+    padding: '10px 12px', // Tighter padding
+    backgroundColor: '#27272a', // zinc-800
+    borderTop: '1px solid #52525b', // zinc-600
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: '8px', // Tighter gap
+    flexShrink: 0 // Prevent form from shrinking
   };
 
   const inputStyle = {
-    padding: '8px',
-    backgroundColor: '#333',
+    padding: '8px 10px', // Tighter padding
+    backgroundColor: '#27272a', // zinc-800
     color: '#ffffff',
-    border: '1px solid #555',
-    borderRadius: '4px',
-    fontSize: '13px'
+    border: '1px solid #52525b', // zinc-600
+    borderRadius: '6px', // Slightly smaller
+    fontSize: '13px', // Slightly smaller
+    fontFamily: 'inherit',
+    transition: 'all 0.2s ease',
+    outline: 'none'
+  };
+
+  const textareaWrapperStyle = {
+    position: 'relative',
+    width: '100%'
   };
 
   const textareaStyle = {
     ...inputStyle,
-    minHeight: '40px',
+    minHeight: '60px', // Smaller minimum height
     resize: 'vertical',
-    fontFamily: 'inherit'
+    paddingBottom: '28px', // Space for character counter
+    lineHeight: '1.4',
+    width: '100%',
+    boxSizing: 'border-box'
   };
 
-  const buttonStyle = {
-    padding: '8px 16px',
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    alignSelf: 'flex-end'
-  };
-
-  const buttonDisabledStyle = {
-    ...buttonStyle,
-    backgroundColor: '#666',
-    cursor: 'not-allowed'
+  const characterCounterStyle = {
+    position: 'absolute',
+    bottom: '8px',
+    right: '10px',
+    fontSize: '11px', // Slightly smaller
+    color: message.length > 280 ? '#ef4444' : '#9ca3af', // red-500 or gray-400
+    fontWeight: message.length > 280 ? '600' : '400',
+    backgroundColor: 'rgba(39, 39, 42, 0.9)', // Semi-transparent zinc-800
+    padding: '2px 5px',
+    borderRadius: '3px',
+    pointerEvents: 'none',
+    userSelect: 'none'
   };
 
   const emptyStateStyle = {
@@ -352,22 +376,11 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    color: '#888',
-    fontSize: '13px',
+    color: '#9ca3af', // gray-400
+    fontSize: '13px', // Slightly smaller
     fontStyle: 'italic',
     textAlign: 'center',
-    padding: '20px'
-  };
-
-  const deleteButtonStyle = {
-    background: 'none',
-    border: 'none',
-    color: '#ff6b6b',
-    cursor: 'pointer',
-    fontSize: '12px',
-    padding: '2px 4px',
-    borderRadius: '2px',
-    marginLeft: '8px'
+    padding: '16px'
   };
 
   return (
@@ -375,6 +388,23 @@ const ChatComponent = ({ imageId, onError, socket }) => {
       className={`chat-component ${messages.length === 0 ? 'chat-empty' : 'chat-has-messages'}`}
       style={containerStyle}
     >
+      <style>{`
+        .chat-component input:focus,
+        .chat-component textarea:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+        
+        .chat-component input:hover:not(:focus),
+        .chat-component textarea:hover:not(:focus) {
+          border-color: #6b7280;
+        }
+        
+        .chat-message:hover {
+          border-color: #6b7280 !important;
+        }
+      `}</style>
       <div style={headerStyle}>
         {appConfig.ui.chat.title}
       </div>
@@ -391,19 +421,21 @@ const ChatComponent = ({ imageId, onError, socket }) => {
         ) : (
           <>
             {messages.map((msg) => (
-              <div key={msg.id} style={messageStyle}>
+              <div key={msg.id} style={messageStyle} className="chat-message">
                 <div style={messageHeaderStyle}>
                   <div>
                     <span style={messageNameStyle}>{msg.userName}</span>
                     <span style={messageTimeStyle}> • {formatTimestamp(msg.createdAt)}</span>
                   </div>
-                <button
-                  onClick={() => handleDeleteMessage(msg.id)}
-                  style={deleteButtonStyle}
-                  title={appConfig.ui.chat.deleteConfirm}
-                >
-                  {appConfig.ui.chat.deleteButton}
-                </button>
+                  <div style={{ minWidth: '60px' }}>
+                    <Button
+                      onClick={() => handleDeleteMessage(msg.id)}
+                      variant="danger"
+                      size="small"
+                    >
+                      {appConfig.ui.chat.deleteButton}
+                    </Button>
+                  </div>
               </div>
               <div style={messageTextStyle}>{msg.message}</div>
             </div>
@@ -422,7 +454,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
           style={inputStyle}
           required
         />
-        <div style={{ position: 'relative' }}>
+        <div style={textareaWrapperStyle}>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -432,24 +464,19 @@ const ChatComponent = ({ imageId, onError, socket }) => {
             maxLength={300}
             required
           />
-          <div style={{
-            position: 'absolute',
-            bottom: '8px',
-            right: '8px',
-            fontSize: '0.75rem',
-            color: message.length > 280 ? '#d32f2f' : '#666',
-            pointerEvents: 'none'
-          }}>
+          <div style={characterCounterStyle}>
             {message.length}/300
           </div>
         </div>
-        <button
+        <Button
           type="submit"
-          style={sending ? buttonDisabledStyle : buttonStyle}
+          variant="success"
+          size="medium"
+          icon="📤"
           disabled={sending}
         >
-          {sending ? 'Wird gesendet...' : appConfig.ui.chat.sendButton}
-        </button>
+          {sending ? appConfig.ui.chat.sendingButton : appConfig.ui.chat.sendButton}
+        </Button>
       </form>
     </div>
   );
