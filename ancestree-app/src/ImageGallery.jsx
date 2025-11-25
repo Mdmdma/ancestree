@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
 import { appConfig } from './config';
 import PictureSlideshow from './PictureSlideshow';
+import DescriptionTextarea from './components/DescriptionTextarea';
 
 const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
   const [images, setImages] = useState([]);
@@ -695,24 +696,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: '#ffffff', margin: '0 0 10px 0' }}>
             {appConfig.ui.imageGallery.confirm.descriptionLabel}
           </label>
-          <textarea
+          <DescriptionTextarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder={appConfig.ui.imageGallery.confirm.descriptionPlaceholder}
-            className="confirm-description"
-            style={{
-              width: '100%',
-              height: '100px',
-              padding: '10px',
-              border: '1px solid #444',
-              borderRadius: '8px',
-              fontSize: '14px',
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              backgroundColor: '#1a1a1a',
-              color: '#ffffff',
-              boxSizing: 'border-box'
-            }}
+            maxLength={1000}
+            minHeight="120px"
+            showButtons={false}
           />
           <div className="confirm-hint" style={{ fontSize: '12px', color: '#cccccc', marginTop: '8px' }}>
             {appConfig.ui.imageGallery.confirm.descriptionHint}
@@ -930,71 +920,17 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           </div>
           
           {editingDescription ? (
-            <div>
-              <div style={{ position: 'relative' }}>
-                <textarea
-                  value={descriptionValue}
-                  onChange={handleDescriptionChange}
-                  onKeyDown={handleDescriptionKeyDown}
-                  placeholder="Enter image description..."
-                  maxLength={1000}
-                  className="gallery-description-textarea"
-                  style={{
-                    width: '100%',
-                    height: '80px',
-                    padding: '8px',
-                    paddingBottom: '24px',
-                    border: '1px solid #444',
-                    borderRadius: '4px',
-                    backgroundColor: '#2a2a2a',
-                    color: '#ffffff',
-                    fontSize: '14px',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '8px',
-                  right: '8px',
-                  fontSize: '0.75rem',
-                  color: descriptionValue.length > 950 ? '#d32f2f' : '#888',
-                  pointerEvents: 'none'
-                }}>
-                  {descriptionValue.length}/1000
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                <button
-                  onClick={saveDescription}
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px'
-                  }}
-                >
-                  Save
-                </button>
-                <button
-                  onClick={cancelEditingDescription}
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: '#666',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px'
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <DescriptionTextarea
+              value={descriptionValue}
+              onChange={handleDescriptionChange}
+              onSave={saveDescription}
+              onCancel={cancelEditingDescription}
+              placeholder="Enter image description..."
+              maxLength={1000}
+              minHeight="120px"
+              saveButtonText="Save"
+              cancelButtonText="Cancel"
+            />
           ) : (
             <div 
               className="gallery-description-text"

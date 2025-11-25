@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { appConfig } from './config';
 import { api } from './api';
 import ChatComponent from './ChatComponent';
+import DescriptionTextarea from './components/DescriptionTextarea';
 
 // Optimized PersonTag component to prevent re-renders
 const PersonTag = React.memo(({ person, index, onPersonSelect }) => {
@@ -556,60 +557,20 @@ const PictureSlideshow = ({
                 {config.descriptionTitle}
               </h4>
               {editingDescription ? (
-                <div>
-                  <textarea
-                    value={descriptionValue}
-                    onChange={handleDescriptionChange}
-                    onKeyDown={handleDescriptionKeyDown}
-                    placeholder={config.descriptionPlaceholder}
-                    className="slideshow-description-textarea"
-                    style={{
-                      width: '100%',
-                      minHeight: '100px',
-                      padding: '10px',
-                      backgroundColor: '#333333',
-                      color: '#ffffff',
-                      border: '1px solid #555555',
-                      borderRadius: '6px',
-                      resize: 'vertical',
-                      fontSize: '14px',
-                      fontFamily: 'inherit'
-                    }}
-                  />
-                  <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
-                    <button
-                      onClick={saveDescription}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                      }}
-                    >
-                      {config.saveButton}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingDescription(false);
-                        setDescriptionValue(currentImage?.description || '');
-                      }}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#666666',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                      }}
-                    >
-                      {config.cancelButton}
-                    </button>
-                  </div>
-                </div>
+                <DescriptionTextarea
+                  value={descriptionValue}
+                  onChange={handleDescriptionChange}
+                  onSave={saveDescription}
+                  onCancel={() => {
+                    setEditingDescription(false);
+                    setDescriptionValue(currentImage?.description || '');
+                  }}
+                  placeholder={config.descriptionPlaceholder}
+                  maxLength={1000}
+                  minHeight="120px"
+                  saveButtonText={config.saveButton}
+                  cancelButtonText={config.cancelButton}
+                />
               ) : (
                 <div>
                   <p 
