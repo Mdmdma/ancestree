@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { appConfig } from './config';
+import Button from './components/Button';
 
 const ContactButton = () => {
   const [showDialog, setShowDialog] = useState(false);
@@ -7,41 +8,24 @@ const ContactButton = () => {
   return (
     <>
       {/* Contact Button - Hidden on mobile */}
-      <button
-        onClick={() => setShowDialog(true)}
-        className="contact-button"
+      <div 
+        className="contact-button-container"
         style={{
           position: 'fixed',
           bottom: '20px',
           left: '20px',
-          backgroundColor: '#3498db',
-          color: 'white',
-          border: 'none',
-          padding: '12px 20px',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: '600',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 9999,
-          transition: 'all 0.2s ease',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}
-        onMouseEnter={(e) => {
-          e.target.style.backgroundColor = '#2980b9';
-          e.target.style.transform = 'translateY(-2px)';
-          e.target.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.backgroundColor = '#3498db';
-          e.target.style.transform = 'translateY(0)';
-          e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+          zIndex: 9999
         }}
       >
-        {appConfig.ui.contact.buttonText}
-      </button>
+        <Button
+          onClick={() => setShowDialog(true)}
+          variant="primary"
+          size="medium"
+          className="bg-[#3498db] hover:bg-[#2980b9] shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+        >
+          {appConfig.ui.contact.buttonText}
+        </Button>
+      </div>
 
       {/* Contact Dialog */}
       {showDialog && (
@@ -63,142 +47,137 @@ const ContactButton = () => {
         >
           <div
             style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '30px',
-              maxWidth: '500px',
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              padding: '40px 32px 32px 32px',
+              maxWidth: '520px',
               width: '90%',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-              color: '#2c3e50'
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-              borderBottom: '2px solid #ecf0f1',
-              paddingBottom: '15px'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '24px', color: '#2c3e50' }}>
+            <div 
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px',
+                paddingBottom: '20px',
+                borderBottom: '2px solid #e5e7eb'
+              }}
+            >
+              <h2 
+                style={{
+                  margin: 0,
+                  fontSize: '24px',
+                  fontWeight: '600',
+                  color: '#1f2937'
+                }}
+              >
                 {appConfig.ui.contact.dialogTitle}
               </h2>
               <button
                 onClick={() => setShowDialog(false)}
                 style={{
-                  background: 'none',
+                  background: 'transparent',
                   border: 'none',
-                  color: '#7f8c8d',
-                  fontSize: '28px',
+                  color: '#9ca3af',
+                  fontSize: '32px',
                   cursor: 'pointer',
-                  padding: '0',
+                  padding: '4px',
                   lineHeight: '1',
-                  transition: 'color 0.2s'
+                  transition: 'all 0.2s ease',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px'
                 }}
-                onMouseEnter={(e) => e.target.style.color = '#2c3e50'}
-                onMouseLeave={(e) => e.target.style.color = '#7f8c8d'}
+                onMouseEnter={(e) => {
+                  e.target.style.color = '#1f2937';
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = '#9ca3af';
+                  e.target.style.backgroundColor = 'transparent';
+                }}
               >
                 ×
               </button>
             </div>
 
             {/* Description */}
-            <div style={{
-              backgroundColor: '#ecf0f1',
-              padding: '20px',
-              borderRadius: '8px',
-              marginBottom: '20px'
-            }}>
-              <p style={{ 
-                margin: 0, 
-                fontSize: '15px', 
-                lineHeight: '1.6',
-                color: '#34495e'
-              }}>
+            <div 
+              style={{
+                backgroundColor: '#f9fafb',
+                padding: '24px',
+                borderRadius: '12px',
+                marginBottom: '24px'
+              }}
+            >
+              <p 
+                style={{
+                  margin: 0,
+                  fontSize: '16px',
+                  lineHeight: '1.625',
+                  color: '#374151'
+                }}
+              >
                 {appConfig.ui.contact.description}
               </p>
             </div>
 
             {/* Contact Buttons - Split */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              marginBottom: '12px'
-            }}>
+            <div 
+              style={{
+                display: 'flex',
+                gap: '16px'
+              }}
+            >
               {/* Email Button */}
-              <a
-                href={`mailto:${appConfig.ui.contact.emailAddress}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'block',
-                  flex: 1,
-                  textAlign: 'center',
-                  padding: '15px 10px',
-                  backgroundColor: '#3498db',
-                  color: 'white',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  transition: 'background-color 0.2s',
-                  boxShadow: '0 2px 8px rgba(52, 152, 219, 0.3)',
-                  boxSizing: 'border-box'
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#2980b9'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#3498db'}
-              >
-                {appConfig.ui.contact.emailButtonText}
-              </a>
+              <div style={{ flex: 1 }}>
+                <a
+                  href={`mailto:${appConfig.ui.contact.emailAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'block',
+                    textDecoration: 'none'
+                  }}
+                >
+                  <Button
+                    variant="primary"
+                    size="medium"
+                    className="bg-[#3498db] hover:bg-[#2980b9] shadow-md hover:shadow-lg w-full"
+                  >
+                    {appConfig.ui.contact.emailButtonText}
+                  </Button>
+                </a>
+              </div>
 
               {/* GitHub Button */}
-              <a
-                href={appConfig.ui.contact.githubUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'block',
-                  flex: 1,
-                  textAlign: 'center',
-                  padding: '15px 10px',
-                  backgroundColor: '#2c3e50',
-                  color: 'white',
-                  textDecoration: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  transition: 'background-color 0.2s',
-                  boxShadow: '0 2px 8px rgba(44, 62, 80, 0.3)',
-                  boxSizing: 'border-box'
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#1a252f'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#2c3e50'}
-              >
-                {appConfig.ui.contact.githubButtonText}
-              </a>
+              <div style={{ flex: 1 }}>
+                <a
+                  href={appConfig.ui.contact.githubUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'block',
+                    textDecoration: 'none'
+                  }}
+                >
+                  <Button
+                    variant="secondary"
+                    size="medium"
+                    className="bg-[#2c3e50] hover:bg-[#1a252f] shadow-md hover:shadow-lg w-full"
+                  >
+                    {appConfig.ui.contact.githubButtonText}
+                  </Button>
+                </a>
+              </div>
             </div>
-
-            {/* Close Button */}
-            <button
-              onClick={() => setShowDialog(false)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                backgroundColor: '#95a5a6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#7f8c8d'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#95a5a6'}
-            >
-              {appConfig.ui.contact.closeButton}
-            </button>
           </div>
         </div>
       )}
@@ -207,7 +186,7 @@ const ContactButton = () => {
       <style>
         {`
           @media (max-width: 768px) {
-            .contact-button {
+            .contact-button-container {
               display: none !important;
             }
           }

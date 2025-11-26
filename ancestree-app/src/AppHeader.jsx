@@ -1,5 +1,6 @@
 import React from 'react';
 import { appConfig } from './config';
+import Button from './components/Button';
 
 const AppHeader = ({ user, onLogout, onAdminClick }) => {
   return (
@@ -13,68 +14,33 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
     }}>
       {/* Logout Button */}
       {user && onLogout && (
-        <button
-          onClick={onLogout}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            backgroundColor: 'var(--header-bg)',
-            color: 'var(--header-text)',
-            border: 'none',
-            padding: '6px 12px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            zIndex: 1000
-          }}
-        >
-          <span>🚪</span>
-          {appConfig.header.logoutButton}
-        </button>
+        <div className="absolute top-[10px] right-[30px] z-[1000]">
+          <Button
+            onClick={onLogout}
+            variant="secondary"
+            size="medium"
+            icon="🚪"
+            className="bg-[var(--header-bg)] text-[var(--header-text)] hover:bg-[var(--header-bg)] hover:opacity-90"
+          >
+            {appConfig.header.logoutButton}
+          </Button>
+        </div>
       )}
 
       {/* User Info - Clickable for Admin Panel */}
       {user && (
-        <button
-          onClick={onAdminClick}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            left: '10px',
-            fontSize: '14px',
-            color: 'var(--header-user-text)',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            backgroundColor: 'var(--header-user-bg)',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            zIndex: 1000,
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-            e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-            e.target.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = 'var(--header-user-bg)';
-            e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-            e.target.style.transform = 'translateY(0)';
-          }}
-        >
-          <span>👨‍👩‍👧‍👦</span>
-          <span>{user.displayName || (user.familyName + ' Family')}</span>
-          <span style={{ fontSize: '10px', opacity: 0.7 }}>⚙️</span>
-        </button>
+        <div className="absolute top-[10px] left-[10px] z-[1000]">
+          <Button
+            onClick={onAdminClick}
+            variant="secondary"
+            size="medium"
+            className="bg-[var(--header-user-bg)] text-[var(--header-user-text)] hover:bg-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
+          >
+            <span>👨‍👩‍👧‍👦</span>
+            <span>{user.displayName || (user.familyName + ' Family')}</span>
+            <span className="text-[10px] opacity-70">⚙️</span>
+          </Button>
+        </div>
       )}
 
       <h1 className="mobile-hide-title" style={{ 
