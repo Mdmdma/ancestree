@@ -5,6 +5,9 @@ import { runEncryptionPerformanceTest, formatTestResults, getDatabaseFieldEstima
 import { enableEncryption, disableEncryption } from './encryptionBatchOperations';
 import { updateEncryptionStatus, getFamilyPassword, updatePassword, pauseKeyCheck, resumeKeyCheck } from './encryptionSession';
 import { exportFamilyDataWithMetadata } from './exportUtils';
+import TextInput from './components/TextInput';
+import Button from './components/Button';
+import DescriptionTextarea from './components/DescriptionTextarea';
 
 const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName, onDataReload }) => {
   const [adminPassword, setAdminPassword] = useState('');
@@ -425,21 +428,11 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   <small style={{ color: 'var(--login-text-muted)' }}>{appConfig.ui.adminPanel.defaultAdminNote}</small>
                 </p>
 
-                <input
+                <TextInput
                   type="password"
                   placeholder={appConfig.ui.adminPanel.authPrompt}
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    marginBottom: '10px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                  disabled={loading}
                 />
 
                 {authError && (
@@ -455,24 +448,15 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   </div>
                 )}
 
-                <button
+                <Button
                   type="submit"
                   disabled={loading || !adminPassword}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: loading ? '#95a5a6' : '#27ae60',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    transition: 'background-color 0.2s'
-                  }}
+                  variant="success"
+                  size="large"
+                  className="w-full"
                 >
                   {loading ? appConfig.ui.adminPanelCommon.authenticating : appConfig.ui.adminPanelCommon.authenticateButton}
-                </button>
+                </Button>
               </div>
             </form>
             </>
@@ -524,40 +508,36 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
               {activeTab === 'familyParameters' && (
                 <div style={{ backgroundColor: '#34495e', padding: '20px', borderRadius: '8px' }}>
                   <h3 style={{ marginTop: 0 }}>{appConfig.ui.adminPanel.familyParameters.title}</h3>
-                  <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.familyParameters.displayNameLabel}</label>
-                  <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} />
+                  <TextInput
+                    label={appConfig.ui.adminPanel.familyParameters.displayNameLabel}
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                  />
                   
-                  <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.familyParameters.adminEmailLabel}</label>
-                  <input 
-                    type="email" 
-                    value={adminEmail} 
+                  <TextInput
+                    label={appConfig.ui.adminPanel.familyParameters.adminEmailLabel}
+                    type="email"
+                    value={adminEmail}
                     onChange={(e) => {
                       setAdminEmail(e.target.value);
                       setEmailError('');
-                    }} 
-                    style={{ 
-                      width: '100%', 
-                      padding: '10px', 
-                      borderRadius: '6px', 
-                      border: emailError ? '2px solid #e74c3c' : 'none', 
-                      marginBottom: '5px' 
-                    }} 
+                    }}
+                    error={emailError}
+                    helperText={emailError || appConfig.ui.adminPanel.familyParameters.adminEmailHint}
                   />
-                  {emailError && (
-                    <div style={{ color: '#e74c3c', fontSize: '12px', marginBottom: '10px' }}>
-                      {emailError}
-                    </div>
-                  )}
-                  {!emailError && (
-                    <small style={{ display: 'block', color: '#95a5a6', fontSize: '12px', marginBottom: '10px' }}>
-                      {appConfig.ui.adminPanel.familyParameters.adminEmailHint}
-                    </small>
-                  )}
                   
-                  <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.familyParameters.purposeLabel}</label>
-                  <textarea value={purposePreview} onChange={(e) => setPurposePreview(e.target.value)} rows={4} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={async () => {
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'white', fontWeight: 'bold', fontSize: '14px' }}>
+                    {appConfig.ui.adminPanel.familyParameters.purposeLabel}
+                  </label>
+                  <DescriptionTextarea
+                    value={purposePreview}
+                    onChange={(e) => setPurposePreview(e.target.value)}
+                    placeholder="Describe the purpose of this family tree..."
+                    maxLength={600}
+                    showButtons={false}
+                  />
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                    <Button onClick={async () => {
                       // Validate email format
                       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                       if (adminEmail && !emailRegex.test(adminEmail)) {
@@ -583,7 +563,13 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                         setLoading(false); 
                         setTimeout(() => setSuccess(''), 3000); 
                       } 
-                    }} disabled={loading} style={{ padding: '10px', borderRadius: '6px', background: '#3498db', color: 'white', border: 'none' }}>{appConfig.ui.adminPanel.familyParameters.saveButton}</button>
+                    }} 
+                    disabled={loading}
+                    variant="primary"
+                    size="medium"
+                  >
+                    {appConfig.ui.adminPanel.familyParameters.saveButton}
+                  </Button>
                   </div>
                 </div>
               )}
@@ -637,22 +623,62 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                     )}
                     
                     {encryptionEnabled && (
-                      <div style={{ marginBottom: '10px' }}>
-                        <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanelCommon.currentFamilyPasswordLabel}</label>
-                        <input type="password" placeholder="Current Family Password" value={currentFamilyPassword} onChange={(e) => setCurrentFamilyPassword(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} disabled={loading || encryptionProgress !== null} />
-                      </div>
+                      <TextInput
+                        label={appConfig.ui.adminPanelCommon.currentFamilyPasswordLabel}
+                        type="password"
+                        placeholder="Current Family Password"
+                        value={currentFamilyPassword}
+                        onChange={(e) => setCurrentFamilyPassword(e.target.value)}
+                        disabled={loading || encryptionProgress !== null}
+                      />
                     )}
-                    <input type="password" placeholder="New Family Password" value={newFamilyPassword} onChange={(e) => setNewFamilyPassword(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} disabled={loading || encryptionProgress !== null} />
-                    <input type="password" placeholder="Confirm Family Password" value={confirmFamilyPassword} onChange={(e) => setConfirmFamilyPassword(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} disabled={loading || encryptionProgress !== null} />
-                    <button type="submit" disabled={loading || encryptionProgress !== null || !newFamilyPassword || !confirmFamilyPassword} style={{ padding: '10px', borderRadius: '6px', background: (loading || encryptionProgress !== null) ? '#95a5a6' : '#3498db', color: 'white', border: 'none' }}>{appConfig.ui.adminPanel.passwords.saveButton}</button>
+                    <TextInput
+                      type="password"
+                      placeholder="New Family Password"
+                      value={newFamilyPassword}
+                      onChange={(e) => setNewFamilyPassword(e.target.value)}
+                      disabled={loading || encryptionProgress !== null}
+                    />
+                    <TextInput
+                      type="password"
+                      placeholder="Confirm Family Password"
+                      value={confirmFamilyPassword}
+                      onChange={(e) => setConfirmFamilyPassword(e.target.value)}
+                      disabled={loading || encryptionProgress !== null}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={loading || encryptionProgress !== null || !newFamilyPassword || !confirmFamilyPassword}
+                      variant="primary"
+                      size="medium"
+                    >
+                      {appConfig.ui.adminPanel.passwords.saveButton}
+                    </Button>
                   </form>
 
                   <form onSubmit={handleChangeAdminPassword} style={{ marginTop: '12px', backgroundColor: '#34495e', padding: '20px', borderRadius: '8px' }}>
                     <h3 style={{ marginTop: 0 }}>{appConfig.ui.adminPanel.passwords.title} - Admin</h3>
-                    <label style={{ display: 'block', marginBottom: '6px' }}>{appConfig.ui.adminPanel.passwords.adminPasswordLabel}</label>
-                    <input type="password" placeholder="New Admin Password" value={newAdminPassword} onChange={(e) => setNewAdminPassword(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} />
-                    <input type="password" placeholder="Confirm Admin Password" value={confirmAdminPassword} onChange={(e) => setConfirmAdminPassword(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', marginBottom: '10px' }} />
-                    <button type="submit" disabled={loading || !newAdminPassword || !confirmAdminPassword} style={{ padding: '10px', borderRadius: '6px', background: '#e67e22', color: 'white', border: 'none' }}>{appConfig.ui.adminPanel.passwords.saveButton}</button>
+                    <TextInput
+                      label={appConfig.ui.adminPanel.passwords.adminPasswordLabel}
+                      type="password"
+                      placeholder="New Admin Password"
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                    />
+                    <TextInput
+                      type="password"
+                      placeholder="Confirm Admin Password"
+                      value={confirmAdminPassword}
+                      onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={loading || !newAdminPassword || !confirmAdminPassword}
+                      variant="primary"
+                      size="medium"
+                    >
+                      {appConfig.ui.adminPanel.passwords.saveButton}
+                    </Button>
                   </form>
                 </div>
               )}
