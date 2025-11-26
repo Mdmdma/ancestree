@@ -4,6 +4,7 @@ import { initializeSession } from './encryptionSession';
 import { appConfig } from './config.js';
 import TextInput from './components/TextInput';
 import Button from './components/Button';
+import ContactButton from './ContactButton';
 
 export default function Login({ onLoginSuccess }) {
   const [familyName, setFamilyName] = useState('');
@@ -11,6 +12,7 @@ export default function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [betaAccessPassword, setBetaAccessPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -65,7 +67,7 @@ export default function Login({ onLoginSuccess }) {
     try {
       let result;
       if (isRegistering) {
-        result = await api.register(familyName, password, displayName, adminPassword, adminEmail);
+        result = await api.register(familyName, password, displayName, adminPassword, adminEmail, betaAccessPassword);
       } else {
         result = await api.login(familyName, password);
       }
@@ -116,6 +118,7 @@ export default function Login({ onLoginSuccess }) {
     setPassword('');
     setAdminPassword('');
     setAdminEmail('');
+    setBetaAccessPassword('');
   };
 
   return (
@@ -202,6 +205,17 @@ export default function Login({ onLoginSuccess }) {
 
           {isRegistering && (
             <TextInput
+              label={appConfig.ui.login.form.betaAccessPasswordLabel}
+              type="password"
+              value={betaAccessPassword}
+              onChange={(e) => setBetaAccessPassword(e.target.value)}
+              placeholder={appConfig.ui.login.form.betaAccessPasswordPlaceholder}
+              helperText={appConfig.ui.login.form.betaAccessPasswordHint}
+            />
+          )}
+
+          {isRegistering && (
+            <TextInput
               label={appConfig.ui.login.form.adminPasswordLabel}
               type="password"
               value={adminPassword}
@@ -281,6 +295,9 @@ export default function Login({ onLoginSuccess }) {
           <p style={{ margin: '5px 0' }}>{appConfig.ui.login.security.authorizedOnly}</p>
         </div>
       </div>
+
+      {/* Contact Button */}
+      <ContactButton />
     </div>
   );
 }

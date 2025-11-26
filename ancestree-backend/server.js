@@ -402,10 +402,16 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Register endpoint (for family registration)
 app.post('/api/auth/register', async (req, res) => {
-  const { familyName, password, displayName, adminPassword, adminEmail } = req.body;
+  const { familyName, password, displayName, adminPassword, adminEmail, betaAccessPassword } = req.body;
 
   if (!familyName || !password) {
     return res.status(400).json({ error: 'Family name and password are required' });
+  }
+
+  // Check beta access password
+  const requiredBetaPassword = process.env.BETA_ACCESS_PASSWORD;
+  if (requiredBetaPassword && betaAccessPassword !== requiredBetaPassword) {
+    return res.status(403).json({ error: 'Invalid beta access password' });
   }
 
   if (!adminPassword) {
