@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api, getLastFamilyName } from './api.js';
 import { initializeSession } from './encryptionSession';
 import { appConfig } from './config.js';
+import TextInput from './components/TextInput';
+import Button from './components/Button';
 
 export default function Login({ onLoginSuccess }) {
   const [familyName, setFamilyName] = useState('');
@@ -154,17 +156,19 @@ export default function Login({ onLoginSuccess }) {
           }}>
             {isRegistering ? appConfig.ui.login.welcome.titleRegister : appConfig.ui.login.welcome.titleLogin}
           </h2>
-          <p style={{
-            fontSize: '14px',
-            color: 'var(--login-text-secondary)',
-            margin: '0',
-            lineHeight: '1.4'
-          }}>
-            {authStatus?.requiresSetup ? 
-              appConfig.ui.login.welcome.setupDescription : 
-              (isRegistering ? appConfig.ui.login.welcome.registerDescription : appConfig.ui.login.welcome.loginDescription)
-            }
-          </p>
+          {!isRegistering && (
+            <p style={{
+              fontSize: '14px',
+              color: 'var(--login-text-secondary)',
+              margin: '0',
+              lineHeight: '1.4'
+            }}>
+              {authStatus?.requiresSetup ? 
+                appConfig.ui.login.welcome.setupDescription : 
+                appConfig.ui.login.welcome.loginDescription
+              }
+            </p>
+          )}
         </div>
 
         {/* Error Message */}
@@ -188,231 +192,78 @@ export default function Login({ onLoginSuccess }) {
           gap: '15px',
           textAlign: 'left'
         }}>
-          <div>
-            <label style={{
-              display: 'block',
-              marginBottom: '5px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: 'var(--login-text-primary)'
-            }}>
-              {isRegistering ? appConfig.ui.login.form.familyIdLabel : appConfig.ui.login.form.familyNameLabel}
-            </label>
-            <input
-              type="text"
-              value={familyName}
-              onChange={(e) => setFamilyName(e.target.value)}
-              placeholder={isRegistering ? appConfig.ui.login.form.familyIdPlaceholder : appConfig.ui.login.form.familyNamePlaceholder}
-              required
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '6px',
-                border: '2px solid var(--login-input-border)',
-                backgroundColor: 'var(--login-input-bg)',
-                color: 'var(--login-input-text)',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-            {isRegistering && (
-              <small style={{
-                display: 'block',
-                marginTop: '5px',
-                fontSize: '12px',
-                color: 'var(--login-text-secondary)'
-              }}>
-                {appConfig.ui.login.form.familyIdHint}
-              </small>
-            )}
-          </div>
+          <TextInput
+            label={isRegistering ? appConfig.ui.login.form.familyIdLabel : appConfig.ui.login.form.familyNameLabel}
+            value={familyName}
+            onChange={(e) => setFamilyName(e.target.value)}
+            placeholder={isRegistering ? appConfig.ui.login.form.familyIdPlaceholder : appConfig.ui.login.form.familyNamePlaceholder}
+            helperText={isRegistering ? appConfig.ui.login.form.familyIdHint : ''}
+          />
 
           {isRegistering && (
-            <div>
-              <label style={{
-                display: 'block',
-                marginBottom: '5px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: 'var(--login-text-primary)'
-              }}>
-                {appConfig.ui.login.form.adminPasswordLabel}
-              </label>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder={appConfig.ui.login.form.adminPasswordPlaceholder}
-                required
-                minLength={6}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  border: '2px solid var(--login-input-border)',
-                  backgroundColor: 'var(--login-input-bg)',
-                  color: 'var(--login-input-text)',
-                  fontSize: '14px',
-                  boxSizing: 'border-box'
-                }}
-              />
-              <small style={{
-                display: 'block',
-                marginTop: '5px',
-                fontSize: '12px',
-                color: 'var(--login-text-secondary)'
-              }}>
-                {appConfig.ui.login.form.adminPasswordHint}
-              </small>
-            </div>
-          )}
-
-          {isRegistering && (
-            <div>
-              <label style={{
-                display: 'block',
-                marginBottom: '5px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: 'var(--login-text-primary)'
-              }}>
-                {appConfig.ui.login.form.adminEmailLabel}
-              </label>
-              <input
-                type="email"
-                value={adminEmail}
-                onChange={(e) => {
-                  setAdminEmail(e.target.value);
-                  setEmailError('');
-                }}
-                placeholder={appConfig.ui.login.form.adminEmailPlaceholder}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  border: emailError ? '2px solid #e74c3c' : '2px solid var(--login-input-border)',
-                  backgroundColor: 'var(--login-input-bg)',
-                  color: 'var(--login-input-text)',
-                  fontSize: '14px',
-                  boxSizing: 'border-box'
-                }}
-              />
-              <small style={{
-                display: 'block',
-                marginTop: '5px',
-                fontSize: '12px',
-                color: emailError ? '#e74c3c' : 'var(--login-text-secondary)'
-              }}>
-                {emailError || appConfig.ui.login.form.adminEmailHint}
-              </small>
-            </div>
-          )}
-
-          {isRegistering && (
-            <div>
-              <label style={{
-                display: 'block',
-                marginBottom: '5px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: 'var(--login-text-primary)'
-              }}>
-                {appConfig.ui.login.form.displayNameLabel}
-              </label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder={appConfig.ui.login.form.displayNamePlaceholder}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  border: '2px solid var(--login-input-border)',
-                  backgroundColor: 'var(--login-input-bg)',
-                  color: 'var(--login-input-text)',
-                  fontSize: '14px',
-                  boxSizing: 'border-box'
-                }}
-              />
-              <small style={{
-                display: 'block',
-                marginTop: '5px',
-                fontSize: '12px',
-                color: 'var(--login-text-secondary)'
-              }}>
-                {appConfig.ui.login.form.displayNameHint}
-              </small>
-            </div>
-          )}
-
-          <div>
-            <label style={{
-              display: 'block',
-              marginBottom: '5px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: 'var(--login-text-primary)'
-            }}>
-              {isRegistering ? appConfig.ui.login.form.createPasswordLabel : appConfig.ui.login.form.passwordLabel}
-            </label>
-            <input
+            <TextInput
+              label={appConfig.ui.login.form.adminPasswordLabel}
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={isRegistering ? appConfig.ui.login.form.createPasswordPlaceholder : appConfig.ui.login.form.passwordPlaceholder}
-              required
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '6px',
-                border: '2px solid var(--login-input-border)',
-                backgroundColor: 'var(--login-input-bg)',
-                color: 'var(--login-input-text)',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              placeholder={appConfig.ui.login.form.adminPasswordPlaceholder}
+              helperText={appConfig.ui.login.form.adminPasswordHint}
             />
-          </div>
+          )}
 
-          <button
+          {isRegistering && (
+            <TextInput
+              label={appConfig.ui.login.form.adminEmailLabel}
+              type="email"
+              value={adminEmail}
+              onChange={(e) => {
+                setAdminEmail(e.target.value);
+                setEmailError('');
+              }}
+              placeholder={appConfig.ui.login.form.adminEmailPlaceholder}
+              error={emailError}
+              helperText={emailError || appConfig.ui.login.form.adminEmailHint}
+            />
+          )}
+
+          {isRegistering && (
+            <TextInput
+              label={appConfig.ui.login.form.displayNameLabel}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={appConfig.ui.login.form.displayNamePlaceholder}
+              helperText={appConfig.ui.login.form.displayNameHint}
+            />
+          )}
+
+          <TextInput
+            label={isRegistering ? appConfig.ui.login.form.createPasswordLabel : appConfig.ui.login.form.passwordLabel}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={isRegistering ? appConfig.ui.login.form.createPasswordPlaceholder : appConfig.ui.login.form.passwordPlaceholder}
+          />
+
+          <Button
             type="submit"
+            variant="success"
+            size="large"
             disabled={loading}
-            style={{
-              backgroundColor: 'var(--login-button-success)',
-              color: 'white',
-              border: 'none',
-              padding: '14px',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-              marginTop: '10px'
-            }}
+            className="w-full mt-2.5"
           >
             {loading ? appConfig.ui.login.buttons.pleaseWait : (isRegistering ? appConfig.ui.login.buttons.register : appConfig.ui.login.buttons.login)}
-          </button>
+          </Button>
 
           {!authStatus?.requiresSetup && (
-            <button
+            <Button
               type="button"
               onClick={toggleMode}
-              style={{
-                backgroundColor: 'transparent',
-                color: 'var(--login-button-info)',
-                border: '2px solid var(--login-button-info)',
-                padding: '10px',
-                borderRadius: '6px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                marginTop: '10px'
-              }}
+              variant="secondary"
+              size="medium"
+              className="w-full mt-2.5"
             >
               {isRegistering ? appConfig.ui.login.buttons.switchToLogin : appConfig.ui.login.buttons.switchToRegister}
-            </button>
+            </Button>
           )}
         </form>
 

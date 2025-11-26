@@ -220,8 +220,8 @@ export const appConfig = {
         housenumber: 'Nr:',
         city: 'Stadt:',
         zip: 'PLZ:',
-        country: 'Land (Code):',
-        addressAutocomplete: 'Adresse (mit Autovervollständigung)'
+        country: 'Land:',
+        addressAutocomplete: 'Adresssuche'
       },
       placeholders: {
         phone: 'z.B. +43 5287 87123',

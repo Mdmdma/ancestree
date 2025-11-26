@@ -42,7 +42,7 @@ const TextInput = ({
         style={{
           width: '100%',
           padding: '8px 12px',
-          marginBottom: '10px',
+          marginBottom: '3px',
           backgroundColor: readOnly ? '#374151' : 'white',
           border: error ? '2px solid #ef4444' : '1px solid #d1d5db',
           borderRadius: '6px',
@@ -56,12 +56,24 @@ const TextInput = ({
         {...props}
       />
       {error && (
-        <div className="text-red-500 text-xs mt-1 mb-2">
+        <div style={{ 
+          color: '#ef4444', 
+          fontSize: '11px', 
+          marginTop: '3px',
+          marginBottom: '8px',
+          lineHeight: '1.3'
+        }}>
           {error}
         </div>
       )}
       {helperText && !error && (
-        <div className="text-gray-400 text-xs mt-1 mb-2">
+        <div style={{ 
+          color: '#9ca3af', 
+          fontSize: '11px', 
+          marginTop: '3px',
+          marginBottom: '8px',
+          lineHeight: '1.3'
+        }}>
           {helperText}
         </div>
       )}
