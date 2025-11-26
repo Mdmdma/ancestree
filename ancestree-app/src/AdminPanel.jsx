@@ -60,6 +60,20 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteError, setDeleteError] = useState('');
 
+  // Completion settings state
+  const [completionSettings, setCompletionSettings] = useState({
+    showMissingRequired: false,
+    requireName: true,
+    requireSurname: true,
+    requireMaidenName: true,
+    requireBirthDate: true,
+    requireStreetFields: true,
+    requireCityZip: true,
+    requireCountry: true,
+    requirePhone: true,
+    requireEmail: true
+  });
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -98,6 +112,10 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
         setDisplayName(adminSettings.display_name || '');
         setPurposePreview(adminSettings.purpose || '');
         setAdminEmail(adminSettings.admin_email || '');
+
+        // Fetch completion settings
+        const completionData = await encryptedApi.getCompletionSettings();
+        setCompletionSettings(completionData);
       } catch (err) {
         console.error('Failed to fetch settings:', err);
         // ignore if not authenticated
@@ -472,6 +490,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
               <button onClick={() => setActiveTab('passwords')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'passwords' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.passwords}</button>
               <button onClick={() => setActiveTab('security')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'security' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.security}</button>
               <button onClick={() => setActiveTab('visibleFields')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'visibleFields' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.visibleFields}</button>
+              <button onClick={() => setActiveTab('completion')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'completion' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.completion}</button>
               <button onClick={() => setActiveTab('dataExport')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'dataExport' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.dataExport}</button>
               <button onClick={() => setActiveTab('test')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'test' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>🧪 Test</button>
               <button onClick={() => setActiveTab('dangerZone')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'dangerZone' ? '#c0392b' : 'transparent', color: activeTab === 'dangerZone' ? 'white' : '#e74c3c', border: '1px solid #e74c3c', textAlign: 'left', fontWeight: '600' }}>{appConfig.ui.adminPanel.menu.dangerZone}</button>
@@ -1124,6 +1143,550 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       : appConfig.ui.adminPanel.dataExport.downloadButton
                     }
                   </button>
+                </div>
+              )}
+
+              {activeTab === 'completion' && (
+                <div style={{ backgroundColor: '#34495e', padding: '20px', borderRadius: '8px' }}>
+                  <h3 style={{ marginTop: 0 }}>{appConfig.ui.adminPanel.completion.title}</h3>
+                  <p style={{ color: '#bdc3c7', fontSize: '14px', marginBottom: '20px' }}>
+                    {appConfig.ui.adminPanel.completion.description}
+                  </p>
+
+                  {/* Main toggle for showing incomplete nodes */}
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ color: 'white', flex: 1 }}>
+                      {appConfig.ui.adminPanel.completion.mainToggleLabel}
+                      <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                        {appConfig.ui.adminPanel.completion.mainToggleHint}
+                      </div>
+                    </label>
+                    <button
+                      disabled={loading}
+                      onClick={async () => {
+                        const newValue = !completionSettings.showMissingRequired;
+                        setLoading(true);
+                        setError('');
+                        try {
+                          const { encryptedApi } = await import('./encryptedApi');
+                          const updatedSettings = {
+                            ...completionSettings,
+                            showMissingRequired: newValue
+                          };
+                          await encryptedApi.updateCompletionSettings(updatedSettings);
+                          setCompletionSettings(updatedSettings);
+                          setSuccess(appConfig.ui.adminPanel.completion.success);
+                          setTimeout(() => setSuccess(''), 3000);
+                          // Trigger data reload to update node displays
+                          if (onDataReload) onDataReload();
+                        } catch (err) {
+                          setError(err.message || appConfig.ui.adminPanel.completion.settingsUpdateError);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      style={{
+                        position: 'relative',
+                        width: '60px',
+                        height: '30px',
+                        borderRadius: '15px',
+                        border: 'none',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        backgroundColor: completionSettings.showMissingRequired ? '#27ae60' : '#7f8c8d',
+                        transition: 'background-color 0.3s ease',
+                        opacity: loading ? 0.6 : 1,
+                        padding: 0
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: completionSettings.showMissingRequired ? '33px' : '3px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: 'white',
+                        transition: 'left 0.3s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                  </div>
+
+                  {/* Required fields section */}
+                  <div style={{ backgroundColor: '#2c3e50', padding: '15px', borderRadius: '8px', marginTop: '20px' }}>
+                    <h4 style={{ color: 'white', marginTop: 0, marginBottom: '15px' }}>{appConfig.ui.adminPanel.completion.requiredFieldsTitle}</h4>
+                    <p style={{ color: '#bdc3c7', fontSize: '14px', marginBottom: '15px' }}>
+                      {appConfig.ui.adminPanel.completion.requiredFieldsDescription}
+                    </p>
+
+                    {/* Name */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.name.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.name.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireName;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireName: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireName ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireName ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Surname */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.surname.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.surname.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireSurname;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireSurname: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireSurname ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireSurname ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Maiden Name */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.maidenName.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.maidenName.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireMaidenName;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireMaidenName: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireMaidenName ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireMaidenName ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Birth Date */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.birthDate.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.birthDate.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireBirthDate;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireBirthDate: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireBirthDate ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireBirthDate ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Street & House Number */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.streetFields.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.streetFields.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireStreetFields;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireStreetFields: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireStreetFields ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireStreetFields ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* City & ZIP */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.cityZip.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.cityZip.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireCityZip;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireCityZip: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireCityZip ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireCityZip ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Country */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.country.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.country.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireCountry;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireCountry: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireCountry ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireCountry ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Phone */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.phone.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.phone.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requirePhone;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requirePhone: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requirePhone ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requirePhone ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Email */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.email.label}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.email.hint}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireEmail;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireEmail: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireEmail ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireEmail ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -755,6 +755,18 @@ export const encryptedApi = {
   // Pass through cleanup
   cleanup: baseApi.cleanup,
 
+  // Completion settings operations
+  async getCompletionSettings() {
+    const settings = await baseApi.getCompletionSettings();
+    // Completion settings are not encrypted - they're just booleans
+    return settings;
+  },
+
+  async updateCompletionSettings(settings) {
+    const result = await baseApi.updateCompletionSettings(settings);
+    return result;
+  },
+
   /**
    * Change password with automatic re-encryption
    * This is equivalent to: disable encryption → change password → enable encryption

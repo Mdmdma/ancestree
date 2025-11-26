@@ -8,8 +8,9 @@ import Button from './components/Button';
 import { appConfig } from './config';
 import { queueGeocoding } from './geocodingService';
 import { api } from './api';
+import { isFieldIncomplete } from './completionUtils';
 
-function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [], socket }) {
+function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [], socket, completionSettings }) {
   const { deleteElements } = useReactFlow();
   
   const [formData, setFormData] = useState({
@@ -296,12 +297,14 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         value={formData.name}
         onChange={(e) => handleInputChange('name', e.target.value)}
         inputRef={nameInputRef}
+        error={completionSettings?.showMissingRequired && isFieldIncomplete('name', formData, completionSettings) ? ' ' : ''}
       />
 
       <TextInput
         label={appConfig.ui.nodeEditor.labels.surname}
         value={formData.surname}
         onChange={(e) => handleInputChange('surname', e.target.value)}
+        error={completionSettings?.showMissingRequired && isFieldIncomplete('surname', formData, completionSettings) ? ' ' : ''}
       />
 
       <TextInput
@@ -309,12 +312,14 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         value={formData.maidenName}
         onChange={(e) => handleInputChange('maidenName', e.target.value)}
         placeholder={appConfig.ui.nodeEditor.placeholders.maidenName}
+        error={completionSettings?.showMissingRequired && isFieldIncomplete('maidenName', formData, completionSettings) ? ' ' : ''}
       />
 
       <DateInput
         label={appConfig.ui.nodeEditor.labels.birthDate}
         value={formData.birthDate}
         onChange={(e) => handleInputChange('birthDate', e.target.value)}
+        error={completionSettings?.showMissingRequired && isFieldIncomplete('birthDate', formData, completionSettings) ? ' ' : ''}
       />
 
       <DateInput
@@ -333,7 +338,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
           value={formData.phone || '+'}
           onChange={(e) => handleInputChange('phone', e.target.value)}
           placeholder={appConfig.ui.nodeEditor.placeholders.phone}
-          error={phoneError}
+          error={phoneError || (completionSettings?.showMissingRequired && isFieldIncomplete('phone', formData, completionSettings) ? ' ' : '')}
         />
       )}
 
@@ -345,7 +350,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
           value={formData.email}
           onChange={(e) => handleInputChange('email', e.target.value)}
           placeholder={appConfig.ui.nodeEditor.placeholders.email}
-          error={emailError}
+          error={emailError || (completionSettings?.showMissingRequired && isFieldIncomplete('email', formData, completionSettings) ? ' ' : '')}
         />
       )}
 
@@ -379,6 +384,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
               value={formData.street}
               onChange={(e) => handleInputChange('street', e.target.value)}
               placeholder={appConfig.ui.nodeEditor.placeholders.street}
+              error={completionSettings?.showMissingRequired && isFieldIncomplete('street', formData, completionSettings) ? ' ' : ''}
             />
           </div>
           <div style={{ flex: '0 0 35%' }}>
@@ -388,6 +394,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
               onChange={(e) => handleInputChange('housenumber', e.target.value)}
               placeholder={appConfig.ui.nodeEditor.placeholders.housenumber}
               maxLength={10}
+              error={completionSettings?.showMissingRequired && isFieldIncomplete('housenumber', formData, completionSettings) ? ' ' : ''}
             />
           </div>
         </div>
@@ -400,6 +407,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
             value={formData.city}
             onChange={(e) => handleInputChange('city', e.target.value)}
             placeholder={appConfig.ui.nodeEditor.placeholders.city}
+            error={completionSettings?.showMissingRequired && isFieldIncomplete('city', formData, completionSettings) ? ' ' : ''}
           />
         </div>
         <div style={{ flex: '0 0 35%' }}>
@@ -408,6 +416,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
             value={formData.zip}
             onChange={(e) => handleInputChange('zip', e.target.value)}
             placeholder={appConfig.ui.nodeEditor.placeholders.zip}
+            error={completionSettings?.showMissingRequired && isFieldIncomplete('zip', formData, completionSettings) ? ' ' : ''}
           />
         </div>
       </div>
@@ -418,6 +427,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         onChange={(e) => handleInputChange('country', e.target.value.toUpperCase())}
         placeholder={appConfig.ui.nodeEditor.placeholders.country}
         maxLength={2}
+        error={completionSettings?.showMissingRequired && isFieldIncomplete('country', formData, completionSettings) ? ' ' : ''}
       />
 
       {isDebugMode && (

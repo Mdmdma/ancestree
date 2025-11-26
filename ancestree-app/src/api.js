@@ -218,6 +218,37 @@ export const api = {
     return result;
   },
 
+  // Completion settings operations
+  async getCompletionSettings() {
+    const response = await fetch(`${API_BASE_URL}/completion/settings`, {
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to fetch completion settings');
+    }
+    
+    return result;
+  },
+
+  async updateCompletionSettings(settings) {
+    const response = await fetch(`${API_BASE_URL}/completion/settings`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(settings)
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update completion settings');
+    }
+    
+    return result;
+  },
+
   // Admin settings operations (key-value store in family database)
   async getAdminSettings() {
     const response = await fetch(`${API_BASE_URL}/admin/settings`, {

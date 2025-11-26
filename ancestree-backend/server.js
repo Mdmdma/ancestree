@@ -972,6 +972,132 @@ app.post('/api/family/encryption', authenticateToken, (req, res) => {
   );
 });
 
+// Get completion settings
+app.get('/api/completion/settings', authenticateToken, (req, res) => {
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    familyDb.get('SELECT * FROM completion_settings ORDER BY id DESC LIMIT 1', [], (err, settings) => {
+      if (err) {
+        console.error('Database error fetching completion settings:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!settings) {
+        // Return default settings if none exist
+        return res.json({
+          showMissingRequired: false,
+          requireName: true,
+          requireSurname: true,
+          requireMaidenName: true,
+          requireBirthDate: true,
+          requireStreetFields: true,
+          requireCityZip: true,
+          requireCountry: true,
+          requirePhone: true,
+          requireEmail: true
+        });
+      }
+
+      res.json({
+        showMissingRequired: Boolean(settings.show_missing_required),
+        requireName: Boolean(settings.require_name),
+        requireSurname: Boolean(settings.require_surname),
+        requireMaidenName: Boolean(settings.require_maiden_name),
+        requireBirthDate: Boolean(settings.require_birth_date),
+        requireStreetFields: Boolean(settings.require_street_fields),
+        requireCityZip: Boolean(settings.require_city_zip),
+        requireCountry: Boolean(settings.require_country),
+        requirePhone: Boolean(settings.require_phone),
+        requireEmail: Boolean(settings.require_email)
+      });
+    });
+  });
+});
+
+// Update completion settings
+app.post('/api/completion/settings', authenticateToken, (req, res) => {
+  const {
+    showMissingRequired,
+    requireName,
+    requireSurname,
+    requireMaidenName,
+    requireBirthDate,
+    requireStreetFields,
+    requireCityZip,
+    requireCountry,
+    requirePhone,
+    requireEmail
+  } = req.body;
+
+  getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
+    if (err) {
+      console.error('Error getting family database:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    // Check if settings exist
+    familyDb.get('SELECT id FROM completion_settings LIMIT 1', [], (err, existingSettings) => {
+      if (err) {
+        console.error('Database error checking completion settings:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      const query = existingSettings
+        ? `UPDATE completion_settings SET 
+             show_missing_required = ?,
+             require_name = ?,
+             require_surname = ?,
+             require_maiden_name = ?,
+             require_birth_date = ?,
+             require_street_fields = ?,
+             require_city_zip = ?,
+             require_country = ?,
+             require_phone = ?,
+             require_email = ?,
+             updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        : `INSERT INTO completion_settings (
+             show_missing_required, require_name, require_surname, require_maiden_name,
+             require_birth_date, require_street_fields, require_city_zip, require_country,
+             require_phone, require_email
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+      const params = [
+        showMissingRequired ? 1 : 0,
+        requireName ? 1 : 0,
+        requireSurname ? 1 : 0,
+        requireMaidenName ? 1 : 0,
+        requireBirthDate ? 1 : 0,
+        requireStreetFields ? 1 : 0,
+        requireCityZip ? 1 : 0,
+        requireCountry ? 1 : 0,
+        requirePhone ? 1 : 0,
+        requireEmail ? 1 : 0
+      ];
+
+      if (existingSettings) {
+        params.push(existingSettings.id);
+      }
+
+      familyDb.run(query, params, function(err) {
+        if (err) {
+          console.error('Database error updating completion settings:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        res.json({ 
+          success: true, 
+          message: 'Completion settings updated successfully' 
+        });
+      });
+    });
+  });
+});
+
 // ============= PROTECTED API ENDPOINTS =============
 
 // Socket.IO connection handling for real-time collaboration

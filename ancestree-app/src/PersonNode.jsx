@@ -1,9 +1,15 @@
 import React from "react";
 import { Position } from "@xyflow/react";
 import CustomHandle from "./CustomHandle";
+import { checkNodeCompletion } from "./completionUtils";
 
 export default function PersonNode({ data, selected }) {
-  const { name, surname, birthDate, deathDate, street, city, zip, country, phone, email, latitude, longitude, isDebugMode } = data;
+  const { name, surname, birthDate, deathDate, street, city, zip, country, phone, email, latitude, longitude, isDebugMode, completionSettings } = data;
+
+  // Check if node is complete
+  const { isComplete } = checkNodeCompletion(data, completionSettings);
+  const showIncompleteWarning = completionSettings?.showMissingRequired && !isComplete;
+  const showCompleteIndicator = completionSettings?.showMissingRequired && isComplete;
 
   // Format address display
   const formatAddress = () => {
@@ -56,7 +62,11 @@ export default function PersonNode({ data, selected }) {
           justifyContent: "center",
           borderRadius: "8px",
           backgroundColor: "var(--node-person-bg)",
-          border: "2px solid #bbbdbf",
+          border: showIncompleteWarning 
+            ? "2px solid #ef4444" 
+            : showCompleteIndicator 
+              ? "2px solid #22c55e" 
+              : "2px solid #bbbdbf",
           padding: "8px 12px",
           width: "120px",
           height: "40px",
@@ -90,7 +100,11 @@ export default function PersonNode({ data, selected }) {
         alignItems: "flex-start",
         borderRadius: "8px",
         backgroundColor: "var(--node-person-bg-selected)",
-        border: "3px solid #09380dff",
+        border: showIncompleteWarning 
+          ? "3px solid #ef4444" 
+          : showCompleteIndicator 
+            ? "3px solid #22c55e" 
+            : "3px solid #09380dff",
         padding: "12px",
         gap: "8px",
         width: "200px",

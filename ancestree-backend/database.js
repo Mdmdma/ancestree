@@ -336,6 +336,47 @@ const initializeFamilyDb = (familyDb) => {
       }
     });
 
+    // Completion settings table for tracking required fields
+    familyDb.run(`CREATE TABLE IF NOT EXISTS completion_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      show_missing_required BOOLEAN DEFAULT 0,
+      require_name BOOLEAN DEFAULT 1,
+      require_surname BOOLEAN DEFAULT 1,
+      require_maiden_name BOOLEAN DEFAULT 1,
+      require_birth_date BOOLEAN DEFAULT 1,
+      require_street_fields BOOLEAN DEFAULT 1,
+      require_city_zip BOOLEAN DEFAULT 1,
+      require_country BOOLEAN DEFAULT 1,
+      require_phone BOOLEAN DEFAULT 1,
+      require_email BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating completion_settings table:', err);
+      } else {
+        console.log('Completion settings table initialized');
+        // Insert default settings if table is empty
+        familyDb.get("SELECT COUNT(*) as count FROM completion_settings", [], (err, row) => {
+          if (err) {
+            console.error('Error checking completion_settings count:', err);
+          } else if (row && row.count === 0) {
+            familyDb.run(`INSERT INTO completion_settings (
+              show_missing_required, require_name, require_surname, require_maiden_name,
+              require_birth_date, require_street_fields, require_city_zip, require_country,
+              require_phone, require_email
+            ) VALUES (0, 1, 1, 1, 1, 1, 1, 1, 1, 1)`, (err) => {
+              if (err) {
+                console.error('Error inserting default completion settings:', err);
+              } else {
+                console.log('Inserted default completion settings');
+              }
+            });
+          }
+        });
+      }
+    });
+
     // Migration: Add last_geocoded column to nodes table if it doesn't exist
     familyDb.all("PRAGMA table_info(nodes)", (err, columns) => {
       if (err) {

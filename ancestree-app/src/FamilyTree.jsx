@@ -237,7 +237,8 @@ const FamilyTree = ({
   setSelectedNode, 
   showDebug, 
   onNodeUpdate,
-  socketData
+  socketData,
+  onCompletionSettingsLoad
 }) => {
   const [loading, setLoading] = useState(true);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -248,6 +249,7 @@ const FamilyTree = ({
   const [initialFitDone, setInitialFitDone] = useState(false);
   const [reactFlowReady, setReactFlowReady] = useState(false);
   const [batchOperationActive, setBatchOperationActive] = useState(false);
+  const [completionSettings, setCompletionSettings] = useState(null);
 
   // Real-time collaboration setup - use provided socket data
   const { socket, isConnected, userCount, isCollaborating } = socketData || {};
@@ -563,10 +565,14 @@ const FamilyTree = ({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [nodesData, edgesData] = await Promise.all([
+        const [nodesData, edgesData, completionData] = await Promise.all([
           encryptedApi.loadNodes(),
-          encryptedApi.loadEdges()
+          encryptedApi.loadEdges(),
+          encryptedApi.getCompletionSettings()
         ]);
+        
+        // Store completion settings
+        setCompletionSettings(completionData);
         
         // Ensure nodes have proper React Flow properties
         const processedNodes = nodesData.map(node => ({
@@ -578,7 +584,8 @@ const FamilyTree = ({
             // Provide defaults for new fields if they don't exist
             // Family nodes are always on the bloodline
             bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-            isDebugMode: showDebug // Add debug mode to node data
+            isDebugMode: showDebug, // Add debug mode to node data
+            completionSettings: completionData // Add completion settings to node data
             // isRecentChange removed - transient UI state
             // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
           }
@@ -612,6 +619,13 @@ const FamilyTree = ({
     loadData();
   }, [setNodes, setEdges, showDebug]);
 
+  // Notify parent when completion settings are loaded
+  useEffect(() => {
+    if (completionSettings && onCompletionSettingsLoad) {
+      onCompletionSettingsLoad(completionSettings);
+    }
+  }, [completionSettings, onCompletionSettingsLoad]);
+
   // Fit view when BOTH ReactFlow is ready AND nodes are loaded
   useEffect(() => {
     console.log('[FIT VIEW] Check conditions - reactFlowReady:', reactFlowReady, 'loading:', loading, 'nodes:', nodes.length, 'initialFitDone:', initialFitDone);
@@ -638,10 +652,16 @@ const FamilyTree = ({
   // Function to refresh data from database (for ensuring sync)
   const refreshData = useCallback(async () => {
     try {
-      const [nodesData, edgesData] = await Promise.all([
+      const [nodesData, edgesData, completionData] = await Promise.all([
         encryptedApi.loadNodes(),
-        encryptedApi.loadEdges()
+        encryptedApi.loadEdges(),
+        encryptedApi.getCompletionSettings()
       ]);
+      
+      // Update completion settings state
+      if (completionData) {
+        setCompletionSettings(completionData);
+      }
       
       // Process nodes with React Flow properties
       const processedNodes = nodesData.map(node => ({
@@ -651,7 +671,8 @@ const FamilyTree = ({
         data: {
           ...node.data,
           bloodline: node.type === 'family' ? true : (node.data.bloodline !== undefined ? node.data.bloodline : true),
-          isDebugMode: showDebug // Add debug mode to node data
+          isDebugMode: showDebug, // Add debug mode to node data
+          completionSettings: completionData || completionSettings // Use fresh settings
           // isRecentChange removed - transient UI state
           // isSelected removed - managed by App.jsx and React Flow (Strategy 3)
         }
@@ -676,7 +697,7 @@ const FamilyTree = ({
     } catch (error) {
       console.error('❌ [FamilyTree] Failed to refresh data:', error);
     }
-  }, [setNodes, setEdges, showDebug]);
+  }, [setNodes, setEdges, showDebug, completionSettings]);
 
   // Auto layout using ELK
   const autoLayout = useCallback(async () => {
@@ -1871,7 +1892,7 @@ const FamilyTree = ({
               const newNodeData = {
                 name: appConfig.ui.defaultNames.partner,
                 surname: sourceNode.data.surname || '',
-                birthDate: `${partnerBirthYear}-01-01`,
+                birthDate: '',
                 deathDate: '',
                 city: sourceNode.data.city || '',
                 zip: sourceNode.data.zip || '',
@@ -1965,7 +1986,7 @@ const FamilyTree = ({
             const personNodeData = {
               name: personName,
               surname: sourceNode.data.surname || '',
-              birthDate: `${personBirthYear}-01-01`,
+              birthDate: '',
               deathDate: '',
               city: sourceNode.data.city || '',
               zip: sourceNode.data.zip || '',

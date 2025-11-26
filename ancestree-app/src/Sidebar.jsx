@@ -25,7 +25,8 @@ const Sidebar = ({
   nodeHasConnections,
   galleryViewMode,
   onGalleryViewModeChange,
-  socket
+  socket,
+  completionSettings
 }) => {
   const { autoLayout, fitTreeToView } = treeOperations || {};
 
@@ -148,6 +149,7 @@ const Sidebar = ({
                 nodes={nodes}
                 edges={edges}
                 socket={socket}
+                completionSettings={completionSettings}
               />
             ) : (
               <div style={{ color: 'var(--sidebar-text)' }}>

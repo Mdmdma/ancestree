@@ -30,6 +30,7 @@ const AddNodeOnEdgeDrop = () => {
   const [galleryViewMode, setGalleryViewMode] = useState('gallery'); // Track gallery view mode for mobile sidebar height
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [completionSettings, setCompletionSettings] = useState(null);
 
   // Initialize socket connection when authenticated
   const socketData = useSocket(getSocketServerUrl(), isAuthenticated);
@@ -430,6 +431,7 @@ const AddNodeOnEdgeDrop = () => {
                 isMapMode={isMapMode}
                 onNodeUpdate={handleTreeUpdate}
                 socketData={socketData}
+                onCompletionSettingsLoad={setCompletionSettings}
               />
             </div>
           </>
@@ -458,6 +460,7 @@ const AddNodeOnEdgeDrop = () => {
           galleryViewMode={galleryViewMode}
           onGalleryViewModeChange={setGalleryViewMode}
           socket={socketData.socket}
+          completionSettings={completionSettings}
         />
       )}
 

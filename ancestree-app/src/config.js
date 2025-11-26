@@ -299,6 +299,7 @@ export const appConfig = {
         passwords: "Passwörter",
         security: "Sicherheit",
         visibleFields: "Sichtbare Felder",
+        completion: "Vervollständigung",
         dataExport: "Daten exportieren",
         dangerZone: "⚠️ Gefahrenzone"
       },
@@ -341,6 +342,55 @@ export const appConfig = {
         emailShowSuccess: "E-Mail-Feld wird nun angezeigt",
         emailHideSuccess: "E-Mail-Feld ist nun ausgeblendet",
         updateError: "Fehler beim Aktualisieren der Feldersichtbarkeit"
+      },
+      completion: {
+        title: "✅ Vervollständigung verfolgen",
+        description: "Verfolge, welche Personenknoten unvollständige Pflichtfelder haben. Wenn aktiviert, werden Knoten mit fehlenden erforderlichen Informationen mit einem roten Rand hervorgehoben und vollständige Knoten mit einem grünen Rand.",
+        mainToggleLabel: "Unvollständige Knoten anzeigen",
+        mainToggleHint: "Wenn aktiviert, zeigen Personenknoten mit fehlenden Pflichtfeldern einen roten Rand und vollständige Knoten einen grünen Rand",
+        requiredFieldsTitle: "Pflichtfelder",
+        requiredFieldsDescription: "Wähle aus, welche Felder für einen Knoten als vollständig erforderlich sind. Unvollständige Pflichtfelder werden im Knoteneditor rot hervorgehoben.",
+        fields: {
+          name: {
+            label: "Name",
+            hint: "Vorname ist erforderlich"
+          },
+          surname: {
+            label: "Nachname",
+            hint: "Familienname ist erforderlich"
+          },
+          maidenName: {
+            label: "Geburtsname",
+            hint: "Geburtsname ist erforderlich (falls zutreffend)"
+          },
+          birthDate: {
+            label: "Geburtsdatum",
+            hint: "Geburtsdatum ist erforderlich"
+          },
+          streetFields: {
+            label: "Straße & Hausnummer",
+            hint: "Straßenadresse ist erforderlich"
+          },
+          cityZip: {
+            label: "Stadt & Postleitzahl",
+            hint: "Stadt und Postleitzahl sind erforderlich"
+          },
+          country: {
+            label: "Land",
+            hint: "Land ist erforderlich"
+          },
+          phone: {
+            label: "Telefon",
+            hint: "Telefonnummer ist erforderlich"
+          },
+          email: {
+            label: "E-Mail",
+            hint: "E-Mail-Adresse ist erforderlich"
+          }
+        },
+        success: "Vervollständigungseinstellungen aktualisiert",
+        updateError: "Fehler beim Aktualisieren der Einstellung",
+        settingsUpdateError: "Fehler beim Aktualisieren der Vervollständigungseinstellungen"
       },
       errors: {
         passwordsDoNotMatch: "Passwörter stimmen nicht überein",
