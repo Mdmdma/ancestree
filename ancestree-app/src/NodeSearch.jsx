@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { appConfig } from './config';
+import { formatDisplayDate } from './dateUtils';
 
 const NodeSearch = ({ nodes, onNodeSelect }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -207,21 +208,8 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
 
   // Formatiere Geburtsdatum für die Anzeige
   const formatBirthDate = (birthDate) => {
-    // Behandle sowohl birthDate als auch birth_date Feldnamen
-    const date = birthDate || '';
-    if (!date) return '';
-    
-    try {
-      const dateObj = new Date(date);
-      if (isNaN(dateObj.getTime())) return date; // Ursprüngliches zurückgeben wenn ungültig
-      return dateObj.toLocaleDateString('de-DE', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch {
-      return date;
-    }
+    // Use the centralized date formatting utility
+    return formatDisplayDate(birthDate);
   };
 
   // Dropdown schließen beim Klicken außerhalb

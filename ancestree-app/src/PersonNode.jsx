@@ -2,6 +2,7 @@ import React from "react";
 import { Position } from "@xyflow/react";
 import CustomHandle from "./CustomHandle";
 import { checkNodeCompletion } from "./completionUtils";
+import { formatDisplayDate } from "./dateUtils";
 
 export default function PersonNode({ data, selected }) {
   const { name, surname, birthDate, deathDate, street, city, zip, country, phone, email, latitude, longitude, isDebugMode, completionSettings } = data;
@@ -118,12 +119,12 @@ export default function PersonNode({ data, selected }) {
           </div>
           {birthDate && (
             <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-secondary)" }}>
-              * {birthDate}
+              * {formatDisplayDate(birthDate)}
             </div>
           )}
           {deathDate && (
             <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-secondary)" }}>
-              † {deathDate}
+              † {formatDisplayDate(deathDate)}
             </div>
           )}
         </div>
