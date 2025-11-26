@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import TextInput from './components/TextInput';
+import DateInput from './components/DateInput';
+import Button from './components/Button';
 
 export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
   const { deleteElements } = useReactFlow();
@@ -104,37 +107,6 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
     };
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '6px',
-    margin: '2px 0',
-    borderRadius: '3px',
-    border: '1px solid #555',
-    backgroundColor: 'var(--debug-bg)',
-    color: 'white',
-    fontSize: '0.8rem',
-    height: '30px',
-    boxSizing: 'border-box'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    color: 'var(--debug-text-muted)',
-    fontSize: '0.75rem',
-    marginBottom: '2px',
-    marginTop: '8px'
-  };
-
-  const buttonStyle = {
-    padding: '8px 12px',
-    margin: '5px 2px',
-    borderRadius: '3px',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '0.8rem',
-    fontWeight: 'bold'
-  };
-
   return (
     <div style={{
       backgroundColor: 'var(--debug-panel-bg)',
@@ -150,12 +122,27 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
       
       {/* Node Selection */}
       <div style={{ marginBottom: '15px' }}>
-        <label style={labelStyle}>Select Node to Edit:</label>
+        <label style={{
+          display: 'block',
+          color: 'var(--debug-text-muted)',
+          fontSize: '0.75rem',
+          marginBottom: '2px',
+          marginTop: '8px'
+        }}>Select Node to Edit:</label>
         <select
           value={selectedNodeId}
           onChange={(e) => setSelectedNodeId(e.target.value)}
           style={{
-            ...inputStyle,
+            width: '100%',
+            padding: '6px',
+            margin: '2px 0',
+            borderRadius: '3px',
+            border: '1px solid #555',
+            backgroundColor: 'var(--debug-bg)',
+            color: 'white',
+            fontSize: '0.8rem',
+            height: '30px',
+            boxSizing: 'border-box',
             cursor: 'pointer'
           }}
         >
@@ -174,36 +161,32 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
             <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-basic)' }}>Basic Information</h5>
             
-            <label style={labelStyle}>ID (Read-only):</label>
-            <input
-              type="text"
+            <TextInput
+              label="ID (Read-only):"
               value={formData.id}
-              readOnly
-              style={{...inputStyle, backgroundColor: 'var(--debug-input-bg)', cursor: 'not-allowed'}}
+              readOnly={true}
+              className="text-white"
             />
 
-            <label style={labelStyle}>First Name:</label>
-            <input
-              type="text"
+            <TextInput
+              label="First Name:"
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>Last Name:</label>
-            <input
-              type="text"
+            <TextInput
+              label="Last Name:"
               value={formData.surname}
               onChange={(e) => handleInputChange('surname', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>Maiden Name:</label>
-            <input
-              type="text"
+            <TextInput
+              label="Maiden Name:"
               value={formData.maidenName}
               onChange={(e) => handleInputChange('maidenName', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
             <label style={labelStyle}>Bloodline:</label>
@@ -222,89 +205,60 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
             <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-dates)' }}>Dates</h5>
             
-            <label style={labelStyle}>Birth Date:</label>
-            <input
-              type="date"
+            <DateInput
+              label="Birth Date:"
               value={formData.birthDate}
               onChange={(e) => handleInputChange('birthDate', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>Death Date:</label>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              <input
-                type="date"
-                value={formData.deathDate}
-                onChange={(e) => handleInputChange('deathDate', e.target.value)}
-                style={{ ...inputStyle, flex: 1, margin: 0 }}
-              />
-              {formData.deathDate && (
-                <button
-                  onClick={() => handleInputChange('deathDate', '')}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #555',
-                    borderRadius: '3px',
-                    backgroundColor: 'var(--button-danger-bg)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                    margin: 0,
-                    height: '30px',
-                    minWidth: '30px'
-                  }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-danger-hover)'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-danger-bg)'}
-                  title="Clear death date"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+            <DateInput
+              label="Death Date:"
+              value={formData.deathDate}
+              onChange={(e) => handleInputChange('deathDate', e.target.value)}
+              showClearButton={true}
+              onClear={() => handleInputChange('deathDate', '')}
+              className="text-white"
+            />
           </div>
 
           {/* Address */}
           <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
             <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-address)' }}>Address</h5>
             
-            <label style={labelStyle}>Street:</label>
-            <input
-              type="text"
+            <TextInput
+              label="Street:"
               value={formData.street}
               onChange={(e) => handleInputChange('street', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>City:</label>
-            <input
-              type="text"
+            <TextInput
+              label="City:"
               value={formData.city}
               onChange={(e) => handleInputChange('city', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>ZIP Code:</label>
-            <input
-              type="text"
+            <TextInput
+              label="ZIP Code:"
               value={formData.zip}
               onChange={(e) => handleInputChange('zip', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>Country:</label>
-            <input
-              type="text"
+            <TextInput
+              label="Country:"
               value={formData.country}
               onChange={(e) => handleInputChange('country', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>Phone:</label>
-            <input
-              type="text"
+            <TextInput
+              label="Phone:"
               value={formData.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
           </div>
 
@@ -312,22 +266,22 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
           <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--debug-section-bg)', borderRadius: '5px' }}>
             <h5 style={{ margin: '0 0 10px 0', color: 'var(--debug-section-position)' }}>Position</h5>
             
-            <label style={labelStyle}>X Position:</label>
-            <input
+            <TextInput
+              label="X Position:"
               type="number"
               step="0.1"
               value={formData.positionX}
               onChange={(e) => handleInputChange('positionX', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
 
-            <label style={labelStyle}>Y Position:</label>
-            <input
+            <TextInput
+              label="Y Position:"
               type="number"
               step="0.1"
               value={formData.positionY}
               onChange={(e) => handleInputChange('positionY', e.target.value)}
-              style={inputStyle}
+              className="text-white"
             />
           </div>
 
@@ -368,35 +322,25 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px' }}>
-            <button
+            <Button
               onClick={handleSave}
-              style={{
-                ...buttonStyle,
-                backgroundColor: 'var(--button-primary-bg)',
-                color: 'white',
-                flex: 1,
-                marginRight: '5px'
-              }}
-              onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-primary-hover)'}
-              onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-primary-bg)'}
+              variant="primary"
+              size="medium"
+              icon="💾"
+              className="flex-1 mr-1.5"
             >
-              💾 Save Changes
-            </button>
+              Save Changes
+            </Button>
             
-            <button
+            <Button
               onClick={handleDelete}
-              style={{
-                ...buttonStyle,
-                backgroundColor: 'var(--button-danger-bg)',
-                color: 'white',
-                flex: 1,
-                marginLeft: '5px'
-              }}
-              onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-danger-hover)'}
-              onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-danger-bg)'}
+              variant="danger"
+              size="medium"
+              icon="🗑️"
+              className="flex-1 ml-1.5"
             >
-              🗑️ Delete Node
-            </button>
+              Delete Node
+            </Button>
           </div>
         </div>
       )}

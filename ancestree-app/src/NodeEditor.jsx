@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import PictureSlideshow from './PictureSlideshow';
 import AddressAutocomplete from './components/AddressAutocomplete';
+import TextInput from './components/TextInput';
+import DateInput from './components/DateInput';
+import Button from './components/Button';
 import { appConfig } from './config';
 import { queueGeocoding } from './geocodingService';
 import { api } from './api';
@@ -258,30 +261,6 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
     }
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '8px',
-    marginBottom: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    fontSize: '14px',
-    height: '34px',
-    boxSizing: 'border-box'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    marginBottom: '5px',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    color: 'white'
-  };
-
-  const addressRowStyle = {
-    display: 'flex',
-    gap: '8px'
-  };
-
   // Check if this is a family node
   const isFamilyNode = node?.type === 'family';
 
@@ -293,23 +272,14 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         
         {/* Delete Button for Family Node */}
         <div style={{ marginTop: '20px' }}>
-          <button
+          <Button
             onClick={handleDelete}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              fontSize: '16px',
-              cursor: 'pointer'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+            variant="danger"
+            size="large"
+            className="w-full"
           >
             {appConfig.ui.nodeEditor.buttons.deleteFamily}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -320,145 +290,102 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
     <div>
       <h3 style={{ color: 'white' }}>{appConfig.ui.nodeEditor.title}</h3>
       
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.name}</label>
-      <input
+      <TextInput
         ref={nameInputRef}
-        type="text"
+        label={appConfig.ui.nodeEditor.labels.name}
         value={formData.name}
         onChange={(e) => handleInputChange('name', e.target.value)}
-        style={inputStyle}
+        inputRef={nameInputRef}
       />
 
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.surname}</label>
-      <input
-        type="text"
+      <TextInput
+        label={appConfig.ui.nodeEditor.labels.surname}
         value={formData.surname}
         onChange={(e) => handleInputChange('surname', e.target.value)}
-        style={inputStyle}
       />
 
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.maidenName}</label>
-      <input
-        type="text"
+      <TextInput
+        label={appConfig.ui.nodeEditor.labels.maidenName}
         value={formData.maidenName}
         onChange={(e) => handleInputChange('maidenName', e.target.value)}
-        style={inputStyle}
         placeholder={appConfig.ui.nodeEditor.placeholders.maidenName}
       />
 
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.birthDate}</label>
-      <input
-        type="date"
+      <DateInput
+        label={appConfig.ui.nodeEditor.labels.birthDate}
         value={formData.birthDate}
         onChange={(e) => handleInputChange('birthDate', e.target.value)}
-        style={inputStyle}
       />
 
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.deathDate}</label>
-      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-        <input
-          type="date"
-          value={formData.deathDate}
-          onChange={(e) => handleInputChange('deathDate', e.target.value || null)}
-          style={{ ...inputStyle, flex: 1, marginBottom: 0 }}
-        />
-        {formData.deathDate && (
-          <button
-            onClick={() => handleInputChange('deathDate', '')}
-            style={{
-              padding: '8px 10px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              backgroundColor: '#f44336',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '14px',
-              marginBottom: 0,
-              height: '34px',
-              minWidth: '34px'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#da190b'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#f44336'}
-            title="Clear death date"
-          >
-            ✕
-          </button>
-        )}
-      </div>
+      <DateInput
+        label={appConfig.ui.nodeEditor.labels.deathDate}
+        value={formData.deathDate}
+        onChange={(e) => handleInputChange('deathDate', e.target.value || null)}
+        showClearButton={true}
+        onClear={() => handleInputChange('deathDate', '')}
+      />
 
       {/* Phone field - conditionally visible */}
       {showPhoneField && (
-        <>
-          <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.phone}</label>
-          <input
-            type="tel"
-            value={formData.phone || '+'}
-            onChange={(e) => handleInputChange('phone', e.target.value)}
-            style={{
-              ...inputStyle,
-              border: phoneError ? '2px solid #e74c3c' : inputStyle.border
-            }}
-            placeholder={appConfig.ui.nodeEditor.placeholders.phone}
-          />
-          {phoneError && (
-            <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '4px', marginBottom: '8px' }}>
-              {phoneError}
-            </div>
-          )}
-        </>
+        <TextInput
+          type="tel"
+          label={appConfig.ui.nodeEditor.labels.phone}
+          value={formData.phone || '+'}
+          onChange={(e) => handleInputChange('phone', e.target.value)}
+          placeholder={appConfig.ui.nodeEditor.placeholders.phone}
+          error={phoneError}
+        />
       )}
 
       {/* Email field - conditionally visible */}
       {showEmailField && (
-        <>
-          <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.email}</label>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            style={{
-              ...inputStyle,
-              border: emailError ? '2px solid #e74c3c' : inputStyle.border
-            }}
-            placeholder={appConfig.ui.nodeEditor.placeholders.email}
-          />
-          {emailError && (
-            <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '4px', marginBottom: '8px' }}>
-              {emailError}
-            </div>
-          )}
-        </>
+        <TextInput
+          type="email"
+          label={appConfig.ui.nodeEditor.labels.email}
+          value={formData.email}
+          onChange={(e) => handleInputChange('email', e.target.value)}
+          placeholder={appConfig.ui.nodeEditor.placeholders.email}
+          error={emailError}
+        />
       )}
 
       {/* Unified Address Autocomplete */}
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.addressAutocomplete}</label>
+      <label className="block text-sm font-medium text-gray-300 mb-1">
+        {appConfig.ui.nodeEditor.labels.addressAutocomplete}
+      </label>
       <AddressAutocomplete
         value={addressAutocompleteValue}
         onSelect={handleAddressSelect}
         placeholder={appConfig.ui.nodeEditor.placeholders.addressAutocomplete}
-        inputStyle={inputStyle}
+        inputStyle={{
+          width: '100%',
+          padding: '8px 12px',
+          backgroundColor: 'white',
+          border: '1px solid #d1d5db',
+          borderRadius: '6px',
+          color: 'black',
+          fontSize: '14px',
+          height: '34px',
+          boxSizing: 'border-box'
+        }}
       />
 
       {/* Individual Address Fields - Read-only display / manual edit fallback */}
       {showStreetFields && (
-        <div style={addressRowStyle}>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.street}</label>
-            <input
-              type="text"
+        <div className="flex gap-2">
+          <div style={{ flex: '0 0 65%' }}>
+            <TextInput
+              label={appConfig.ui.nodeEditor.labels.street}
               value={formData.street}
               onChange={(e) => handleInputChange('street', e.target.value)}
-              style={inputStyle}
               placeholder={appConfig.ui.nodeEditor.placeholders.street}
             />
           </div>
-          <div style={{ width: '80px' }}>
-            <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.housenumber}</label>
-            <input
-              type="text"
+          <div style={{ flex: '0 0 35%' }}>
+            <TextInput
+              label={appConfig.ui.nodeEditor.labels.housenumber}
               value={formData.housenumber}
               onChange={(e) => handleInputChange('housenumber', e.target.value)}
-              style={inputStyle}
               placeholder={appConfig.ui.nodeEditor.placeholders.housenumber}
               maxLength={10}
             />
@@ -466,52 +393,50 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
         </div>
       )}
 
-      <div style={addressRowStyle}>
-        <div style={{ flex: 1 }}>
-          <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.city}</label>
-          <input
-            type="text"
+      <div className="flex gap-2">
+        <div style={{ flex: '0 0 65%' }}>
+          <TextInput
+            label={appConfig.ui.nodeEditor.labels.city}
             value={formData.city}
             onChange={(e) => handleInputChange('city', e.target.value)}
-            style={inputStyle}
             placeholder={appConfig.ui.nodeEditor.placeholders.city}
           />
         </div>
-        <div style={{ width: '80px' }}>
-          <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.zip}</label>
-          <input
-            type="text"
+        <div style={{ flex: '0 0 35%' }}>
+          <TextInput
+            label={appConfig.ui.nodeEditor.labels.zip}
             value={formData.zip}
             onChange={(e) => handleInputChange('zip', e.target.value)}
-            style={inputStyle}
             placeholder={appConfig.ui.nodeEditor.placeholders.zip}
           />
         </div>
       </div>
 
-      <label style={labelStyle}>{appConfig.ui.nodeEditor.labels.country}</label>
-      <input
-        type="text"
+      <TextInput
+        label={appConfig.ui.nodeEditor.labels.country}
         value={formData.country}
         onChange={(e) => handleInputChange('country', e.target.value.toUpperCase())}
-        style={inputStyle}
         placeholder={appConfig.ui.nodeEditor.placeholders.country}
-        maxLength="2"
+        maxLength={2}
       />
 
       {isDebugMode && (
         <div style={{ marginTop: '20px', borderTop: '1px solid #444', paddingTop: '15px' }}>
           <h4 style={{ color: '#FFF', margin: '0 0 15px 0', fontSize: '16px' }}>{appConfig.ui.nodeEditor.debug.title}</h4>
           
-          <label style={labelStyle}>{appConfig.ui.nodeEditor.debug.nodeId}</label>
-          <input
-            type="text"
+          <TextInput
+            label={appConfig.ui.nodeEditor.debug.nodeId}
             value={node.id}
-            readOnly
-            style={{...inputStyle, backgroundColor: '#444', cursor: 'not-allowed'}}
+            readOnly={true}
           />
 
-          <label style={labelStyle}>{appConfig.ui.nodeEditor.debug.bloodlineStatus}</label>
+          <label style={{
+            display: 'block',
+            marginBottom: '5px',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            color: 'white'
+          }}>{appConfig.ui.nodeEditor.debug.bloodlineStatus}</label>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
             <input
               type="checkbox"
@@ -524,25 +449,21 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>{appConfig.ui.nodeEditor.debug.xPosition}</label>
-              <input
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <TextInput
                 type="number"
-                step="0.1"
+                label={appConfig.ui.nodeEditor.debug.xPosition}
                 value={formData.positionX}
                 onChange={(e) => handleInputChange('positionX', e.target.value)}
-                style={inputStyle}
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>{appConfig.ui.nodeEditor.debug.yPosition}</label>
-              <input
+            <div className="flex-1">
+              <TextInput
                 type="number"
-                step="0.1"
+                label={appConfig.ui.nodeEditor.debug.yPosition}
                 value={formData.positionY}
                 onChange={(e) => handleInputChange('positionY', e.target.value)}
-                style={inputStyle}
               />
             </div>
           </div>
@@ -574,45 +495,26 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
 
       {/* Pictures Button */}
       <div style={{ marginTop: '20px', borderTop: '1px solid #666', paddingTop: '20px' }}>
-        <button
+        <Button
           onClick={() => setShowSlideshow(true)}
-          style={{
-            width: '100%',
-            padding: '12px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            fontSize: '16px',
-            cursor: 'pointer',
-            marginBottom: '10px'
-          }}
-          onMouseOver={(e) => e.target.style.backgroundColor = '#45a049'}
-          onMouseOut={(e) => e.target.style.backgroundColor = '#4CAF50'}
+          variant="success"
+          size="large"
+          className="w-full mb-2.5"
         >
           {appConfig.ui.nodeEditor.buttons.pictures}
-        </button>
+        </Button>
       </div>
 
       {/* Delete Button - Always visible */}
       <div style={{ marginTop: '10px' }}>
-        <button
+        <Button
           onClick={handleDelete}
-          style={{
-            width: '100%',
-            padding: '12px',
-            backgroundColor: '#dc3545',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            fontSize: '16px',
-            cursor: 'pointer'
-          }}
-          onMouseOver={(e) => e.target.style.backgroundColor = '#c82333'}
-          onMouseOut={(e) => e.target.style.backgroundColor = '#dc3545'}
+          variant="danger"
+          size="large"
+          className="w-full"
         >
           {appConfig.ui.nodeEditor.buttons.delete}
-        </button>
+        </Button>
       </div>
 
       {showSlideshow && (
