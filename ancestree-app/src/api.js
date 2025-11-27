@@ -684,6 +684,20 @@ export const api = {
     return response.json();
   },
 
+  async toggleImageQuestion(id, hasOpenQuestions) {
+    const response = await fetch(`${API_BASE_URL}/images/${id}/question`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ hasOpenQuestions })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to toggle image question');
+    }
+    
+    return response.json();
+  },
+
   async deleteImage(id) {
     const response = await fetch(`${API_BASE_URL}/images/${id}`, {
       method: 'DELETE',

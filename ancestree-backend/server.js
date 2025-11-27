@@ -1119,8 +1119,8 @@ io.on('connection', (socket) => {
       const familyId = decoded.id;
       const familyName = decoded.familyName;
       
-      // Join the family-specific room
-      const roomName = `family-${familyId}`;
+      // Join the family-specific room using family name (not family ID)
+      const roomName = familyName;
       socket.join(roomName);
       
       // Track user info
@@ -1319,8 +1319,8 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
       // Broadcast to ALL users in the family room (including the sender)
       // The client-side duplicate check will prevent duplicates
       const ioInstance = req.app.get('io');
-      console.log(`[CREATE NODE] Broadcasting node:created to family-${familyId}, Node ID: ${id}`);
-      ioInstance.to(`family-${familyId}`).emit('node:created', newNode);
+      console.log(`[CREATE NODE] Broadcasting node:created to ${familyName}, Node ID: ${id}`);
+      ioInstance.to(familyName).emit('node:created', newNode);
       
       res.json({ success: true, id: this.lastID });
     });
@@ -1468,12 +1468,12 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
         const ioInstance = req.app.get('io');
         if (socketId) {
           // Exclude the sender from receiving this event
-          console.log(`[UPDATE NODE] Broadcasting node:updated to family-${familyId}, Node ID: ${id}, excluding socket: ${socketId}`);
-          ioInstance.to(`family-${familyId}`).except(socketId).emit('node:updated', updatedNode);
+          console.log(`[UPDATE NODE] Broadcasting node:updated to ${familyName}, Node ID: ${id}, excluding socket: ${socketId}`);
+          ioInstance.to(familyName).except(socketId).emit('node:updated', updatedNode);
         } else {
           // Fallback: broadcast to all (for backwards compatibility)
-          console.log(`[UPDATE NODE] Broadcasting node:updated to family-${familyId}, Node ID: ${id} (no socket ID)`);
-          ioInstance.to(`family-${familyId}`).emit('node:updated', updatedNode);
+          console.log(`[UPDATE NODE] Broadcasting node:updated to ${familyName}, Node ID: ${id} (no socket ID)`);
+          ioInstance.to(familyName).emit('node:updated', updatedNode);
         }
         
         res.json({ success: true, changes: this.changes });
@@ -1555,7 +1555,7 @@ app.delete('/api/nodes/:id', authenticateToken, (req, res) => {
           }
           
           // Broadcast the deletion to other users in the family room
-          req.app.get('io').to(`family-${familyId}`).emit('node:deleted', { id });
+          req.app.get('io').to(familyName).emit('node:deleted', { id });
           
           res.json({ success: true, changes: this.changes });
         });
@@ -1600,10 +1600,10 @@ app.post('/api/edges', authenticateToken, (req, res) => {
       const ioInstance = req.app.get('io');
       if (socketId) {
         // Exclude the sender from receiving this event
-        ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:created', newEdge);
+        ioInstance.to(familyName).except(socketId).emit('edge:created', newEdge);
       } else {
         // Fallback: broadcast to all (for backwards compatibility)
-        ioInstance.to(`family-${familyId}`).emit('edge:created', newEdge);
+        ioInstance.to(familyName).emit('edge:created', newEdge);
       }
       
       res.json({ success: true, edgeId: id });
@@ -1628,7 +1628,7 @@ app.delete('/api/edges/:id', authenticateToken, (req, res) => {
       }
       
       // Broadcast the deletion to other users in the family room
-      req.app.get('io').to(`family-${familyId}`).emit('edge:deleted', { id });
+      req.app.get('io').to(familyName).emit('edge:deleted', { id });
       
       res.json({ success: true, changes: this.changes });
     });
@@ -1712,9 +1712,9 @@ app.put('/api/edges/:id', authenticateToken, (req, res) => {
         // Broadcast to other users in the family room (exclude the sender)
         const ioInstance = req.app.get('io');
         if (socketId) {
-          ioInstance.to(`family-${familyId}`).except(socketId).emit('edge:updated', updatedEdge);
+          ioInstance.to(familyName).except(socketId).emit('edge:updated', updatedEdge);
       } else {
-        ioInstance.to(`family-${familyId}`).emit('edge:updated', updatedEdge);
+        ioInstance.to(familyName).emit('edge:updated', updatedEdge);
       }
       
       res.json({ success: true, edge: updatedEdge });
@@ -2171,6 +2171,7 @@ app.get('/api/images', authenticateToken, (req, res) => {
           uploadedBy: row.uploaded_by,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
+          has_open_questions: row.has_open_questions || false,
           people: people
         };
       });
@@ -2222,6 +2223,7 @@ app.get('/api/images/:id', authenticateToken, (req, res) => {
           uploadedBy: imageRow.uploaded_by,
           createdAt: imageRow.created_at,
           updatedAt: imageRow.updated_at,
+          has_open_questions: imageRow.has_open_questions || false,
           people: peopleRows.map(row => ({
             id: row.id,
             personId: row.person_id,
@@ -2435,6 +2437,48 @@ app.put('/api/images/:id', authenticateToken, (req, res) => {
   }
 });
 
+// Toggle has_open_questions field for an image
+app.put('/api/images/:id/question', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const { hasOpenQuestions } = req.body;
+  const familyName = req.user.familyName;
+
+  if (typeof hasOpenQuestions !== 'boolean') {
+    return res.status(400).json({ error: 'hasOpenQuestions must be a boolean value' });
+  }
+
+  try {
+    const familyDb = getFamilyDb(familyName);
+    
+    familyDb.run(
+      'UPDATE images SET has_open_questions = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [hasOpenQuestions ? 1 : 0, id],
+      function(err) {
+        if (err) {
+          console.error('Error updating image question status:', err);
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Image not found' });
+        }
+
+        // Emit Socket.IO event for real-time updates
+        console.log(`[Socket.IO] Emitting imageQuestionToggled to room: ${familyName}, imageId: ${id}, hasOpenQuestions: ${hasOpenQuestions}`);
+        io.to(familyName).emit('imageQuestionToggled', {
+          imageId: id,
+          hasOpenQuestions
+        });
+
+        res.json({ success: true, hasOpenQuestions });
+      }
+    );
+  } catch (error) {
+    console.error('Error toggling image question:', error);
+    res.status(500).json({ error: 'Failed to toggle image question' });
+  }
+});
+
 // Image proxy endpoint for downloading images from S3 (solves CORS issues)
 app.post('/api/images/proxy', authenticateToken, async (req, res) => {
   const { s3Url } = req.body;
@@ -2517,7 +2561,7 @@ app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
 
   try {
     const query = `
-      SELECT i.id, i.s3_url, i.description, i.original_filename, i.created_at
+      SELECT i.id, i.s3_url, i.description, i.original_filename, i.created_at, i.has_open_questions
       FROM images i
       INNER JOIN image_people ip ON i.id = ip.image_id
       WHERE ip.person_id = ?
@@ -2559,6 +2603,7 @@ app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
               description: row.description,
               originalFilename: row.original_filename,
               createdAt: row.created_at,
+              has_open_questions: row.has_open_questions || false,
               people: peopleRows
             });
             processedImages++;
@@ -2697,7 +2742,7 @@ app.post('/api/images/:imageId/chat', authenticateToken, (req, res) => {
         };
 
         // Emit the new message to all clients in this family room for real-time updates
-        req.app.get('io').to(`family-${familyId}`).emit('chat:message', {
+        req.app.get('io').to(familyName).emit('chat:message', {
           imageId: imageId,
           message: newMessage
         });
@@ -2740,7 +2785,7 @@ app.delete('/api/images/:imageId/chat/:messageId', authenticateToken, (req, res)
       }
 
       // Emit the message deletion to all clients in this family room
-      req.app.get('io').to(`family-${familyId}`).emit('chat:messageDeleted', {
+      req.app.get('io').to(familyName).emit('chat:messageDeleted', {
         imageId: imageId,
         messageId: messageId
       });

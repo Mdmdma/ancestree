@@ -17,6 +17,7 @@ const Button = ({
   size = 'medium', // 'small', 'medium', 'large'
   icon,
   className = '',
+  style = {},
   ...props
 }) => {
   // Base styles
@@ -104,7 +105,8 @@ const Button = ({
     color: currentVariant.color,
     opacity: disabled ? 0.6 : 1,
     transform: isActive && !disabled ? 'scale(0.98)' : 'scale(1)',
-    boxShadow: isHovered && !disabled ? '0 2px 8px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
+    boxShadow: isHovered && !disabled ? '0 2px 8px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+    ...style  // Merge custom styles from props to allow overrides
   };
 
   // Ensure icon inherits button font size but can be slightly larger for better visibility

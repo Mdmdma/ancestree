@@ -202,7 +202,8 @@ export const appConfig = {
       fullscreenButton: "⛶ Vollbild",
       exitFullscreenButton: "⛶ Vollbild verlassen",
       previousButton: "‹",
-      nextButton: "›"
+      nextButton: "›",
+      questionButton: "? Markiere Bilder mit offenen Fragen  ?"
     },
     
     // Node Editor configuration
@@ -591,7 +592,8 @@ export const appConfig = {
       fullscreenButton: "⛶ Vollbild",
       exitFullscreenButton: "⛶ Vollbild verlassen",
       previousButton: "‹",
-      nextButton: "›"
+      nextButton: "›",
+      questionButton: "? Markiere Bilder mit offenen Fragen  ?"
     },
 
     // Alerts and notifications

@@ -652,6 +652,11 @@ export const encryptedApi = {
     return result;
   },
 
+  async updateImageQuestion(id, has_open_questions) {
+    // Question flag is not encrypted - it's just a boolean flag
+    return baseApi.updateImageQuestion(id, has_open_questions);
+  },
+
   async deleteImage(id) {
     return baseApi.deleteImage(id);
   },

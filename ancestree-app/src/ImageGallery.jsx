@@ -6,6 +6,61 @@ import PictureSlideshow from './PictureSlideshow';
 import DescriptionTextarea from './components/DescriptionTextarea';
 import Button from './components/Button';
 
+// Memoized ImageThumbnail component to prevent unnecessary re-renders
+const ImageThumbnail = React.memo(({ image, onClick }) => {
+  return (
+    <div
+      style={{
+        border: image.has_open_questions ? '3px solid #dc3545' : '1px solid #444',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        backgroundColor: '#2a2a2a',
+        transition: 'transform 0.2s, border-color 0.2s'
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+    >
+      <img
+        src={image.s3Url}
+        alt={image.description || image.originalFilename}
+        style={{
+          width: '100%',
+          height: '150px',
+          objectFit: 'cover',
+          display: 'block'
+        }}
+      />
+      <div style={{ padding: '10px' }}>
+        {image.description ? (
+          <div style={{ fontSize: '12px', color: '#ffffff', marginBottom: '5px' }}>
+            {image.description.length > 80 
+              ? image.description.substring(0, 80) + '...'
+              : image.description
+            }
+          </div>
+        ) : (
+          <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
+            {appConfig.ui.imageGallery.gallery.noDescription}
+          </div>
+        )}
+        <div style={{ fontSize: '10px', color: '#aaaaaa' }}>
+          {image.people.length} {image.people.length !== 1 ? appConfig.ui.imageGallery.gallery.personsTagged : appConfig.ui.imageGallery.gallery.personTagged}
+        </div>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function - only re-render if these properties change
+  return prevProps.image.id === nextProps.image.id &&
+         prevProps.image.has_open_questions === nextProps.image.has_open_questions &&
+         prevProps.image.description === nextProps.image.description &&
+         prevProps.image.people.length === nextProps.image.people.length;
+});
+
+ImageThumbnail.displayName = 'ImageThumbnail';
+
 const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -48,6 +103,52 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   useEffect(() => {
     loadImages();
   }, [loadImages]);
+
+  // Listen for Socket.IO question toggle events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleQuestionToggled = (data) => {
+      console.log('[ImageGallery] Received imageQuestionToggled event:', data);
+      const { imageId, hasOpenQuestions } = data;
+      
+      // Update images if this image is in the current set
+      setImages(prevImages => {
+        const index = prevImages.findIndex(img => img.id === imageId);
+        if (index === -1) {
+          console.log('[ImageGallery] Image not found in current images');
+          return prevImages;
+        }
+        
+        console.log(`[ImageGallery] Updating image at index ${index} with has_open_questions=${hasOpenQuestions}`);
+        // Create a new array with the updated image
+        const updatedImages = prevImages.map((img, idx) => 
+          idx === index 
+            ? { ...img, has_open_questions: hasOpenQuestions }
+            : img
+        );
+        
+        return updatedImages;
+      });
+
+      // Update selected image if it's the one being toggled
+      setSelectedImage(prevSelected => {
+        if (prevSelected && prevSelected.id === imageId) {
+          console.log('[ImageGallery] Updating selected image with has_open_questions=', hasOpenQuestions);
+          return { ...prevSelected, has_open_questions: hasOpenQuestions };
+        }
+        return prevSelected;
+      });
+    };
+
+    console.log('[ImageGallery] Registering imageQuestionToggled listener');
+    socket.on('imageQuestionToggled', handleQuestionToggled);
+
+    return () => {
+      console.log('[ImageGallery] Unregistering imageQuestionToggled listener');
+      socket.off('imageQuestionToggled', handleQuestionToggled);
+    };
+  }, [socket]);
 
   // Notify parent when tagging mode changes
   useEffect(() => {
@@ -394,50 +495,14 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           boxSizing: 'border-box'
         }}>
           {images.map((image, index) => (
-            <div
+            <ImageThumbnail
               key={image.id || `image-${index}`}
-              style={{
-                border: '1px solid #444',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                backgroundColor: '#2a2a2a',
-                transition: 'transform 0.2s'
-              }}
+              image={image}
               onClick={() => {
                 setSelectedImage(image);
                 setViewMode('view');
               }}
-              onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
-              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-            >
-              <img
-                src={image.s3Url}
-                alt={image.description || image.originalFilename}
-                style={{
-                  width: '100%',
-                  height: '150px',
-                  objectFit: 'cover'
-                }}
-              />
-              <div style={{ padding: '10px' }}>
-                {image.description ? (
-                  <div style={{ fontSize: '12px', color: '#ffffff', marginBottom: '5px' }}>
-                    {image.description.length > 80 
-                      ? image.description.substring(0, 80) + '...'
-                      : image.description
-                    }
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
-                    {appConfig.ui.imageGallery.gallery.noDescription}
-                  </div>
-                )}
-                <div style={{ fontSize: '10px', color: '#aaaaaa' }}>
-                  {image.people.length} {image.people.length !== 1 ? appConfig.ui.imageGallery.gallery.personsTagged : appConfig.ui.imageGallery.gallery.personTagged}
-                </div>
-              </div>
-            </div>
+            />
           ))}
         </div>
       )}
@@ -591,7 +656,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   // Render confirmation view
   const renderConfirm = () => (
     <div className="confirm-container">
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexDirection: 'column' }}>
         <Button
           onClick={() => {
             resetUploadState();
@@ -673,7 +738,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       </div>
 
       {/* Upload Button */}
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
         <Button
           onClick={confirmUpload}
           disabled={uploadingImage}
@@ -770,7 +835,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   );
   const renderImageView = () => (
     <div>
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexDirection: 'column' }}>
         <Button
           onClick={() => setViewMode('gallery')}
           variant="secondary"
@@ -802,8 +867,9 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             width: '100%',
             maxHeight: '400px',
             objectFit: 'contain',
-            border: '1px solid #444',
-            borderRadius: '5px'
+            border: selectedImage.has_open_questions ? '3px solid #dc3545' : '1px solid #444',
+            borderRadius: '5px',
+            transition: 'border-color 0.2s'
           }}
         />
       </div>

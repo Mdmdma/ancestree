@@ -418,6 +418,26 @@ const initializeFamilyDb = (familyDb) => {
         });
       }
     });
+
+    // Migration: Add has_open_questions column to images table if it doesn't exist
+    familyDb.all("PRAGMA table_info(images)", (err, columns) => {
+      if (err) {
+        console.error('Error checking images table schema:', err);
+        return;
+      }
+      
+      const columnNames = columns.map(col => col.name);
+      
+      if (!columnNames.includes('has_open_questions')) {
+        familyDb.run("ALTER TABLE images ADD COLUMN has_open_questions BOOLEAN DEFAULT 0", (err) => {
+          if (err) {
+            console.error('Error adding has_open_questions column to images:', err);
+          } else {
+            console.log('Added has_open_questions column to images table');
+          }
+        });
+      }
+    });
   });
 };
 

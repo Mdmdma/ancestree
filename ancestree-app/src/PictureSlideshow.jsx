@@ -49,6 +49,52 @@ const PersonTag = React.memo(({ person, index, onPersonSelect }) => {
 
 PersonTag.displayName = 'PersonTag';
 
+// Optimized SlideshowImage component - only re-renders when image or question status changes
+const SlideshowImage = React.memo(({ currentImage, isFullscreen, imageStyle, fullscreenImageStyle }) => {
+  if (!currentImage) return null;
+
+  return (
+    <div style={{
+      position: 'relative',
+      maxWidth: '100%',
+      maxHeight: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center'
+    }}>
+      <img
+        src={currentImage.s3Url || currentImage.url}
+        alt={currentImage.description || 'Bild'}
+        style={isFullscreen ? fullscreenImageStyle : imageStyle}
+        onError={(e) => {
+          console.error('Error loading image:', currentImage);
+          e.target.style.display = 'none';
+        }}
+      />
+      {currentImage.has_open_questions && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          border: '4px solid #dc3545',
+          pointerEvents: 'none',
+          transition: 'opacity 0.2s',
+          boxSizing: 'border-box'
+        }} />
+      )}
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if the image ID or question status changes
+  return prevProps.currentImage?.id === nextProps.currentImage?.id &&
+         prevProps.currentImage?.has_open_questions === nextProps.currentImage?.has_open_questions &&
+         prevProps.isFullscreen === nextProps.isFullscreen;
+});
+
+SlideshowImage.displayName = 'SlideshowImage';
+
 const PictureSlideshow = ({ 
   mode = 'family', // 'family' or 'person'
   personId, 
@@ -68,6 +114,63 @@ const PictureSlideshow = ({
   const [editingDescription, setEditingDescription] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [settingPreferred, setSettingPreferred] = useState(false);
+
+  // Handle question toggle
+  const toggleImageQuestion = useCallback(async () => {
+    const image = images[currentIndex];
+    if (!image) return;
+    
+    const newValue = !image.has_open_questions;
+    
+    try {
+      await api.toggleImageQuestion(image.id, newValue);
+      
+      // Update local state
+      const updatedImages = [...images];
+      updatedImages[currentIndex] = { ...image, has_open_questions: newValue };
+      setImages(updatedImages);
+    } catch (err) {
+      console.error('Error toggling image question:', err);
+      alert('Fehler beim Markieren des Bildes: ' + err.message);
+    }
+  }, [images, currentIndex]);
+
+  // Listen for Socket.IO question toggle events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleQuestionToggled = (data) => {
+      console.log('[PictureSlideshow] Received imageQuestionToggled event:', data);
+      const { imageId, hasOpenQuestions } = data;
+      
+      // Update images if this image is in the current set
+      setImages(prevImages => {
+        const index = prevImages.findIndex(img => img.id === imageId);
+        if (index === -1) {
+          console.log('[PictureSlideshow] Image not found in current images');
+          return prevImages;
+        }
+        
+        console.log(`[PictureSlideshow] Updating image at index ${index} with has_open_questions=${hasOpenQuestions}`);
+        // Create a new array with the updated image
+        const updatedImages = prevImages.map((img, idx) => 
+          idx === index 
+            ? { ...img, has_open_questions: hasOpenQuestions }
+            : img
+        );
+        
+        return updatedImages;
+      });
+    };
+
+    console.log('[PictureSlideshow] Registering imageQuestionToggled listener');
+    socket.on('imageQuestionToggled', handleQuestionToggled);
+
+    return () => {
+      console.log('[PictureSlideshow] Unregistering imageQuestionToggled listener');
+      socket.off('imageQuestionToggled', handleQuestionToggled);
+    };
+  }, [socket]);
 
   const loadImages = useCallback(async () => {
     try {
@@ -507,25 +610,33 @@ const PictureSlideshow = ({
           <h3 style={{ margin: 0, color: '#ffffff' }}>
             {title}
           </h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Question Mark Button with Info Text */}
+            <Button
+              onClick={toggleImageQuestion}
+              variant={currentImage?.has_open_questions ? 'danger' : 'secondary'}
+              size="medium"
+              style={{ 
+                whiteSpace: 'normal',
+                width: 'auto',
+                maxWidth: 'none'
+              }}
+            >
+              {config.questionButton}
+            </Button>
+
             {isFullscreen ? (
-              <div style={{ width: '200px' }}>
-                <Button onClick={toggleFullscreen} variant="success" size="medium">
-                  {config.exitFullscreenButton}
-                </Button>
-              </div>
+              <Button onClick={toggleFullscreen} variant="success" size="medium">
+                {config.exitFullscreenButton}
+              </Button>
             ) : (
               <>
-                <div style={{ width: '150px' }}>
-                  <Button onClick={toggleFullscreen} variant="success" size="medium">
-                    {config.fullscreenButton}
-                  </Button>
-                </div>
-                <div style={{ width: '80px' }}>
-                  <Button onClick={onClose} variant="danger" size="medium" icon="✖">
-                    {/* Close button */}
-                  </Button>
-                </div>
+                <Button onClick={toggleFullscreen} variant="success" size="medium">
+                  {config.fullscreenButton}
+                </Button>
+                <Button onClick={onClose} variant="danger" size="medium" icon="✖">
+                  {/* Close button */}
+                </Button>
               </>
             )}
           </div>
@@ -566,17 +677,12 @@ const PictureSlideshow = ({
               </button>
             )}
             
-            {currentImage && (
-              <img
-                src={currentImage.s3Url || currentImage.url}
-                alt={currentImage.description || `Bild ${currentIndex + 1}`}
-                style={isFullscreen ? fullscreenImageStyle : imageStyle}
-                onError={(e) => {
-                  console.error('Error loading image:', currentImage);
-                  e.target.style.display = 'none';
-                }}
-              />
-            )}
+            <SlideshowImage
+              currentImage={currentImage}
+              isFullscreen={isFullscreen}
+              imageStyle={imageStyle}
+              fullscreenImageStyle={fullscreenImageStyle}
+            />
             
             {images.length > 1 && (
               <button
