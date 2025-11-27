@@ -4,8 +4,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const multer = require('multer');
-const multerS3 = require('multer-s3');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
@@ -126,33 +124,303 @@ AWS.config.update({
 const s3 = new AWS.S3();
 const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || 'ancestree-images';
 
-// Configure multer for S3 uploads
-const upload = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: S3_BUCKET_NAME,
-    metadata: function (req, file, cb) {
-      cb(null, { fieldName: file.fieldname });
-    },
-    key: function (req, file, cb) {
-      const fileExtension = path.extname(file.originalname);
-      const uniqueFileName = `${uuidv4()}${fileExtension}`;
-      cb(null, `images/${uniqueFileName}`);
-    }
-  }),
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  },
-  fileFilter: function (req, file, cb) {
-    // Accept only image files
-    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'), false);
+// Presigned URL configuration
+const PRESIGNED_URL_EXPIRY_UPLOAD = 300; // 5 minutes for uploads
+const PRESIGNED_URL_EXPIRY_VIEW = 3600; // 1 hour for viewing
+
+// Helper function to generate presigned upload URL
+function generatePresignedUploadUrl(s3Key, contentType) {
+  const params = {
+    Bucket: S3_BUCKET_NAME,
+    Key: s3Key,
+    ContentType: contentType,
+    Expires: PRESIGNED_URL_EXPIRY_UPLOAD
+  };
+  return s3.getSignedUrl('putObject', params);
+}
+
+// Helper function to generate presigned view URL
+function generatePresignedViewUrl(s3Key) {
+  const params = {
+    Bucket: S3_BUCKET_NAME,
+    Key: s3Key,
+    Expires: PRESIGNED_URL_EXPIRY_VIEW
+  };
+  return s3.getSignedUrl('getObject', params);
+}
+
+// Grace periods for soft delete (in days)
+const GRACE_PERIOD_USER_DELETION = 10; // 10 days for user-initiated deletion
+const GRACE_PERIOD_SERVER_DELETION = 1; // 1 day for server-initiated deletion
+
+/**
+ * Delete all S3 objects under a family prefix
+ * @param {string} familyName - The family name (used as prefix)
+ * @returns {Promise<{deleted: number, errors: number}>}
+ */
+async function deleteAllFamilyImages(familyName) {
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    console.log(`[S3 Cleanup] AWS not configured, skipping S3 deletion for family: ${familyName}`);
+    return { deleted: 0, errors: 0, skipped: true };
+  }
+  
+  const prefix = `images/${familyName}/`;
+  let totalDeleted = 0;
+  let totalErrors = 0;
+  let continuationToken = null;
+  
+  console.log(`[S3 Cleanup] Starting deletion of all objects with prefix: ${prefix}`);
+  
+  try {
+    do {
+      // List objects with the family prefix
+      const listParams = {
+        Bucket: S3_BUCKET_NAME,
+        Prefix: prefix,
+        ContinuationToken: continuationToken
+      };
+      
+      const listedObjects = await s3.listObjectsV2(listParams).promise();
+      
+      if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
+        console.log(`[S3 Cleanup] No objects found with prefix: ${prefix}`);
+        break;
+      }
+      
+      console.log(`[S3 Cleanup] Found ${listedObjects.Contents.length} objects to delete`);
+      
+      // Delete objects in batch
+      const deleteParams = {
+        Bucket: S3_BUCKET_NAME,
+        Delete: {
+          Objects: listedObjects.Contents.map(({ Key }) => ({ Key })),
+          Quiet: false
+        }
+      };
+      
+      const deleteResult = await s3.deleteObjects(deleteParams).promise();
+      
+      if (deleteResult.Deleted) {
+        totalDeleted += deleteResult.Deleted.length;
+      }
+      if (deleteResult.Errors) {
+        totalErrors += deleteResult.Errors.length;
+        deleteResult.Errors.forEach(err => {
+          console.error(`[S3 Cleanup] Error deleting ${err.Key}: ${err.Message}`);
+        });
+      }
+      
+      continuationToken = listedObjects.IsTruncated ? listedObjects.NextContinuationToken : null;
+      
+    } while (continuationToken);
+    
+    console.log(`[S3 Cleanup] Completed deletion for ${familyName}: ${totalDeleted} deleted, ${totalErrors} errors`);
+    return { deleted: totalDeleted, errors: totalErrors };
+    
+  } catch (error) {
+    console.error(`[S3 Cleanup] Error deleting family images for ${familyName}:`, error);
+    return { deleted: totalDeleted, errors: totalErrors + 1, error: error.message };
+  }
+}
+
+/**
+ * Migrate images from flat structure to family prefix structure
+ * @param {string} familyName - The family name
+ * @returns {Promise<{migrated: number, errors: number, skipped: number}>}
+ */
+async function migrateImagesToFamilyPrefix(familyName) {
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    console.log(`[S3 Migration] AWS not configured, skipping migration for family: ${familyName}`);
+    return { migrated: 0, errors: 0, skipped: 0, awsNotConfigured: true };
+  }
+  
+  const familyDb = getFamilyDb(familyName);
+  
+  return new Promise((resolve, reject) => {
+    // Get all images for this family
+    familyDb.all('SELECT id, s3_key, s3_url FROM images', async (err, images) => {
+      if (err) {
+        console.error(`[S3 Migration] Error fetching images for ${familyName}:`, err);
+        return reject(err);
+      }
+      
+      if (!images || images.length === 0) {
+        console.log(`[S3 Migration] No images found for family: ${familyName}`);
+        return resolve({ migrated: 0, errors: 0, skipped: 0 });
+      }
+      
+      let migrated = 0;
+      let errors = 0;
+      let skipped = 0;
+      
+      console.log(`[S3 Migration] Processing ${images.length} images for family: ${familyName}`);
+      
+      for (const image of images) {
+        try {
+          const currentKey = image.s3_key;
+          
+          // Skip encrypted keys (can't migrate these)
+          if (!currentKey || currentKey.startsWith('enc:')) {
+            console.log(`[S3 Migration] Skipping encrypted/null key for image ${image.id}`);
+            skipped++;
+            continue;
+          }
+          
+          // Check if already migrated (key already has family prefix)
+          if (currentKey.startsWith(`images/${familyName}/`)) {
+            console.log(`[S3 Migration] Image ${image.id} already migrated, skipping`);
+            skipped++;
+            continue;
+          }
+          
+          // Parse the current key to get the filename
+          // Old format: images/uuid.ext
+          const keyParts = currentKey.split('/');
+          const filename = keyParts[keyParts.length - 1];
+          const newKey = `images/${familyName}/${filename}`;
+          
+          console.log(`[S3 Migration] Migrating image ${image.id}: ${currentKey} -> ${newKey}`);
+          
+          // Copy object to new location
+          await s3.copyObject({
+            Bucket: S3_BUCKET_NAME,
+            CopySource: `${S3_BUCKET_NAME}/${currentKey}`,
+            Key: newKey
+          }).promise();
+          
+          // Update database with new key
+          await new Promise((res, rej) => {
+            familyDb.run(
+              'UPDATE images SET s3_key = ?, s3_url = ? WHERE id = ?',
+              [newKey, newKey, image.id], // s3_url now stores the key, not full URL
+              function(updateErr) {
+                if (updateErr) rej(updateErr);
+                else res();
+              }
+            );
+          });
+          
+          // Delete old object
+          await s3.deleteObject({
+            Bucket: S3_BUCKET_NAME,
+            Key: currentKey
+          }).promise();
+          
+          migrated++;
+          console.log(`[S3 Migration] Successfully migrated image ${image.id}`);
+          
+        } catch (imageError) {
+          console.error(`[S3 Migration] Error migrating image ${image.id}:`, imageError);
+          errors++;
+        }
+      }
+      
+      // Update migration status in auth database
+      authDb.run(
+        'UPDATE users SET s3_images_migrated = 1 WHERE family_name = ?',
+        [familyName],
+        (updateErr) => {
+          if (updateErr) {
+            console.error(`[S3 Migration] Error updating migration flag for ${familyName}:`, updateErr);
+          }
+        }
+      );
+      
+      console.log(`[S3 Migration] Completed for ${familyName}: ${migrated} migrated, ${errors} errors, ${skipped} skipped`);
+      resolve({ migrated, errors, skipped });
+    });
+  });
+}
+
+/**
+ * List all S3 prefixes (family folders) to find orphans
+ * @returns {Promise<string[]>} Array of family names found in S3
+ */
+async function listS3FamilyPrefixes() {
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    return [];
+  }
+  
+  const prefixes = new Set();
+  let continuationToken = null;
+  
+  try {
+    do {
+      const params = {
+        Bucket: S3_BUCKET_NAME,
+        Prefix: 'images/',
+        Delimiter: '/',
+        ContinuationToken: continuationToken
+      };
+      
+      const result = await s3.listObjectsV2(params).promise();
+      
+      if (result.CommonPrefixes) {
+        result.CommonPrefixes.forEach(prefix => {
+          // Extract family name from prefix (images/familyname/)
+          const parts = prefix.Prefix.split('/');
+          if (parts.length >= 2 && parts[1]) {
+            prefixes.add(parts[1]);
+          }
+        });
+      }
+      
+      continuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+    } while (continuationToken);
+    
+    return Array.from(prefixes);
+  } catch (error) {
+    console.error('[S3] Error listing family prefixes:', error);
+    return [];
+  }
+}
+
+/**
+ * Clean up orphaned S3 prefixes (families that no longer exist in the database)
+ * @returns {Promise<{deleted: string[], errors: string[]}>}
+ */
+async function cleanupOrphanedS3Prefixes() {
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    console.log('[S3 Cleanup] AWS not configured, skipping orphan cleanup');
+    return { deleted: [], errors: [] };
+  }
+  
+  console.log('[S3 Cleanup] Starting orphaned prefix cleanup...');
+  
+  const s3Prefixes = await listS3FamilyPrefixes();
+  console.log(`[S3 Cleanup] Found ${s3Prefixes.length} family prefixes in S3`);
+  
+  // Get all active family names from the database
+  const activeFamilies = await new Promise((resolve, reject) => {
+    authDb.all('SELECT family_name FROM users WHERE deleted_at IS NULL', [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows ? rows.map(r => r.family_name) : []);
+    });
+  });
+  
+  console.log(`[S3 Cleanup] Found ${activeFamilies.length} active families in database`);
+  
+  const deleted = [];
+  const errors = [];
+  
+  for (const prefix of s3Prefixes) {
+    if (!activeFamilies.includes(prefix)) {
+      console.log(`[S3 Cleanup] Found orphaned prefix: ${prefix}`);
+      try {
+        const result = await deleteAllFamilyImages(prefix);
+        if (result.deleted > 0) {
+          deleted.push(prefix);
+        }
+      } catch (error) {
+        console.error(`[S3 Cleanup] Error cleaning up orphaned prefix ${prefix}:`, error);
+        errors.push(prefix);
+      }
     }
   }
-});
+  
+  console.log(`[S3 Cleanup] Orphan cleanup complete: ${deleted.length} prefixes deleted, ${errors.length} errors`);
+  return { deleted, errors };
+}
 
 // Cleanup routine to remove items with null keys and duplicate edges
 // This runs across ALL family databases
@@ -335,6 +603,22 @@ setTimeout(cleanupNullKeys, 5000); // Wait 5 seconds after server start
 function cleanupInactiveAndNonCompliantUsers() {
   console.log('Running user cleanup routine...');
   
+  // Step 1: Mark users for soft delete (if not already marked)
+  markUsersForDeletion();
+  
+  // Step 2: Permanently delete users whose grace period has expired
+  permanentlyDeleteExpiredUsers();
+  
+  // Step 3: Clean up orphaned S3 prefixes (async, don't await)
+  cleanupOrphanedS3Prefixes().catch(err => {
+    console.error('Error during orphaned S3 prefix cleanup:', err);
+  });
+}
+
+/**
+ * Mark inactive and non-compliant users for deletion (soft delete)
+ */
+function markUsersForDeletion() {
   // Get the latest terms version
   authDb.get('SELECT version, release_date FROM terms ORDER BY release_date DESC LIMIT 1', [], (err, latestTerms) => {
     if (err) {
@@ -344,7 +628,6 @@ function cleanupInactiveAndNonCompliantUsers() {
     
     if (!latestTerms) {
       console.log('No terms found, skipping terms compliance cleanup');
-      return;
     }
     
     const oneMonthAgo = new Date();
@@ -357,33 +640,38 @@ function cleanupInactiveAndNonCompliantUsers() {
     
     // Find users who haven't accepted the latest terms and it's been more than 1 month since terms release
     // OR users who haven't accessed the app in 12 months
-    const termsReleaseDate = new Date(latestTerms.release_date);
-    const termsGracePeriodEnd = new Date(termsReleaseDate);
-    termsGracePeriodEnd.setMonth(termsGracePeriodEnd.getMonth() + 1);
+    // Only consider users that are not already marked for deletion
+    let termsGracePeriodPassed = false;
     
-    const now = new Date();
-    
-    // Only enforce terms acceptance if grace period has passed
-    const termsGracePeriodPassed = now > termsGracePeriodEnd;
+    if (latestTerms) {
+      const termsReleaseDate = new Date(latestTerms.release_date);
+      const termsGracePeriodEnd = new Date(termsReleaseDate);
+      termsGracePeriodEnd.setMonth(termsGracePeriodEnd.getMonth() + 1);
+      termsGracePeriodPassed = new Date() > termsGracePeriodEnd;
+    }
     
     let query = `
       SELECT id, family_name, terms_version, terms_accepted_at, last_accessed, created_at
       FROM users
-      WHERE 
-        (last_accessed IS NOT NULL AND last_accessed < ?)
-        OR (last_accessed IS NULL AND created_at < ?)
+      WHERE deleted_at IS NULL
+        AND (
+          (last_accessed IS NOT NULL AND last_accessed < ?)
+          OR (last_accessed IS NULL AND created_at < ?)
+        )
     `;
     let params = [oneYearAgoStr, oneYearAgoStr];
     
     // Add terms non-compliance check if grace period has passed
-    if (termsGracePeriodPassed) {
+    if (latestTerms && termsGracePeriodPassed) {
       query = `
         SELECT id, family_name, terms_version, terms_accepted_at, last_accessed, created_at
         FROM users
-        WHERE 
-          (last_accessed IS NOT NULL AND last_accessed < ?)
-          OR (last_accessed IS NULL AND created_at < ?)
-          OR (terms_version IS NULL OR terms_version != ?)
+        WHERE deleted_at IS NULL
+          AND (
+            (last_accessed IS NOT NULL AND last_accessed < ?)
+            OR (last_accessed IS NULL AND created_at < ?)
+            OR (terms_version IS NULL OR terms_version != ?)
+          )
       `;
       params = [oneYearAgoStr, oneYearAgoStr, latestTerms.version];
     }
@@ -395,16 +683,18 @@ function cleanupInactiveAndNonCompliantUsers() {
       }
       
       if (!users || users.length === 0) {
-        console.log('No users need cleanup');
+        console.log('No users need to be marked for deletion');
         return;
       }
+      
+      const now = new Date().toISOString();
       
       users.forEach(user => {
         const isInactive = 
           (user.last_accessed && new Date(user.last_accessed) < new Date(oneYearAgoStr)) ||
           (!user.last_accessed && new Date(user.created_at) < new Date(oneYearAgoStr));
         
-        const hasNotAcceptedTerms = termsGracePeriodPassed && 
+        const hasNotAcceptedTerms = latestTerms && termsGracePeriodPassed && 
           (!user.terms_version || user.terms_version !== latestTerms.version);
         
         let reason = '';
@@ -417,34 +707,113 @@ function cleanupInactiveAndNonCompliantUsers() {
           return;
         }
         
-        console.log(`Deleting user ${user.family_name} (ID: ${user.id}): ${reason}`);
+        console.log(`[Soft Delete] Marking user ${user.family_name} (ID: ${user.id}) for deletion: ${reason}`);
         
-        // Delete the family database file
-        const familyDbPath = path.join(__dirname, 'databases', `database_family_${user.family_name}.db`);
-        if (fs.existsSync(familyDbPath)) {
-          try {
-            // Close the database connection if it exists
-            closeFamilyDatabase(user.family_name);
-            fs.unlinkSync(familyDbPath);
-            console.log(`Deleted family database for ${user.family_name}`);
-          } catch (deleteErr) {
-            console.error(`Error deleting family database for ${user.family_name}:`, deleteErr);
+        // Soft delete: set deleted_at and deletion_source
+        authDb.run(
+          'UPDATE users SET deleted_at = ?, deletion_source = ? WHERE id = ?',
+          [now, 'server', user.id],
+          function(updateErr) {
+            if (updateErr) {
+              console.error(`Error marking user ${user.family_name} for deletion:`, updateErr);
+            } else {
+              console.log(`[Soft Delete] User ${user.family_name} marked for deletion (grace period: ${GRACE_PERIOD_SERVER_DELETION} days)`);
+            }
           }
-        }
-        
-        // Delete user from auth database
-        authDb.run('DELETE FROM users WHERE id = ?', [user.id], function(deleteErr) {
-          if (deleteErr) {
-            console.error(`Error deleting user ${user.family_name}:`, deleteErr);
-          } else {
-            console.log(`Deleted user ${user.family_name} from auth database`);
-          }
-        });
-        
-        // TODO: Delete S3 images for this family (requires listing all images and deleting them)
-        // This is left as a manual cleanup task for now since it requires S3 operations
+        );
       });
     });
+  });
+}
+
+/**
+ * Permanently delete users whose grace period has expired
+ */
+async function permanentlyDeleteExpiredUsers() {
+  const now = new Date();
+  
+  // Calculate cutoff dates for each deletion source
+  const userCutoff = new Date(now);
+  userCutoff.setDate(userCutoff.getDate() - GRACE_PERIOD_USER_DELETION);
+  
+  const serverCutoff = new Date(now);
+  serverCutoff.setDate(serverCutoff.getDate() - GRACE_PERIOD_SERVER_DELETION);
+  
+  const adminCutoff = new Date(now);
+  adminCutoff.setDate(adminCutoff.getDate() - GRACE_PERIOD_SERVER_DELETION); // Admin uses same as server
+  
+  // Find users whose grace period has expired
+  const query = `
+    SELECT id, family_name, deleted_at, deletion_source
+    FROM users
+    WHERE deleted_at IS NOT NULL
+      AND (
+        (deletion_source = 'user' AND deleted_at < ?)
+        OR (deletion_source = 'server' AND deleted_at < ?)
+        OR (deletion_source = 'admin' AND deleted_at < ?)
+      )
+  `;
+  
+  authDb.all(query, [userCutoff.toISOString(), serverCutoff.toISOString(), adminCutoff.toISOString()], async (err, users) => {
+    if (err) {
+      console.error('Error finding expired users for permanent deletion:', err);
+      return;
+    }
+    
+    if (!users || users.length === 0) {
+      console.log('No users have expired grace periods');
+      return;
+    }
+    
+    for (const user of users) {
+      const gracePeriod = user.deletion_source === 'user' ? GRACE_PERIOD_USER_DELETION : GRACE_PERIOD_SERVER_DELETION;
+      console.log(`[Permanent Delete] Processing user ${user.family_name} (deleted_at: ${user.deleted_at}, source: ${user.deletion_source}, grace: ${gracePeriod} days)`);
+      
+      try {
+        // 1. Delete S3 images for this family
+        console.log(`[Permanent Delete] Deleting S3 images for family: ${user.family_name}`);
+        const s3Result = await deleteAllFamilyImages(user.family_name);
+        console.log(`[Permanent Delete] S3 cleanup result: ${s3Result.deleted} deleted, ${s3Result.errors} errors`);
+        
+        // 2. Close and delete the family database file
+        const familyDbPath = path.join(__dirname, 'databases', `database_family_${user.family_name}.db`);
+        
+        await new Promise((resolve, reject) => {
+          closeFamilyDatabase(user.family_name, (closeErr) => {
+            if (closeErr) {
+              console.error(`Error closing database for ${user.family_name}:`, closeErr);
+              // Continue anyway, file might still be deletable
+            }
+            
+            if (fs.existsSync(familyDbPath)) {
+              try {
+                fs.unlinkSync(familyDbPath);
+                console.log(`[Permanent Delete] Deleted family database for ${user.family_name}`);
+              } catch (deleteErr) {
+                console.error(`Error deleting family database for ${user.family_name}:`, deleteErr);
+              }
+            }
+            resolve();
+          });
+        });
+        
+        // 3. Delete user from auth database
+        await new Promise((resolve, reject) => {
+          authDb.run('DELETE FROM users WHERE id = ?', [user.id], function(deleteErr) {
+            if (deleteErr) {
+              console.error(`Error deleting user ${user.family_name} from auth:`, deleteErr);
+              reject(deleteErr);
+            } else {
+              console.log(`[Permanent Delete] User ${user.family_name} permanently deleted from auth database`);
+              resolve();
+            }
+          });
+        });
+        
+      } catch (error) {
+        console.error(`[Permanent Delete] Error during permanent deletion of ${user.family_name}:`, error);
+      }
+    }
   });
 }
 
@@ -990,7 +1359,7 @@ app.post('/api/auth/change-admin-password', authenticateToken, async (req, res) 
   }
 });
 
-// Delete family database and auth entry (admin only)
+// Soft delete family (marks for deletion with grace period - admin only)
 app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
   const { adminPassword } = req.body;
 
@@ -1000,7 +1369,7 @@ app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
 
   try {
     // First verify admin password
-    authDb.get('SELECT family_name, admin_password_hash FROM users WHERE id = ?', [req.user.id], async (err, user) => {
+    authDb.get('SELECT family_name, admin_password_hash, deleted_at FROM users WHERE id = ?', [req.user.id], async (err, user) => {
       if (err) {
         console.error('Database error during family deletion:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -1010,6 +1379,15 @@ app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      // Check if already marked for deletion
+      if (user.deleted_at) {
+        return res.status(400).json({ 
+          error: 'Family is already marked for deletion',
+          deletedAt: user.deleted_at,
+          gracePeriodDays: GRACE_PERIOD_USER_DELETION
+        });
+      }
+
       // Verify admin password
       const passwordMatch = await bcrypt.compare(adminPassword, user.admin_password_hash);
       if (!passwordMatch) {
@@ -1017,47 +1395,118 @@ app.delete('/api/auth/delete-family', authenticateToken, async (req, res) => {
       }
 
       const familyName = user.family_name;
-      const familyDbPath = path.join(__dirname, 'databases', `database_family_${familyName}.db`);
+      const deletionDate = new Date().toISOString();
+      const permanentDeletionDate = new Date(Date.now() + GRACE_PERIOD_USER_DELETION * 24 * 60 * 60 * 1000).toISOString();
 
-      // Close the database connection if it's in the cache
-      closeFamilyDatabase(familyName, (closeErr) => {
-        if (closeErr) {
-          console.error(`Error closing database for ${familyName}:`, closeErr);
-          return res.status(500).json({ error: 'Failed to close database connection' });
-        }
-
-        // Delete the family database file
-        try {
-          if (fs.existsSync(familyDbPath)) {
-            fs.unlinkSync(familyDbPath);
-            console.log(`Deleted family database: ${familyDbPath}`);
-          } else {
-            console.log(`Family database file not found: ${familyDbPath}`);
-          }
-        } catch (fsError) {
-          console.error('Error deleting family database file:', fsError);
-          return res.status(500).json({ error: 'Failed to delete family database file' });
-        }
-
-        // Delete the user from auth database
-        authDb.run('DELETE FROM users WHERE id = ?', [req.user.id], function(deleteErr) {
-          if (deleteErr) {
-            console.error('Database error during user deletion:', deleteErr);
+      // Mark user for soft deletion with 'user' source
+      authDb.run(
+        'UPDATE users SET deleted_at = ?, deletion_source = ? WHERE id = ?',
+        [deletionDate, 'user', req.user.id],
+        function(updateErr) {
+          if (updateErr) {
+            console.error('Database error during soft deletion:', updateErr);
             return res.status(500).json({ error: 'Internal server error' });
           }
 
-          console.log(`Deleted family "${familyName}" from auth database`);
+          console.log(`Family "${familyName}" marked for deletion by user. Will be permanently deleted after ${permanentDeletionDate}`);
           res.json({ 
             success: true, 
-            message: `Family "${familyName}" and all associated data have been permanently deleted` 
+            message: `Family "${familyName}" has been marked for deletion`,
+            deletedAt: deletionDate,
+            permanentDeletionDate: permanentDeletionDate,
+            gracePeriodDays: GRACE_PERIOD_USER_DELETION,
+            canCancel: true
           });
-        });
-      });
+        }
+      );
     });
   } catch (error) {
     console.error('Family deletion error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Cancel family deletion (within grace period)
+app.post('/api/auth/cancel-deletion', authenticateToken, async (req, res) => {
+  try {
+    authDb.get('SELECT family_name, deleted_at, deletion_source FROM users WHERE id = ?', [req.user.id], (err, user) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (!user.deleted_at) {
+        return res.status(400).json({ error: 'Family is not marked for deletion' });
+      }
+
+      // Check if still within grace period
+      const deletedAt = new Date(user.deleted_at);
+      const gracePeriod = user.deletion_source === 'user' ? GRACE_PERIOD_USER_DELETION : GRACE_PERIOD_SERVER_DELETION;
+      const expirationDate = new Date(deletedAt.getTime() + gracePeriod * 24 * 60 * 60 * 1000);
+
+      if (new Date() > expirationDate) {
+        return res.status(400).json({ error: 'Grace period has expired. Deletion cannot be cancelled.' });
+      }
+
+      // Clear deletion markers
+      authDb.run(
+        'UPDATE users SET deleted_at = NULL, deletion_source = NULL WHERE id = ?',
+        [req.user.id],
+        function(updateErr) {
+          if (updateErr) {
+            console.error('Database error cancelling deletion:', updateErr);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+
+          console.log(`Family "${user.family_name}" deletion cancelled by user`);
+          res.json({ 
+            success: true, 
+            message: `Deletion of family "${user.family_name}" has been cancelled`
+          });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Cancel deletion error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get deletion status
+app.get('/api/auth/deletion-status', authenticateToken, (req, res) => {
+  authDb.get('SELECT family_name, deleted_at, deletion_source FROM users WHERE id = ?', [req.user.id], (err, user) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.deleted_at) {
+      return res.json({ markedForDeletion: false });
+    }
+
+    const deletedAt = new Date(user.deleted_at);
+    const gracePeriod = user.deletion_source === 'user' ? GRACE_PERIOD_USER_DELETION : GRACE_PERIOD_SERVER_DELETION;
+    const expirationDate = new Date(deletedAt.getTime() + gracePeriod * 24 * 60 * 60 * 1000);
+    const daysRemaining = Math.max(0, Math.ceil((expirationDate - new Date()) / (24 * 60 * 60 * 1000)));
+
+    res.json({
+      markedForDeletion: true,
+      deletedAt: user.deleted_at,
+      deletionSource: user.deletion_source,
+      gracePeriodDays: gracePeriod,
+      permanentDeletionDate: expirationDate.toISOString(),
+      daysRemaining: daysRemaining,
+      canCancel: new Date() < expirationDate
+    });
+  });
 });
 
 // Get family settings (encryption status, show_street_fields, show_phone_field, show_email_field)
@@ -1084,6 +1533,92 @@ app.get('/api/family/settings', authenticateToken, (req, res) => {
       });
     }
   );
+});
+
+// Migrate images to family prefix structure (admin only)
+app.post('/api/admin/migrate-images', authenticateToken, async (req, res) => {
+  const { adminPassword } = req.body;
+
+  if (!adminPassword) {
+    return res.status(400).json({ error: 'Admin password is required for migration' });
+  }
+
+  try {
+    // Verify admin password first
+    authDb.get('SELECT family_name, admin_password_hash, s3_images_migrated FROM users WHERE id = ?', [req.user.id], async (err, user) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify admin password
+      const passwordMatch = await bcrypt.compare(adminPassword, user.admin_password_hash);
+      if (!passwordMatch) {
+        return res.status(401).json({ error: 'Invalid admin password' });
+      }
+
+      if (user.s3_images_migrated) {
+        return res.json({
+          success: true,
+          message: 'Images have already been migrated to family prefix structure',
+          alreadyMigrated: true,
+          migratedCount: 0
+        });
+      }
+
+      const familyName = user.family_name;
+
+      // Perform migration
+      try {
+        const migratedCount = await migrateImagesToFamilyPrefix(familyName);
+
+        // Mark migration as complete
+        authDb.run('UPDATE users SET s3_images_migrated = 1 WHERE id = ?', [req.user.id], (updateErr) => {
+          if (updateErr) {
+            console.error('Error updating migration status:', updateErr);
+            // Migration succeeded but status update failed - log but don't fail
+          }
+
+          console.log(`Image migration completed for family "${familyName}": ${migratedCount} images migrated`);
+          res.json({
+            success: true,
+            message: `Successfully migrated ${migratedCount} images to family prefix structure`,
+            migratedCount: migratedCount,
+            alreadyMigrated: false
+          });
+        });
+      } catch (migrationError) {
+        console.error(`Image migration failed for family "${familyName}":`, migrationError);
+        res.status(500).json({ error: 'Image migration failed: ' + migrationError.message });
+      }
+    });
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get migration status
+app.get('/api/admin/migration-status', authenticateToken, (req, res) => {
+  authDb.get('SELECT family_name, s3_images_migrated FROM users WHERE id = ?', [req.user.id], (err, user) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      familyName: user.family_name,
+      migrated: Boolean(user.s3_images_migrated)
+    });
+  });
 });
 
 // Get all admin settings (key-value pairs from family database)
@@ -2255,137 +2790,227 @@ app.post('/api/test/create-self-loops', authenticateToken, (req, res) => {
 
 // ============= IMAGE ENDPOINTS =============
 
-// Upload image
-app.post('/api/images/upload', authenticateToken, (req, res) => {
-  const familyId = req.user.id;
+// Get presigned URL for uploading an image (client uploads directly to S3)
+app.post('/api/images/presigned-upload', authenticateToken, (req, res) => {
   const familyName = req.user.familyName;
+  const { filename, contentType, fileSize } = req.body;
   
-  // Check if AWS credentials are configured before attempting upload
+  // Check if AWS credentials are configured
   if (!AWS_CREDENTIALS_CONFIGURED) {
-    console.error('Image upload attempted but AWS credentials are not configured');
+    console.error('Presigned upload URL requested but AWS credentials are not configured');
     return res.status(500).json({ 
       error: 'Server configuration error: AWS S3 credentials not configured. Please contact the administrator.',
-      code: 'AWS_NOT_CONFIGURED',
-      adminMessage: 'Configure AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and S3_BUCKET_NAME in the .env file'
+      code: 'AWS_NOT_CONFIGURED'
     });
   }
   
-  // Use multer upload middleware with error handling
-  upload.single('image')(req, res, function(err) {
-    // Handle multer errors
-    if (err) {
-      console.error('Multer error:', err);
-      
-      if (err instanceof multer.MulterError) {
-        // Multer-specific errors
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ 
-            error: 'File too large. Maximum file size is 10MB.',
-            code: 'FILE_TOO_LARGE'
-          });
-        }
-        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-          return res.status(400).json({ 
-            error: 'Unexpected file field.',
-            code: 'INVALID_FIELD'
-          });
-        }
-        return res.status(400).json({ 
-          error: `Upload error: ${err.message}`,
-          code: 'UPLOAD_ERROR'
+  // Validate content type
+  const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  if (!allowedMimes.includes(contentType)) {
+    return res.status(400).json({ 
+      error: 'Only image files are allowed (JPEG, PNG, GIF, WebP).',
+      code: 'INVALID_FILE_TYPE'
+    });
+  }
+  
+  // Validate file size (10MB limit)
+  const maxSize = 10 * 1024 * 1024;
+  if (fileSize && fileSize > maxSize) {
+    return res.status(400).json({ 
+      error: 'File too large. Maximum file size is 10MB.',
+      code: 'FILE_TOO_LARGE'
+    });
+  }
+  
+  try {
+    // Generate unique S3 key
+    const fileExtension = path.extname(filename) || '.jpg';
+    const uniqueFileName = `${uuidv4()}${fileExtension}`;
+    const s3Key = `images/${familyName}/${uniqueFileName}`;
+    
+    // Generate presigned upload URL
+    const uploadUrl = generatePresignedUploadUrl(s3Key, contentType);
+    
+    res.json({
+      success: true,
+      uploadUrl,
+      s3Key,
+      expiresIn: PRESIGNED_URL_EXPIRY_UPLOAD
+    });
+  } catch (error) {
+    console.error('Error generating presigned upload URL:', error);
+    res.status(500).json({ error: 'Failed to generate upload URL' });
+  }
+});
+
+// Confirm upload and save image metadata to database
+app.post('/api/images/confirm-upload', authenticateToken, (req, res) => {
+  const familyName = req.user.familyName;
+  const { s3Key, originalFilename, description, fileSize, mimeType, uploadedBy } = req.body;
+  
+  if (!s3Key || !originalFilename) {
+    return res.status(400).json({ 
+      error: 'Missing required fields: s3Key and originalFilename',
+      code: 'MISSING_FIELDS'
+    });
+  }
+  
+  try {
+    const familyDb = getFamilyDb(familyName);
+    const imageId = uuidv4();
+    const filename = s3Key.split('/').pop();
+    
+    const imageData = {
+      id: imageId,
+      filename: filename,
+      original_filename: originalFilename,
+      s3_key: s3Key,
+      s3_url: '', // No longer storing public URLs
+      description: description || '',
+      file_size: fileSize || 0,
+      mime_type: mimeType || 'image/jpeg',
+      uploaded_by: uploadedBy || 'anonymous'
+    };
+
+    familyDb.run(`INSERT INTO images (
+      id, filename, original_filename, s3_key, s3_url, description, 
+      file_size, mime_type, uploaded_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      imageData.id,
+      imageData.filename,
+      imageData.original_filename,
+      imageData.s3_key,
+      imageData.s3_url,
+      imageData.description,
+      imageData.file_size,
+      imageData.mime_type,
+      imageData.uploaded_by
+    ], function(err) {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ 
+          error: `Database error: ${err.message}`,
+          code: 'DATABASE_ERROR'
         });
       }
-      
-      // File filter errors
-      if (err.message.includes('Only image files')) {
-        return res.status(400).json({ 
-          error: 'Only image files are allowed (JPEG, PNG, GIF, WebP).',
-          code: 'INVALID_FILE_TYPE'
-        });
+
+      // Generate a presigned view URL for immediate display
+      const viewUrl = generatePresignedViewUrl(s3Key);
+
+      res.json({
+        success: true,
+        image: {
+          ...imageData,
+          s3Url: viewUrl // Provide presigned URL for immediate use
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error confirming image upload:', error);
+    res.status(500).json({ error: 'Failed to confirm image upload' });
+  }
+});
+
+// Get presigned view URL for a single image
+app.get('/api/images/:id/presigned-url', authenticateToken, (req, res) => {
+  const imageId = req.params.id;
+  const familyName = req.user.familyName;
+  
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    return res.status(500).json({ 
+      error: 'AWS S3 credentials not configured',
+      code: 'AWS_NOT_CONFIGURED'
+    });
+  }
+  
+  try {
+    const familyDb = getFamilyDb(familyName);
+    
+    familyDb.get(`SELECT s3_key FROM images WHERE id = ?`, [imageId], (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
       }
       
-      // S3 or other errors - provide more helpful messages
-      let errorMessage = err.message;
-      let errorCode = 'UPLOAD_FAILED';
-      
-      // Check for common AWS S3 errors
-      if (err.message.includes('Access Denied') || err.code === 'AccessDenied') {
-        errorMessage = 'AWS S3 Access Denied. Please check that AWS credentials are correctly configured.';
-        errorCode = 'S3_ACCESS_DENIED';
-        console.error('S3 Access Denied - Possible causes:');
-        console.error('  1. AWS credentials are missing or incorrect in .env file');
-        console.error('  2. IAM user does not have S3 permissions');
-        console.error('  3. S3 bucket does not exist or is in a different region');
-      } else if (err.message.includes('Network') || err.code === 'NetworkingError') {
-        errorMessage = 'Network error connecting to AWS S3. Please check your internet connection.';
-        errorCode = 'S3_NETWORK_ERROR';
-      } else if (err.message.includes('NoSuchBucket')) {
-        errorMessage = 'S3 bucket does not exist. Please check S3_BUCKET_NAME in configuration.';
-        errorCode = 'S3_BUCKET_NOT_FOUND';
+      if (!row) {
+        return res.status(404).json({ error: 'Image not found' });
       }
       
-      return res.status(500).json({ 
-        error: errorMessage,
-        code: errorCode,
-        originalError: err.message
+      const viewUrl = generatePresignedViewUrl(row.s3_key);
+      
+      res.json({
+        success: true,
+        imageId,
+        url: viewUrl,
+        expiresIn: PRESIGNED_URL_EXPIRY_VIEW
+      });
+    });
+  } catch (error) {
+    console.error('Error generating presigned view URL:', error);
+    res.status(500).json({ error: 'Failed to generate view URL' });
+  }
+});
+
+// Get presigned view URLs for multiple images (batch)
+app.post('/api/images/presigned-urls', authenticateToken, (req, res) => {
+  const { imageIds, s3Keys } = req.body;
+  const familyName = req.user.familyName;
+  
+  if (!AWS_CREDENTIALS_CONFIGURED) {
+    return res.status(500).json({ 
+      error: 'AWS S3 credentials not configured',
+      code: 'AWS_NOT_CONFIGURED'
+    });
+  }
+  
+  try {
+    // If s3Keys are provided directly (for encrypted data scenario)
+    if (s3Keys && Array.isArray(s3Keys)) {
+      const urls = {};
+      for (const s3Key of s3Keys) {
+        if (s3Key) {
+          urls[s3Key] = generatePresignedViewUrl(s3Key);
+        }
+      }
+      return res.json({
+        success: true,
+        urls,
+        expiresIn: PRESIGNED_URL_EXPIRY_VIEW
       });
     }
     
-    // Check if file was uploaded
-    if (!req.file) {
-      return res.status(400).json({ 
-        error: 'No image file provided.',
-        code: 'NO_FILE'
-      });
-    }
-
-    try {
+    // If imageIds are provided, look up s3Keys from database
+    if (imageIds && Array.isArray(imageIds) && imageIds.length > 0) {
       const familyDb = getFamilyDb(familyName);
-      const imageId = uuidv4();
-      const imageData = {
-        id: imageId,
-        filename: req.file.key.split('/').pop(), // Extract filename from S3 key
-        original_filename: req.file.originalname,
-        s3_key: req.file.key,
-        s3_url: req.file.location,
-        description: req.body.description || '',
-        file_size: req.file.size,
-        mime_type: req.file.mimetype,
-        uploaded_by: req.body.uploaded_by || 'anonymous'
-      };
-
-      familyDb.run(`INSERT INTO images (
-        id, filename, original_filename, s3_key, s3_url, description, 
-        file_size, mime_type, uploaded_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-        imageData.id,
-        imageData.filename,
-        imageData.original_filename,
-        imageData.s3_key,
-        imageData.s3_url,
-        imageData.description,
-        imageData.file_size,
-        imageData.mime_type,
-        imageData.uploaded_by
-      ], function(err) {
+      const placeholders = imageIds.map(() => '?').join(',');
+      
+      familyDb.all(`SELECT id, s3_key FROM images WHERE id IN (${placeholders})`, imageIds, (err, rows) => {
         if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ 
-            error: `Database error: ${err.message}`,
-            code: 'DATABASE_ERROR'
-          });
+          return res.status(500).json({ error: err.message });
         }
-
+        
+        const urls = {};
+        for (const row of rows) {
+          if (row.s3_key) {
+            urls[row.id] = generatePresignedViewUrl(row.s3_key);
+          }
+        }
+        
         res.json({
           success: true,
-          image: imageData
+          urls,
+          expiresIn: PRESIGNED_URL_EXPIRY_VIEW
         });
       });
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      res.status(500).json({ error: 'Failed to upload image' });
+    } else {
+      return res.status(400).json({ 
+        error: 'Either imageIds or s3Keys array must be provided',
+        code: 'MISSING_PARAMS'
+      });
     }
-  });
+  } catch (error) {
+    console.error('Error generating batch presigned URLs:', error);
+    res.status(500).json({ error: 'Failed to generate view URLs' });
+  }
 });
 
 // Get all images
@@ -2763,19 +3388,27 @@ app.put('/api/images/:id/question', authenticateToken, (req, res) => {
   }
 });
 
-// Image proxy endpoint for downloading images from S3 (solves CORS issues)
+// Image proxy endpoint for downloading images from S3 (solves CORS issues for export)
+// Accepts either s3Key directly or s3Url (for backwards compatibility)
 app.post('/api/images/proxy', authenticateToken, async (req, res) => {
-  const { s3Url } = req.body;
+  const { s3Url, s3Key: providedS3Key } = req.body;
   
-  if (!s3Url) {
-    return res.status(400).json({ error: 'S3 URL is required' });
+  if (!s3Url && !providedS3Key) {
+    return res.status(400).json({ error: 'Either s3Key or s3Url is required' });
   }
   
   try {
-    // Extract S3 key from URL
-    // URL format: https://bucket-name.s3.region.amazonaws.com/images/filename.jpg
-    const urlParts = new URL(s3Url);
-    const s3Key = urlParts.pathname.substring(1); // Remove leading slash
+    let s3Key;
+    
+    if (providedS3Key) {
+      // Use provided s3Key directly
+      s3Key = providedS3Key;
+    } else {
+      // Extract S3 key from URL (backwards compatibility)
+      // URL format: https://bucket-name.s3.region.amazonaws.com/images/filename.jpg
+      const urlParts = new URL(s3Url);
+      s3Key = urlParts.pathname.substring(1); // Remove leading slash
+    }
     
     console.log(`[Image Proxy] Fetching image from S3: ${s3Key}`);
     
@@ -2808,27 +3441,49 @@ app.post('/api/images/proxy', authenticateToken, async (req, res) => {
 });
 
 // Delete image (also removes from S3)
-app.delete('/api/images/:id', authenticateToken, (req, res) => {
+app.delete('/api/images/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const familyName = req.user.familyName;
 
   try {
     const familyDb = getFamilyDb(familyName);
     
-    // Delete from database only (this will cascade delete image_people records)
-    // Note: S3 files are NOT deleted to allow encrypted s3_key/s3_url in database
-    familyDb.run(`DELETE FROM images WHERE id = ?`, [id], function(err) {
+    // First, get the s3_key to delete from S3
+    familyDb.get(`SELECT s3_key FROM images WHERE id = ?`, [id], async (err, row) => {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
 
-      if (this.changes === 0) {
+      if (!row) {
         return res.status(404).json({ error: 'Image not found' });
       }
 
-      res.json({ 
-        success: true, 
-        message: 'Image deleted successfully'
+      const s3Key = row.s3_key;
+      
+      // Delete from S3 if we have a key and AWS is configured
+      if (s3Key && AWS_CREDENTIALS_CONFIGURED) {
+        try {
+          await s3.deleteObject({
+            Bucket: S3_BUCKET_NAME,
+            Key: s3Key
+          }).promise();
+          console.log(`[S3] Deleted image: ${s3Key}`);
+        } catch (s3Error) {
+          console.error('[S3] Error deleting image:', s3Error);
+          // Continue with database deletion even if S3 deletion fails
+        }
+      }
+      
+      // Delete from database (this will cascade delete image_people records)
+      familyDb.run(`DELETE FROM images WHERE id = ?`, [id], function(err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+
+        res.json({ 
+          success: true, 
+          message: 'Image deleted successfully'
+        });
       });
     });
   } catch (error) {

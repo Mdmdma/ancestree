@@ -396,18 +396,20 @@ export async function exportFamilyDataWithMetadata(onProgress, familyName = 'fam
         onProgress(progress, `Lade Bild ${imageNumber} von ${totalImages}...`);
         
         try {
-          // Use s3Url or url, preferring s3Url (these are DECRYPTED by encryptedApi)
-          const imageUrl = image.s3Url || image.url;
+          // Use s3Key for proxy (preferred) or s3Url for backwards compatibility
+          // s3Key is decrypted by encryptedApi.loadImages()
+          const imageKeyOrUrl = image.s3Key || image.s3Url || image.url;
           
-          if (!imageUrl) {
-            console.warn(`Skipping image ${image.id}: no URL found`);
+          if (!imageKeyOrUrl) {
+            console.warn(`Skipping image ${image.id}: no s3Key or URL found`);
             continue;
           }
           
           console.log(`[Export] Fetching image ${image.id} via proxy...`);
           
           // Fetch image via backend proxy (solves CORS issues)
-          const imageBlob = await api.fetchImageViaProxy(imageUrl);
+          // The proxy accepts either s3Key or s3Url
+          const imageBlob = await api.fetchImageViaProxy(imageKeyOrUrl);
           
           console.log(`[Export] Converting image ${image.id} to PNG with metadata...`);
           
@@ -545,14 +547,14 @@ export async function exportFamilyData(onProgress) {
         onProgress(progress, `Verarbeite Bild ${i + 1} von ${totalImages}...`);
         
         try {
-          // Use s3Url or url, preferring s3Url
+          // Use s3Url (presigned URL from encryptedApi.loadImages) or s3Key for proxy fallback
           const imageUrl = image.s3Url || image.url;
           
           if (!imageUrl) {
             continue;
           }
           
-          // Load image using Image element (works better with CORS)
+          // Load image using Image element (works with presigned URLs)
           const img = await loadImageElement(imageUrl);
           
           // Build tagged people list with actual names from personMap

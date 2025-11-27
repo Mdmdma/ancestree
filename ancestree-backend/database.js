@@ -267,6 +267,39 @@ const initializeAuthDb = () => {
               }
             });
           }
+          
+          // Check and add deleted_at for soft delete support
+          if (!columnNames.includes('deleted_at')) {
+            authDb.run("ALTER TABLE users ADD COLUMN deleted_at DATETIME", (err) => {
+              if (err) {
+                console.error('Error adding deleted_at column:', err);
+              } else {
+                console.log('Added deleted_at column to users table');
+              }
+            });
+          }
+          
+          // Check and add deletion_source (user, server, admin)
+          if (!columnNames.includes('deletion_source')) {
+            authDb.run("ALTER TABLE users ADD COLUMN deletion_source TEXT", (err) => {
+              if (err) {
+                console.error('Error adding deletion_source column:', err);
+              } else {
+                console.log('Added deletion_source column to users table');
+              }
+            });
+          }
+          
+          // Check and add s3_images_migrated flag
+          if (!columnNames.includes('s3_images_migrated')) {
+            authDb.run("ALTER TABLE users ADD COLUMN s3_images_migrated BOOLEAN DEFAULT 0", (err) => {
+              if (err) {
+                console.error('Error adding s3_images_migrated column:', err);
+              } else {
+                console.log('Added s3_images_migrated column to users table');
+              }
+            });
+          }
         });
       }
     });

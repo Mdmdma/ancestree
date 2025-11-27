@@ -582,7 +582,90 @@ export const api = {
     throw lastError;
   },
 
-  // Image operations with robust upload
+  // Image operations with presigned URLs for private S3 bucket
+  
+  // Step 1: Get presigned URL for uploading to S3
+  async getPresignedUploadUrl(filename, contentType, fileSize) {
+    const response = await fetch(`${API_BASE_URL}/images/presigned-upload`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ filename, contentType, fileSize })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get upload URL');
+    }
+    
+    return response.json();
+  },
+  
+  // Step 2: Upload file directly to S3 using presigned URL
+  async uploadToS3(uploadUrl, file, onProgress = null) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Progress tracking
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            onProgress(percentComplete, e.loaded, e.total);
+          }
+        });
+      }
+      
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ success: true });
+        } else {
+          reject(new Error(`S3 upload failed with status ${xhr.status}`));
+        }
+      });
+      
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during S3 upload'));
+      });
+      
+      xhr.addEventListener('abort', () => {
+        reject(new Error('S3 upload was aborted'));
+      });
+      
+      xhr.addEventListener('timeout', () => {
+        reject(new Error('S3 upload timed out'));
+      });
+      
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.timeout = 120000; // 2 minutes for large files
+      xhr.send(file);
+    });
+  },
+  
+  // Step 3: Confirm upload and save metadata to database
+  async confirmImageUpload(s3Key, originalFilename, description, fileSize, mimeType, uploadedBy = 'user') {
+    const response = await fetch(`${API_BASE_URL}/images/confirm-upload`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ 
+        s3Key, 
+        originalFilename, 
+        description, 
+        fileSize, 
+        mimeType, 
+        uploadedBy 
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to confirm upload');
+    }
+    
+    return response.json();
+  },
+  
+  // Combined upload function (handles all 3 steps)
   async uploadImage(file, description, uploadedBy = 'user', onProgress = null) {
     // Validate file on client side before attempting upload
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -597,102 +680,80 @@ export const api = {
 
     // Use retry logic for the upload
     return this.retryWithBackoff(async (attempt) => {
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('description', description);
-      formData.append('uploaded_by', uploadedBy);
-
-      const authHeaders = getAuthHeaders();
-      delete authHeaders['Content-Type']; // Remove Content-Type for FormData
-
-      // Increase timeout for larger files and retry attempts
-      const baseTimeout = 60000; // 60 seconds
-      const timeoutMultiplier = 1 + (attempt * 0.5); // Increase timeout on retries
-      const timeout = baseTimeout * timeoutMultiplier;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        // Use XMLHttpRequest for better progress tracking and mobile compatibility
-        const uploadPromise = new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          
-          // Progress tracking
-          if (onProgress) {
-            xhr.upload.addEventListener('progress', (e) => {
-              if (e.lengthComputable) {
-                const percentComplete = (e.loaded / e.total) * 100;
-                onProgress(percentComplete, e.loaded, e.total);
-              }
-            });
-          }
-          
-          // Load event - successful response
-          xhr.addEventListener('load', () => {
-            clearTimeout(timeoutId);
-            
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const response = JSON.parse(xhr.responseText);
-                resolve(response);
-              } catch (e) {
-                reject(new Error('Invalid response from server'));
-              }
-            } else {
-              try {
-                const errorData = JSON.parse(xhr.responseText);
-                reject(new Error(errorData.error || `Upload failed with status ${xhr.status}`));
-              } catch (e) {
-                reject(new Error(`Upload failed with status ${xhr.status}`));
-              }
-            }
-          });
-          
-          // Error event - network errors
-          xhr.addEventListener('error', () => {
-            clearTimeout(timeoutId);
-            reject(new Error('Network error. Please check your connection and try again.'));
-          });
-          
-          // Abort event
-          xhr.addEventListener('abort', () => {
-            clearTimeout(timeoutId);
-            reject(new Error('Upload timed out. Please try again.'));
-          });
-          
-          // Timeout event
-          xhr.addEventListener('timeout', () => {
-            clearTimeout(timeoutId);
-            reject(new Error('Upload timed out. Please try again.'));
-          });
-          
-          // Open and send request
-          xhr.open('POST', `${API_BASE_URL}/images/upload`);
-          
-          // Set auth header
-          if (authToken) {
-            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
-          }
-          
-          // Set timeout
-          xhr.timeout = timeout;
-          
-          // Send the form data
-          xhr.send(formData);
-          
-          // Wire up abort controller
-          controller.signal.addEventListener('abort', () => {
-            xhr.abort();
-          });
-        });
-
-        return await uploadPromise;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        throw error;
-      }
+      // Step 1: Get presigned upload URL from backend
+      if (onProgress) onProgress(5, 0, file.size);
+      const { uploadUrl, s3Key } = await this.getPresignedUploadUrl(file.name, file.type, file.size);
+      
+      // Step 2: Upload directly to S3
+      if (onProgress) onProgress(10, 0, file.size);
+      await this.uploadToS3(uploadUrl, file, (percent, loaded, total) => {
+        // Scale progress from 10% to 90%
+        if (onProgress) {
+          const scaledPercent = 10 + (percent * 0.8);
+          onProgress(scaledPercent, loaded, total);
+        }
+      });
+      
+      // Step 3: Confirm upload and save metadata
+      if (onProgress) onProgress(95, file.size, file.size);
+      const result = await this.confirmImageUpload(
+        s3Key, 
+        file.name, 
+        description, 
+        file.size, 
+        file.type, 
+        uploadedBy
+      );
+      
+      if (onProgress) onProgress(100, file.size, file.size);
+      return result;
     }, 3, 1000); // 3 retries, starting with 1 second delay
+  },
+  
+  // Get presigned view URL for a single image
+  async getPresignedViewUrl(imageId) {
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/presigned-url`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get view URL');
+    }
+    
+    return response.json();
+  },
+  
+  // Get presigned view URLs for multiple images (batch) - by image IDs
+  async getPresignedViewUrls(imageIds) {
+    const response = await fetch(`${API_BASE_URL}/images/presigned-urls`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ imageIds })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get view URLs');
+    }
+    
+    return response.json();
+  },
+  
+  // Get presigned view URLs for multiple images (batch) - by S3 keys (for encrypted data)
+  async getPresignedViewUrlsByKeys(s3Keys) {
+    const response = await fetch(`${API_BASE_URL}/images/presigned-urls`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ s3Keys })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get view URLs');
+    }
+    
+    return response.json();
   },
 
   async loadImages() {
@@ -800,11 +861,15 @@ export const api = {
   },
 
   // Image proxy for downloading images (solves CORS issues)
-  async fetchImageViaProxy(s3Url) {
+  // Accepts either s3Key (preferred) or s3Url (backwards compatibility)
+  async fetchImageViaProxy(s3KeyOrUrl) {
+    // Determine if it's a key or URL
+    const isUrl = s3KeyOrUrl && (s3KeyOrUrl.startsWith('http://') || s3KeyOrUrl.startsWith('https://'));
+    
     const response = await fetch(`${API_BASE_URL}/images/proxy`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ s3Url })
+      body: JSON.stringify(isUrl ? { s3Url: s3KeyOrUrl } : { s3Key: s3KeyOrUrl })
     });
     
     if (!response.ok) {

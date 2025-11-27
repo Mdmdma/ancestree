@@ -479,7 +479,8 @@ export const encryptedApi = {
     // User can still see encrypted data strings if they exist
     if (!encEnabled || !key) {
       console.log('[EncryptedAPI] No decryption available, returning images as-is');
-      return images;
+      // Still need to resolve presigned URLs for viewing
+      return await this.resolveImageUrls(images);
     }
     
     // Decrypt all images
@@ -488,7 +489,57 @@ export const encryptedApi = {
       decryptedImages.push(await decryptImageData(image));
     }
     
-    return decryptedImages;
+    // Resolve presigned URLs for decrypted images
+    return await this.resolveImageUrls(decryptedImages);
+  },
+  
+  // Resolve presigned view URLs for images using their s3Keys
+  async resolveImageUrls(images) {
+    if (!images || images.length === 0) {
+      return images;
+    }
+    
+    try {
+      // Collect all s3Keys that need URLs
+      const s3Keys = images
+        .map(img => img.s3Key)
+        .filter(key => key && !key.startsWith('enc:')); // Skip encrypted keys
+      
+      if (s3Keys.length === 0) {
+        // If all keys are encrypted or missing, return images as-is
+        return images;
+      }
+      
+      // Batch fetch presigned URLs
+      const { urls } = await baseApi.getPresignedViewUrlsByKeys(s3Keys);
+      
+      // Map presigned URLs back to images
+      return images.map(image => {
+        if (image.s3Key && urls[image.s3Key]) {
+          return {
+            ...image,
+            s3Url: urls[image.s3Key] // Replace with presigned URL
+          };
+        }
+        return image;
+      });
+    } catch (error) {
+      console.error('[EncryptedAPI] Error resolving image URLs:', error);
+      // Return images without URLs on error
+      return images;
+    }
+  },
+  
+  // Get presigned URL for a single image (by ID or s3Key)
+  async getPresignedUrl(imageIdOrKey) {
+    // If it looks like an s3Key, use batch method
+    if (imageIdOrKey && imageIdOrKey.includes('/')) {
+      const { urls } = await baseApi.getPresignedViewUrlsByKeys([imageIdOrKey]);
+      return urls[imageIdOrKey];
+    }
+    // Otherwise treat as image ID
+    const { url } = await baseApi.getPresignedViewUrl(imageIdOrKey);
+    return url;
   },
   
   // Node operations with encryption
@@ -592,7 +643,7 @@ export const encryptedApi = {
   
   // Image operations with encryption
   async uploadImage(file, description, uploadedBy = 'user', onProgress = null) {
-    // Upload the image first (multipart/form-data cannot be encrypted)
+    // Upload the image using presigned URL (handled by baseApi)
     // Pass all parameters to baseApi including the progress callback
     const result = await baseApi.uploadImage(file, description, uploadedBy, onProgress);
     
@@ -605,7 +656,7 @@ export const encryptedApi = {
         filename: result.image.filename,
         originalFilename: result.image.originalFilename,
         s3Key: result.image.s3Key,
-        s3Url: result.image.s3Url,
+        // s3Url is now a presigned URL, we don't need to store it permanently
         uploadedBy: result.image.uploadedBy,
         description: result.image.description,
         mimeType: result.image.mimeType,
@@ -617,12 +668,13 @@ export const encryptedApi = {
       // Update the image record with encrypted metadata
       await baseApi.updateImage(imageId, encryptedMetadata);
       
-      // Return the decrypted result for the UI
+      // Return the result with the temporary presigned URL for immediate UI display
       return {
         ...result,
         image: {
           ...result.image,
           // Keep the original decrypted values for immediate UI display
+          // The s3Url from result is already a presigned URL
         }
       };
     }
@@ -665,7 +717,8 @@ export const encryptedApi = {
     const images = await baseApi.loadPersonImages(personId);
     
     if (!isEncryptionEnabled()) {
-      return images;
+      // Still need to resolve presigned URLs
+      return await this.resolveImageUrls(images);
     }
     
     // Decrypt all images
@@ -674,7 +727,8 @@ export const encryptedApi = {
       decryptedImages.push(await decryptImageData(image));
     }
     
-    return decryptedImages;
+    // Resolve presigned URLs for decrypted images
+    return await this.resolveImageUrls(decryptedImages);
   },
   
   // Image-person tagging operations with encryption
