@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import Login from './Login';
 import AdminPanel from './AdminPanel';
 import ContactButton from './ContactButton';
+import TermsAcceptanceDialog from './TermsAcceptanceDialog';
 import { api, getAuthToken, getSocketServerUrl, setLogoutCallback, setLastFamilyName } from './api';
 import { encryptedApi } from './encryptedApi';
 import { clearSession, isEncryptionEnabled, getDerivedKey, shouldPauseKeyCheck } from './encryptionSession';
@@ -31,6 +32,10 @@ const AddNodeOnEdgeDrop = () => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [completionSettings, setCompletionSettings] = useState(null);
+  
+  // Terms acceptance state
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+  const [termsStatus, setTermsStatus] = useState(null);
 
   // Initialize socket connection when authenticated
   const socketData = useSocket(getSocketServerUrl(), isAuthenticated);
@@ -138,6 +143,29 @@ const AddNodeOnEdgeDrop = () => {
     // Store the family name for auto-fill after forced logout
     setLastFamilyName(userData.familyName);
     // Note: Encryption session is initialized in Login.jsx via initializeSession()
+    
+    // Check if user needs to accept new terms
+    try {
+      const status = await api.getTermsStatus();
+      setTermsStatus(status);
+      if (status.needsAcceptance) {
+        setShowTermsDialog(true);
+      }
+    } catch (err) {
+      console.error('[App] Failed to check terms status:', err);
+      // Don't block login if terms check fails
+    }
+  };
+
+  // Handle terms acceptance
+  const handleTermsAccepted = () => {
+    setShowTermsDialog(false);
+    setTermsStatus(prev => prev ? { ...prev, needsAcceptance: false } : null);
+  };
+
+  const handleTermsDialogClose = () => {
+    setShowTermsDialog(false);
+    // User can close without accepting, but dialog will show again on next login
   };
 
   // Handle admin panel
@@ -473,6 +501,17 @@ const AddNodeOnEdgeDrop = () => {
           onAuthenticate={handleAdminAuthenticate}
           familyName={user?.familyName}
           onDataReload={() => treeOperations?.refreshData()}
+        />
+      )}
+
+      {/* Terms Acceptance Dialog */}
+      {isAuthenticated && (
+        <TermsAcceptanceDialog
+          isOpen={showTermsDialog}
+          onClose={handleTermsDialogClose}
+          onAccepted={handleTermsAccepted}
+          currentVersion={termsStatus?.currentVersion}
+          userAcceptedVersion={termsStatus?.userAcceptedVersion}
         />
       )}
 

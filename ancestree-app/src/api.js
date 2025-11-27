@@ -203,6 +203,49 @@ export const api = {
     return result;
   },
 
+  // Terms and Conditions operations
+  async getTermsVersion() {
+    const response = await fetch(`${API_BASE_URL}/terms/version`);
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to get terms version');
+    }
+    
+    return result;
+  },
+
+  async getTermsStatus() {
+    const response = await fetch(`${API_BASE_URL}/terms/status`, {
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to get terms status');
+    }
+    
+    return result;
+  },
+
+  async acceptTerms(adminPassword, termsVersion) {
+    const response = await fetch(`${API_BASE_URL}/terms/accept`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ adminPassword, termsVersion })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to accept terms');
+    }
+    
+    return result;
+  },
+
   // Family settings operations
   async getFamilySettings() {
     const response = await fetch(`${API_BASE_URL}/family/settings`, {

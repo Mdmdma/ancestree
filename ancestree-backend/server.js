@@ -329,6 +329,132 @@ setInterval(cleanupNullKeys, CLEANUP_INTERVAL);
 // Run initial cleanup on server start
 setTimeout(cleanupNullKeys, 5000); // Wait 5 seconds after server start
 
+// ============= USER AND TERMS CLEANUP ROUTINE =============
+// Cleanup users who haven't accepted new terms after 1 month
+// Cleanup users who haven't accessed the app for 12 months
+function cleanupInactiveAndNonCompliantUsers() {
+  console.log('Running user cleanup routine...');
+  
+  // Get the latest terms version
+  authDb.get('SELECT version, release_date FROM terms ORDER BY release_date DESC LIMIT 1', [], (err, latestTerms) => {
+    if (err) {
+      console.error('Error getting latest terms for cleanup:', err);
+      return;
+    }
+    
+    if (!latestTerms) {
+      console.log('No terms found, skipping terms compliance cleanup');
+      return;
+    }
+    
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const oneMonthAgoStr = oneMonthAgo.toISOString();
+    
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const oneYearAgoStr = oneYearAgo.toISOString();
+    
+    // Find users who haven't accepted the latest terms and it's been more than 1 month since terms release
+    // OR users who haven't accessed the app in 12 months
+    const termsReleaseDate = new Date(latestTerms.release_date);
+    const termsGracePeriodEnd = new Date(termsReleaseDate);
+    termsGracePeriodEnd.setMonth(termsGracePeriodEnd.getMonth() + 1);
+    
+    const now = new Date();
+    
+    // Only enforce terms acceptance if grace period has passed
+    const termsGracePeriodPassed = now > termsGracePeriodEnd;
+    
+    let query = `
+      SELECT id, family_name, terms_version, terms_accepted_at, last_accessed, created_at
+      FROM users
+      WHERE 
+        (last_accessed IS NOT NULL AND last_accessed < ?)
+        OR (last_accessed IS NULL AND created_at < ?)
+    `;
+    let params = [oneYearAgoStr, oneYearAgoStr];
+    
+    // Add terms non-compliance check if grace period has passed
+    if (termsGracePeriodPassed) {
+      query = `
+        SELECT id, family_name, terms_version, terms_accepted_at, last_accessed, created_at
+        FROM users
+        WHERE 
+          (last_accessed IS NOT NULL AND last_accessed < ?)
+          OR (last_accessed IS NULL AND created_at < ?)
+          OR (terms_version IS NULL OR terms_version != ?)
+      `;
+      params = [oneYearAgoStr, oneYearAgoStr, latestTerms.version];
+    }
+    
+    authDb.all(query, params, (err, users) => {
+      if (err) {
+        console.error('Error finding users for cleanup:', err);
+        return;
+      }
+      
+      if (!users || users.length === 0) {
+        console.log('No users need cleanup');
+        return;
+      }
+      
+      users.forEach(user => {
+        const isInactive = 
+          (user.last_accessed && new Date(user.last_accessed) < new Date(oneYearAgoStr)) ||
+          (!user.last_accessed && new Date(user.created_at) < new Date(oneYearAgoStr));
+        
+        const hasNotAcceptedTerms = termsGracePeriodPassed && 
+          (!user.terms_version || user.terms_version !== latestTerms.version);
+        
+        let reason = '';
+        if (isInactive) {
+          reason = 'inactive for more than 12 months';
+        } else if (hasNotAcceptedTerms) {
+          reason = `has not accepted terms version ${latestTerms.version} (grace period ended)`;
+        } else {
+          // This user doesn't actually need deletion
+          return;
+        }
+        
+        console.log(`Deleting user ${user.family_name} (ID: ${user.id}): ${reason}`);
+        
+        // Delete the family database file
+        const familyDbPath = path.join(__dirname, 'databases', `database_family_${user.family_name}.db`);
+        if (fs.existsSync(familyDbPath)) {
+          try {
+            // Close the database connection if it exists
+            closeFamilyDatabase(user.family_name);
+            fs.unlinkSync(familyDbPath);
+            console.log(`Deleted family database for ${user.family_name}`);
+          } catch (deleteErr) {
+            console.error(`Error deleting family database for ${user.family_name}:`, deleteErr);
+          }
+        }
+        
+        // Delete user from auth database
+        authDb.run('DELETE FROM users WHERE id = ?', [user.id], function(deleteErr) {
+          if (deleteErr) {
+            console.error(`Error deleting user ${user.family_name}:`, deleteErr);
+          } else {
+            console.log(`Deleted user ${user.family_name} from auth database`);
+          }
+        });
+        
+        // TODO: Delete S3 images for this family (requires listing all images and deleting them)
+        // This is left as a manual cleanup task for now since it requires S3 operations
+      });
+    });
+  });
+}
+
+// Run user cleanup once per day (86400000 ms)
+const USER_CLEANUP_INTERVAL = 60 * 1000 * 60 * 24; // 24 hours
+setInterval(cleanupInactiveAndNonCompliantUsers, USER_CLEANUP_INTERVAL);
+
+// Run initial user cleanup 30 seconds after server start
+setTimeout(cleanupInactiveAndNonCompliantUsers, 30000);
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -374,6 +500,14 @@ app.post('/api/auth/login', async (req, res) => {
         return res.status(401).json({ error: 'Invalid family name or password' });
       }
 
+      // Update last_accessed timestamp
+      authDb.run('UPDATE users SET last_accessed = CURRENT_TIMESTAMP WHERE id = ?', [user.id], (updateErr) => {
+        if (updateErr) {
+          console.error('Error updating last_accessed:', updateErr);
+          // Don't fail login if this fails
+        }
+      });
+
       // Generate JWT token
       const token = jwt.sign(
         { 
@@ -404,11 +538,141 @@ app.post('/api/auth/login', async (req, res) => {
 // This should match the version in the frontend TermsAndConditions.jsx
 const CURRENT_TERMS_VERSION = 'beta-1.0';
 
+// Get current terms version from database
 app.get('/api/terms/version', (req, res) => {
-  res.json({
-    version: CURRENT_TERMS_VERSION,
-    lastUpdated: '2025-11-27'
+  authDb.get('SELECT version, release_date FROM terms ORDER BY release_date DESC LIMIT 1', [], (err, row) => {
+    if (err) {
+      console.error('Error getting current terms version:', err);
+      return res.status(500).json({ error: 'Failed to get terms version' });
+    }
+    
+    if (!row) {
+      // Fallback to hardcoded version if no terms in database
+      return res.json({
+        version: CURRENT_TERMS_VERSION,
+        lastUpdated: '2025-11-27'
+      });
+    }
+    
+    res.json({
+      version: row.version,
+      lastUpdated: row.release_date
+    });
   });
+});
+
+// Get all terms versions (for admin purposes)
+app.get('/api/terms/all', authenticateToken, (req, res) => {
+  authDb.all('SELECT * FROM terms ORDER BY release_date DESC', [], (err, rows) => {
+    if (err) {
+      console.error('Error getting all terms versions:', err);
+      return res.status(500).json({ error: 'Failed to get terms versions' });
+    }
+    res.json(rows);
+  });
+});
+
+// Check if user has accepted the latest terms
+app.get('/api/terms/status', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  
+  // Get latest terms version
+  authDb.get('SELECT version, release_date FROM terms ORDER BY release_date DESC LIMIT 1', [], (err, latestTerms) => {
+    if (err) {
+      console.error('Error getting latest terms:', err);
+      return res.status(500).json({ error: 'Failed to check terms status' });
+    }
+    
+    if (!latestTerms) {
+      return res.json({ needsAcceptance: false, message: 'No terms found' });
+    }
+    
+    // Get user's accepted terms version
+    authDb.get('SELECT terms_version, terms_accepted_at FROM users WHERE id = ?', [userId], (err, user) => {
+      if (err) {
+        console.error('Error getting user terms status:', err);
+        return res.status(500).json({ error: 'Failed to check user terms status' });
+      }
+      
+      const needsAcceptance = !user.terms_version || user.terms_version !== latestTerms.version;
+      
+      res.json({
+        needsAcceptance,
+        currentVersion: latestTerms.version,
+        currentReleaseDate: latestTerms.release_date,
+        userAcceptedVersion: user.terms_version || null,
+        userAcceptedAt: user.terms_accepted_at || null
+      });
+    });
+  });
+});
+
+// Accept new terms (requires admin password)
+app.post('/api/terms/accept', authenticateToken, async (req, res) => {
+  const { adminPassword, termsVersion } = req.body;
+  const userId = req.user.id;
+  
+  if (!adminPassword) {
+    return res.status(400).json({ error: 'Admin password is required to accept new terms' });
+  }
+  
+  if (!termsVersion) {
+    return res.status(400).json({ error: 'Terms version is required' });
+  }
+  
+  try {
+    // Get user's admin password hash
+    authDb.get('SELECT admin_password_hash FROM users WHERE id = ?', [userId], async (err, user) => {
+      if (err) {
+        console.error('Error getting user:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+      
+      if (!user || !user.admin_password_hash) {
+        return res.status(400).json({ error: 'Admin password not set for this account' });
+      }
+      
+      // Verify admin password
+      const passwordMatch = await bcrypt.compare(adminPassword, user.admin_password_hash);
+      if (!passwordMatch) {
+        return res.status(401).json({ error: 'Invalid admin password' });
+      }
+      
+      // Verify the terms version exists
+      authDb.get('SELECT version FROM terms WHERE version = ?', [termsVersion], (err, terms) => {
+        if (err) {
+          console.error('Error checking terms version:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+        
+        if (!terms) {
+          return res.status(400).json({ error: 'Invalid terms version' });
+        }
+        
+        // Update user's terms acceptance
+        authDb.run(
+          'UPDATE users SET terms_version = ?, terms_accepted_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [termsVersion, userId],
+          function(err) {
+            if (err) {
+              console.error('Error updating terms acceptance:', err);
+              return res.status(500).json({ error: 'Failed to accept terms' });
+            }
+            
+            res.json({
+              success: true,
+              message: 'Terms accepted successfully',
+              termsVersion,
+              acceptedAt: new Date().toISOString()
+            });
+          }
+        );
+      });
+    });
+  } catch (error) {
+    console.error('Error accepting terms:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Register endpoint (for family registration)

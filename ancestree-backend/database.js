@@ -248,6 +248,57 @@ const initializeAuthDb = () => {
               }
             });
           }
+          
+          // Check and add last_accessed
+          if (!columnNames.includes('last_accessed')) {
+            authDb.run("ALTER TABLE users ADD COLUMN last_accessed DATETIME", (err) => {
+              if (err) {
+                console.error('Error adding last_accessed column:', err);
+              } else {
+                console.log('Added last_accessed column to users table');
+                // Set initial value to created_at for existing users
+                authDb.run("UPDATE users SET last_accessed = created_at WHERE last_accessed IS NULL", (updateErr) => {
+                  if (updateErr) {
+                    console.error('Error setting initial last_accessed values:', updateErr);
+                  } else {
+                    console.log('Set initial last_accessed values for existing users');
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    // Terms table for tracking terms versions
+    authDb.run(`CREATE TABLE IF NOT EXISTS terms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version TEXT NOT NULL UNIQUE,
+      release_date DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating terms table:', err);
+      } else {
+        console.log('Terms table initialized');
+        
+        // Insert initial terms version if not exists
+        authDb.get('SELECT id FROM terms WHERE version = ?', ['beta-1.0'], (err, row) => {
+          if (err) {
+            console.error('Error checking for initial terms version:', err);
+          } else if (!row) {
+            authDb.run('INSERT INTO terms (version, release_date) VALUES (?, ?)', 
+              ['beta-1.0', '2025-11-27'], 
+              (err) => {
+                if (err) {
+                  console.error('Error inserting initial terms version:', err);
+                } else {
+                  console.log('Inserted initial terms version beta-1.0');
+                }
+              }
+            );
+          }
         });
       }
     });
