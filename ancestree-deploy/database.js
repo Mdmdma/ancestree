@@ -226,6 +226,112 @@ const initializeAuthDb = () => {
               }
             });
           }
+          
+          // Check and add terms_accepted_at
+          if (!columnNames.includes('terms_accepted_at')) {
+            authDb.run("ALTER TABLE users ADD COLUMN terms_accepted_at DATETIME", (err) => {
+              if (err) {
+                console.error('Error adding terms_accepted_at column:', err);
+              } else {
+                console.log('Added terms_accepted_at column to users table');
+              }
+            });
+          }
+          
+          // Check and add terms_version
+          if (!columnNames.includes('terms_version')) {
+            authDb.run("ALTER TABLE users ADD COLUMN terms_version TEXT", (err) => {
+              if (err) {
+                console.error('Error adding terms_version column:', err);
+              } else {
+                console.log('Added terms_version column to users table');
+              }
+            });
+          }
+          
+          // Check and add last_accessed
+          if (!columnNames.includes('last_accessed')) {
+            authDb.run("ALTER TABLE users ADD COLUMN last_accessed DATETIME", (err) => {
+              if (err) {
+                console.error('Error adding last_accessed column:', err);
+              } else {
+                console.log('Added last_accessed column to users table');
+                // Set initial value to created_at for existing users
+                authDb.run("UPDATE users SET last_accessed = created_at WHERE last_accessed IS NULL", (updateErr) => {
+                  if (updateErr) {
+                    console.error('Error setting initial last_accessed values:', updateErr);
+                  } else {
+                    console.log('Set initial last_accessed values for existing users');
+                  }
+                });
+              }
+            });
+          }
+          
+          // Check and add deleted_at for soft delete support
+          if (!columnNames.includes('deleted_at')) {
+            authDb.run("ALTER TABLE users ADD COLUMN deleted_at DATETIME", (err) => {
+              if (err) {
+                console.error('Error adding deleted_at column:', err);
+              } else {
+                console.log('Added deleted_at column to users table');
+              }
+            });
+          }
+          
+          // Check and add deletion_source (user, server, admin)
+          if (!columnNames.includes('deletion_source')) {
+            authDb.run("ALTER TABLE users ADD COLUMN deletion_source TEXT", (err) => {
+              if (err) {
+                console.error('Error adding deletion_source column:', err);
+              } else {
+                console.log('Added deletion_source column to users table');
+              }
+            });
+          }
+          
+          // Check and add s3_images_migrated flag
+          if (!columnNames.includes('s3_images_migrated')) {
+            authDb.run("ALTER TABLE users ADD COLUMN s3_images_migrated BOOLEAN DEFAULT 0", (err) => {
+              if (err) {
+                console.error('Error adding s3_images_migrated column:', err);
+              } else {
+                console.log('Added s3_images_migrated column to users table');
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    // Terms table for tracking terms versions
+    authDb.run(`CREATE TABLE IF NOT EXISTS terms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version TEXT NOT NULL UNIQUE,
+      release_date DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating terms table:', err);
+      } else {
+        console.log('Terms table initialized');
+        
+        // Insert initial terms version if not exists
+        authDb.get('SELECT id FROM terms WHERE version = ?', ['beta-1.0'], (err, row) => {
+          if (err) {
+            console.error('Error checking for initial terms version:', err);
+          } else if (!row) {
+            authDb.run('INSERT INTO terms (version, release_date) VALUES (?, ?)', 
+              ['beta-1.0', '2025-11-27'], 
+              (err) => {
+                if (err) {
+                  console.error('Error inserting initial terms version:', err);
+                } else {
+                  console.log('Inserted initial terms version beta-1.0');
+                }
+              }
+            );
+          }
         });
       }
     });
@@ -336,6 +442,47 @@ const initializeFamilyDb = (familyDb) => {
       }
     });
 
+    // Completion settings table for tracking required fields
+    familyDb.run(`CREATE TABLE IF NOT EXISTS completion_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      show_missing_required BOOLEAN DEFAULT 0,
+      require_name BOOLEAN DEFAULT 1,
+      require_surname BOOLEAN DEFAULT 1,
+      require_maiden_name BOOLEAN DEFAULT 1,
+      require_birth_date BOOLEAN DEFAULT 1,
+      require_street_fields BOOLEAN DEFAULT 1,
+      require_city_zip BOOLEAN DEFAULT 1,
+      require_country BOOLEAN DEFAULT 1,
+      require_phone BOOLEAN DEFAULT 1,
+      require_email BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating completion_settings table:', err);
+      } else {
+        console.log('Completion settings table initialized');
+        // Insert default settings if table is empty
+        familyDb.get("SELECT COUNT(*) as count FROM completion_settings", [], (err, row) => {
+          if (err) {
+            console.error('Error checking completion_settings count:', err);
+          } else if (row && row.count === 0) {
+            familyDb.run(`INSERT INTO completion_settings (
+              show_missing_required, require_name, require_surname, require_maiden_name,
+              require_birth_date, require_street_fields, require_city_zip, require_country,
+              require_phone, require_email
+            ) VALUES (0, 1, 1, 1, 1, 1, 1, 1, 1, 1)`, (err) => {
+              if (err) {
+                console.error('Error inserting default completion settings:', err);
+              } else {
+                console.log('Inserted default completion settings');
+              }
+            });
+          }
+        });
+      }
+    });
+
     // Migration: Add last_geocoded column to nodes table if it doesn't exist
     familyDb.all("PRAGMA table_info(nodes)", (err, columns) => {
       if (err) {
@@ -373,6 +520,26 @@ const initializeFamilyDb = (familyDb) => {
             console.error('Error adding housenumber column to nodes:', err);
           } else {
             console.log('Added housenumber column to nodes table');
+          }
+        });
+      }
+    });
+
+    // Migration: Add has_open_questions column to images table if it doesn't exist
+    familyDb.all("PRAGMA table_info(images)", (err, columns) => {
+      if (err) {
+        console.error('Error checking images table schema:', err);
+        return;
+      }
+      
+      const columnNames = columns.map(col => col.name);
+      
+      if (!columnNames.includes('has_open_questions')) {
+        familyDb.run("ALTER TABLE images ADD COLUMN has_open_questions BOOLEAN DEFAULT 0", (err) => {
+          if (err) {
+            console.error('Error adding has_open_questions column to images:', err);
+          } else {
+            console.log('Added has_open_questions column to images table');
           }
         });
       }
