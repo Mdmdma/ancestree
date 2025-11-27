@@ -400,12 +400,32 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Get current terms version
+// This should match the version in the frontend TermsAndConditions.jsx
+const CURRENT_TERMS_VERSION = 'beta-1.0';
+
+app.get('/api/terms/version', (req, res) => {
+  res.json({
+    version: CURRENT_TERMS_VERSION,
+    lastUpdated: '2025-11-27'
+  });
+});
+
 // Register endpoint (for family registration)
 app.post('/api/auth/register', async (req, res) => {
-  const { familyName, password, displayName, adminPassword, adminEmail, betaAccessPassword } = req.body;
+  const { familyName, password, displayName, adminPassword, adminEmail, betaAccessPassword, termsAccepted, termsVersion } = req.body;
 
   if (!familyName || !password) {
     return res.status(400).json({ error: 'Family name and password are required' });
+  }
+
+  // Check terms acceptance
+  if (!termsAccepted) {
+    return res.status(400).json({ error: 'You must accept the terms and conditions to register' });
+  }
+
+  if (!termsVersion) {
+    return res.status(400).json({ error: 'Terms version is required' });
   }
 
   // Check beta access password
@@ -460,9 +480,9 @@ app.post('/api/auth/register', async (req, res) => {
         // Generate encryption salt for default encryption
         const encryptionSalt = crypto.randomBytes(16).toString('hex');
 
-        // Create user with encryption enabled by default
-        authDb.run('INSERT INTO users (family_name, password_hash, admin_password_hash, display_name, encryption_enabled, encryption_salt) VALUES (?, ?, ?, ?, ?, ?)', 
-          [familyName, passwordHash, adminPasswordHash, finalDisplayName, 1, encryptionSalt], 
+        // Create user with encryption enabled by default and terms acceptance
+        authDb.run('INSERT INTO users (family_name, password_hash, admin_password_hash, display_name, encryption_enabled, encryption_salt, terms_accepted_at, terms_version) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)', 
+          [familyName, passwordHash, adminPasswordHash, finalDisplayName, 1, encryptionSalt, termsVersion], 
           function(err) {
             if (err) {
               console.error('Database error during user creation:', err);

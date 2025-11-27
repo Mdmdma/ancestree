@@ -226,6 +226,28 @@ const initializeAuthDb = () => {
               }
             });
           }
+          
+          // Check and add terms_accepted_at
+          if (!columnNames.includes('terms_accepted_at')) {
+            authDb.run("ALTER TABLE users ADD COLUMN terms_accepted_at DATETIME", (err) => {
+              if (err) {
+                console.error('Error adding terms_accepted_at column:', err);
+              } else {
+                console.log('Added terms_accepted_at column to users table');
+              }
+            });
+          }
+          
+          // Check and add terms_version
+          if (!columnNames.includes('terms_version')) {
+            authDb.run("ALTER TABLE users ADD COLUMN terms_version TEXT", (err) => {
+              if (err) {
+                console.error('Error adding terms_version column:', err);
+              } else {
+                console.log('Added terms_version column to users table');
+              }
+            });
+          }
         });
       }
     });

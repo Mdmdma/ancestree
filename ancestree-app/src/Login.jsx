@@ -5,6 +5,7 @@ import { appConfig } from './config.js';
 import TextInput from './components/TextInput';
 import Button from './components/Button';
 import ContactButton from './ContactButton';
+import TermsAndConditions, { TERMS_VERSION } from './TermsAndConditions';
 
 export default function Login({ onLoginSuccess }) {
   const [familyName, setFamilyName] = useState('');
@@ -18,6 +19,9 @@ export default function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [authStatus, setAuthStatus] = useState(null);
   const [emailError, setEmailError] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [termsError, setTermsError] = useState('');
 
   // Check if family is already registered
   useEffect(() => {
@@ -46,6 +50,7 @@ export default function Login({ onLoginSuccess }) {
     setLoading(true);
     setError('');
     setEmailError('');
+    setTermsError('');
 
     // Validate email format if registering
     if (isRegistering && adminEmail) {
@@ -64,10 +69,17 @@ export default function Login({ onLoginSuccess }) {
       return;
     }
 
+    // Require terms acceptance for registration
+    if (isRegistering && !termsAccepted) {
+      setTermsError('Sie müssen die Nutzungsbedingungen akzeptieren');
+      setLoading(false);
+      return;
+    }
+
     try {
       let result;
       if (isRegistering) {
-        result = await api.register(familyName, password, displayName, adminPassword, adminEmail, betaAccessPassword);
+        result = await api.register(familyName, password, displayName, adminPassword, adminEmail, betaAccessPassword, termsAccepted, TERMS_VERSION);
       } else {
         result = await api.login(familyName, password);
       }
@@ -113,12 +125,14 @@ export default function Login({ onLoginSuccess }) {
     setIsRegistering(!isRegistering);
     setError('');
     setEmailError('');
+    setTermsError('');
     setFamilyName('');
     setDisplayName('');
     setPassword('');
     setAdminPassword('');
     setAdminEmail('');
     setBetaAccessPassword('');
+    setTermsAccepted(false);
   };
 
   return (
@@ -258,6 +272,93 @@ export default function Login({ onLoginSuccess }) {
             placeholder={isRegistering ? appConfig.ui.login.form.createPasswordPlaceholder : appConfig.ui.login.form.passwordPlaceholder}
           />
 
+          {/* Terms and Conditions Checkbox (Registration only) */}
+          {isRegistering && (
+            <div style={{ marginTop: '8px' }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                color: 'var(--login-text-secondary)'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => {
+                    setTermsAccepted(e.target.checked);
+                    setTermsError('');
+                  }}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    marginTop: '2px',
+                    cursor: 'pointer',
+                    accentColor: 'var(--button-success-bg, #4CAF50)'
+                  }}
+                />
+                <span>
+                  Ich akzeptiere die{' '}
+                  <button
+                    type="button"
+                    onClick={() => setShowTerms(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#4CAF50',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontSize: 'inherit'
+                    }}
+                  >
+                    Nutzungsbedingungen und Datenschutzerklärung
+                  </button>
+                  {' '}und bestätige, dass ich mindestens 16 Jahre alt bin.
+                </span>
+              </label>
+              {termsError && (
+                <p style={{
+                  color: '#f44336',
+                  fontSize: '12px',
+                  marginTop: '6px',
+                  marginLeft: '28px'
+                }}>
+                  {termsError}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Terms Notice (Login only) */}
+          {!isRegistering && (
+            <p style={{
+              fontSize: '12px',
+              color: 'var(--login-text-muted)',
+              textAlign: 'center',
+              marginTop: '8px',
+              lineHeight: '1.4'
+            }}>
+              Mit der Anmeldung akzeptieren Sie die{' '}
+              <button
+                type="button"
+                onClick={() => setShowTerms(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#4CAF50',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: 'inherit'
+                }}
+              >
+                Nutzungsbedingungen und Datenschutzerklärung
+              </button>.
+            </p>
+          )}
+
           <Button
             type="submit"
             variant="success"
@@ -298,6 +399,9 @@ export default function Login({ onLoginSuccess }) {
 
       {/* Contact Button */}
       <ContactButton />
+
+      {/* Terms and Conditions Modal */}
+      <TermsAndConditions isOpen={showTerms} onClose={() => setShowTerms(false)} />
     </div>
   );
 }
