@@ -1,8 +1,8 @@
 import React from 'react';
 
 // Current terms version - increment this when terms change
-export const TERMS_VERSION = 'beta-1.0';
-export const TERMS_LAST_UPDATED = '27. November 2025';
+export const TERMS_VERSION = 'beta-1.1';
+export const TERMS_LAST_UPDATED = '28. November 2025';
 
 export default function TermsAndConditions({ isOpen, onClose }) {
   if (!isOpen) return null;
@@ -277,18 +277,21 @@ export function TermsContent() {
           5.4 Bildspeicherung
         </h4>
         <p>
-          Hochgeladene Bilder werden <strong>unverschlüsselt</strong> in einem Amazon S3-Bucket 
-          (Standort: Frankfurt, Deutschland) gespeichert.
+          Hochgeladene Bilder werden <strong>unverschlüsselt</strong> in einem privaten Amazon 
+          S3-Bucket (Standort: Frankfurt, Deutschland) gespeichert.
         </p>
         <p style={{ marginTop: '8px' }}>
-          Die Bilder sind technisch gesehen öffentlich lesbar («public-read»). Der Schutz erfolgt 
-          dadurch, dass die Bild-URLs selbst clientseitig verschlüsselt in der Datenbank gespeichert 
-          werden. Ohne Zugang zum Familienkonto können die URLs nicht ermittelt werden.
+          Die Bilder sind in einem <strong>privaten S3-Bucket</strong> gespeichert und können 
+          nur über authentifizierte Anfragen durch die Ancestree-Anwendung abgerufen werden. 
+          Ein direkter Zugriff auf die Bilder über URLs ohne gültige Authentifizierung ist 
+          nicht möglich. Die Bild-URLs selbst werden zusätzlich clientseitig verschlüsselt 
+          in der Datenbank gespeichert.
         </p>
-        <p style={{ marginTop: '8px', padding: '12px', backgroundColor: 'rgba(255,87,34,0.1)', borderRadius: '6px', borderLeft: '3px solid #FF5722' }}>
-          <strong>Wichtig:</strong> Wenn eine Bild-URL bekannt wird (z.B. durch Weitergabe), 
-          kann das Bild ohne Authentifizierung aufgerufen werden. Teilen Sie Bild-URLs nicht 
-          mit Personen ausserhalb Ihres Familienkreises.
+        <p style={{ marginTop: '8px', padding: '12px', backgroundColor: 'rgba(76,175,80,0.1)', borderRadius: '6px', borderLeft: '3px solid #4CAF50' }}>
+          <strong>Sicherheit:</strong> Die Bilder sind durch die private Bucket-Konfiguration 
+          geschützt und können nur von autorisierten Nutzern über die Anwendung abgerufen werden. 
+          Selbst wenn eine Bild-URL bekannt wird, ist ein direkter Zugriff ohne gültige 
+          Authentifizierung nicht möglich.
         </p>
 
         <h4 style={{ marginTop: '16px', marginBottom: '8px', fontSize: '14px', color: 'var(--login-text-secondary, #ccc)' }}>
