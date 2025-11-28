@@ -80,3 +80,29 @@ export const formatDisplayDate = (date) => {
   // Otherwise convert from ISO
   return formatDateToGerman(date);
 };
+
+/**
+ * Extract the birth year from a date string
+ * @param {string} birthDate - Date in ISO (YYYY-MM-DD) or German (dd.mm.yyyy) format
+ * @returns {number|null} - The year as a number, or null if invalid/missing
+ */
+export const getBirthYear = (birthDate) => {
+  if (!birthDate) return null;
+  
+  // Handle ISO format (YYYY-MM-DD)
+  if (birthDate.includes('-')) {
+    const year = parseInt(birthDate.split('-')[0]);
+    return isNaN(year) ? null : year;
+  }
+  
+  // Handle German format (dd.mm.yyyy)
+  if (birthDate.includes('.')) {
+    const parts = birthDate.split('.');
+    if (parts.length === 3) {
+      const year = parseInt(parts[2]);
+      return isNaN(year) ? null : year;
+    }
+  }
+  
+  return null;
+};

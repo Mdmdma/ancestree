@@ -22,6 +22,7 @@ import { useDebounce } from './hooks/useDebounce';
 import { isEncryptionEnabled, getDerivedKey, isBatchOperationInProgress } from './encryptionSession';
 import { decryptNodeData, decryptEdgeData } from './encryptedApi';
 import { queueBatchGeocoding } from './geocodingService';
+import { getBirthYear } from './dateUtils';
 
 import '@xyflow/react/dist/style.css';
 
@@ -925,8 +926,8 @@ const FamilyTree = ({
           nodes.find(node => node.id === n.id && node.type === 'family')
         );
         
-        // Sort family nodes by their X position for consistent port ordering
-        familyNodesInCluster.sort((a, b) => a.x - b.x);
+        // Sort family nodes by their X position (inverted: right to left for consistent edge routing)
+        familyNodesInCluster.sort((a, b) => b.x - a.x);
         
         // Create individual ports for each external edge from family nodes
         const ports = [];
@@ -944,8 +945,36 @@ const FamilyTree = ({
             return !isOtherNodeInCluster;
           });
           
-          // Create a dedicated port for each external edge
-          externalEdges.forEach((edge, edgeIndex) => {
+          // Sort external edges by target cluster's bloodline person birthday
+          // Older nodes (earlier birthday) go to the left, nodes without birthDate go to the right
+          const sortedExternalEdges = [...externalEdges].sort((edgeA, edgeB) => {
+            const otherNodeIdA = edgeA.source === familyNode.id ? edgeA.target : edgeA.source;
+            const otherNodeIdB = edgeB.source === familyNode.id ? edgeB.target : edgeB.source;
+            
+            // Find target clusters for both edges
+            const targetClusterA = elkClusters.find(c => c.clusterNodes.some(n => n.id === otherNodeIdA));
+            const targetClusterB = elkClusters.find(c => c.clusterNodes.some(n => n.id === otherNodeIdB));
+            
+            // Get birth year from the bloodline person of each target cluster
+            const birthYearA = targetClusterA?.bloodlineNode?.data?.birthDate 
+              ? getBirthYear(targetClusterA.bloodlineNode.data.birthDate) 
+              : null;
+            const birthYearB = targetClusterB?.bloodlineNode?.data?.birthDate 
+              ? getBirthYear(targetClusterB.bloodlineNode.data.birthDate) 
+              : null;
+            
+            // Nodes without birthDate go to the right (end of array)
+            if (birthYearA === null && birthYearB === null) return 0;
+            if (birthYearA === null) return 1;  // A goes to the right
+            if (birthYearB === null) return -1; // B goes to the right
+            
+            // Sort by birth year: older (smaller year) goes to the left (beginning)
+            // INVERTED: birthYearB - birthYearA so younger is first (left), older is last (right)
+            return birthYearB - birthYearA;
+          });
+          
+          // Create a dedicated port for each external edge (now sorted by birthday)
+          sortedExternalEdges.forEach((edge, edgeIndex) => {
             const otherNodeId = edge.source === familyNode.id ? edge.target : edge.source;
             const targetClusterIndex = elkClusters.findIndex(c => 
               c.clusterNodes.some(n => n.id === otherNodeId)
@@ -958,13 +987,13 @@ const FamilyTree = ({
             }
             
             // Determine port side and position - always on bottom (SOUTH side)
-            let portSide = 'SOUTH';
-            let basePortX = familyNode.x - cluster.bounds.minX + 50;
-            let portY = cluster.bounds.height + 100;
+            const portSide = 'SOUTH';
+            const basePortX = familyNode.x - cluster.bounds.minX + 50;
+            const portY = cluster.bounds.height + 100;
             
             // Calculate port X position with spacing for multiple ports from the same family node
             const portSpacing = 25; // Distance between ports from the same family node
-            const portOffset = (edgeIndex - (externalEdges.length - 1) / 2) * portSpacing;
+            const portOffset = (edgeIndex - (sortedExternalEdges.length - 1) / 2) * portSpacing;
             let portX = basePortX + portOffset;
             
             // Ensure port X position is within cluster bounds with some padding
@@ -975,30 +1004,28 @@ const FamilyTree = ({
               id: `port-family-${familyNode.id}-edge-${edge.id}`,
               layoutOptions: {
                 'elk.port.side': portSide,
-                'elk.port.index': `${portIndex}`, // Port index for ordering
+                'elk.port.index': `${portIndex}`,
                 'elk.port.anchor': `(${portX}, ${portY})`,
-                'elk.port.borderOffset': '0' // Align ports to cluster border
+                'elk.port.borderOffset': '0'
               },
-              // Port properties to influence ordering
               properties: {
                 'portAlignment': 'BEGIN',
-                'portConstraints': 'FIXED_ORDER' // Keep ports in specified order
+                'portConstraints': 'FIXED_ORDER'
               },
-              // Store metadata for debug purposes and edge mapping
               metadata: {
                 familyNodes: [familyNode.id],
                 targetGroup: primaryTargetType,
                 groupSize: 1,
                 familyNodeX: familyNode.x,
                 familyNodeY: familyNode.y,
-                edgeId: edge.id, // Store the edge ID for mapping
+                edgeId: edge.id,
                 targetNodeId: otherNodeId,
-                portOrder: portIndex, // Explicit port ordering value
-                portPositionX: portX // X position for downstream ordering hints
+                portOrder: portIndex,
+                portPositionX: portX
               }
             });
             
-            portIndex--;
+            portIndex++;
           });
         });
         
@@ -1009,63 +1036,8 @@ const FamilyTree = ({
           ports: ports,
           layoutOptions: {
             'elk.priority': `${Math.max(1, connectionCount)}`,
-            'elk.portConstraints': 'FIXED_ORDER', // Enforce port ordering
-            'elk.layered.crossingMinimization.forceNodeModelOrder': 'true' // Force model order
-          }
-        });
-      });
-
-      // Calculate downstream cluster ordering based on upstream port positions
-      // This creates a map of which clusters should be ordered left-to-right
-      const downstreamClusterOrdering = new Map();
-      
-      elkClusters.forEach((sourceCluster, sourceIndex) => {
-        const sourcePorts = elkGraph.children[sourceIndex].ports || [];
-        
-        // Group downstream connections by target cluster and calculate average port X position
-        const targetClusterPositions = new Map();
-        
-        sourcePorts.forEach(port => {
-          const targetNodeId = port.metadata?.targetNodeId;
-          if (!targetNodeId) return;
-          
-          // Find which cluster the target node belongs to
-          const targetClusterIndex = elkClusters.findIndex(c =>
-            c.clusterNodes.some(n => n.id === targetNodeId)
-          );
-          
-          if (targetClusterIndex !== -1 && targetClusterIndex !== sourceIndex) {
-            if (!targetClusterPositions.has(targetClusterIndex)) {
-              targetClusterPositions.set(targetClusterIndex, []);
-            }
-            targetClusterPositions.get(targetClusterIndex).push(port.metadata.portPositionX);
-          }
-        });
-        
-        // Calculate average port X position for each downstream cluster
-        const orderedTargets = Array.from(targetClusterPositions.entries())
-          .map(([targetIndex, portXPositions]) => ({
-            targetIndex,
-            avgPortX: portXPositions.reduce((sum, x) => sum + x, 0) / portXPositions.length
-          }))
-          .sort((a, b) => b.avgPortX - a.avgPortX); // INVERTED: Sort right-to-left (highest X first)
-        
-        if (orderedTargets.length > 0) {
-          downstreamClusterOrdering.set(sourceIndex, orderedTargets);
-        }
-      });
-      
-      // Apply ordering hints to ELK clusters based on downstream relationships
-      downstreamClusterOrdering.forEach((orderedTargets, sourceIndex) => {
-        orderedTargets.forEach((target, orderIndex) => {
-          const targetCluster = elkGraph.children[target.targetIndex];
-          if (targetCluster) {
-            // Set layer ID and position hint based on port ordering
-            targetCluster.layoutOptions = {
-              ...targetCluster.layoutOptions,
-              'elk.layered.layerChoiceConstraint': `${sourceIndex + 1}`, // Layer after source
-              'elk.layered.crossingMinimization.positionChoiceConstraint': `${orderIndex}` // Left-to-right order
-            };
+            'elk.portConstraints': 'FIXED_ORDER',
+            'elk.layered.crossingMinimization.forceNodeModelOrder': 'true'
           }
         });
       });
@@ -1728,13 +1700,6 @@ const FamilyTree = ({
           const calculateBirthYear = (ageOffset) => {
             const currentYear = new Date().getFullYear();
             return currentYear - ageOffset;
-          };
-          
-          // Helper function to parse birth year from date string
-          const getBirthYear = (birthDate) => {
-            if (!birthDate) return null;
-            const year = parseInt(birthDate.split('-')[0]);
-            return isNaN(year) ? null : year;
           };
           
           // Function to calculate handle offset from node center
