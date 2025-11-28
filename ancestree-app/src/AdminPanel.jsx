@@ -337,7 +337,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
           backgroundColor: 'var(--login-bg)',
           borderRadius: '12px',
           padding: '30px',
-          maxWidth: '500px',
+          maxWidth: '800px',
           width: '90%',
           maxHeight: '90vh',
           overflow: 'auto',
@@ -485,7 +485,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
         {isAuthenticated ? (
           <div style={{ display: 'flex', gap: '16px' }}>
             {/* Side menu */}
-            <div style={{ width: '160px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ width: '192px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button onClick={() => setActiveTab('familyParameters')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'familyParameters' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.familyParameters}</button>
               <button onClick={() => setActiveTab('passwords')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'passwords' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.passwords}</button>
               <button onClick={() => setActiveTab('security')} style={{ padding: '10px', borderRadius: '6px', background: activeTab === 'security' ? '#3b5770' : 'transparent', color: 'white', border: '1px solid #34495e', textAlign: 'left' }}>{appConfig.ui.adminPanel.menu.security}</button>
@@ -552,7 +552,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                     value={purposePreview}
                     onChange={(e) => setPurposePreview(e.target.value)}
                     placeholder="Describe the purpose of this family tree..."
-                    maxLength={600}
+                    maxLength={3000}
                     showButtons={false}
                   />
                   <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>

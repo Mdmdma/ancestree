@@ -4,9 +4,9 @@ import Button from './Button';
 /**
  * Unified textarea component for image descriptions
  * Features:
- * - Character counter inside the textarea (bottom-right, always unobstructed)
+ * - Character counter below the textarea (always visible, never covered)
  * - Elastic height: minimum 4 rows, auto-grows with content
- * - Scrolling only when exceeding 20 lines
+ * - Scrolling only when exceeding 8 lines (reduced for compact display)
  * - Keyboard shortcuts (Cmd/Ctrl+Enter to save, Escape to cancel)
  * - Consistent styling across all uses
  * - Tailwind CSS utility classes with fallback inline styles
@@ -18,7 +18,7 @@ const DescriptionTextarea = ({
   onSave, 
   onCancel,
   placeholder = "Enter image description...",
-  maxLength = 1000,
+  maxLength = 3000,
   minHeight = '120px', // Kept for backward compatibility but not used
   readOnly = false,
   showButtons = true,
@@ -28,7 +28,7 @@ const DescriptionTextarea = ({
 }) => {
   const textareaRef = useRef(null);
   const characterCount = value?.length || 0;
-  const isNearLimit = characterCount > 950;
+  const isNearLimit = characterCount > maxLength - 100;
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -44,7 +44,7 @@ const DescriptionTextarea = ({
     
     // Calculate heights
     const minRows = 4;
-    const maxRows = 20;
+    const maxRows = 8; // Reduced from 20 for more compact display
     const minHeightPx = lineHeight * minRows + 24; // 24px for padding
     const maxHeightPx = lineHeight * maxRows + 24;
     
@@ -71,7 +71,7 @@ const DescriptionTextarea = ({
 
   return (
     <div className={`w-full ${className}`}>
-      <div className="relative w-full">
+      <div className="w-full">
         <textarea
           ref={textareaRef}
           value={value}
@@ -85,24 +85,17 @@ const DescriptionTextarea = ({
             paddingLeft: '12px',
             paddingRight: '12px',
             paddingTop: '12px',
-            paddingBottom: '36px', // Extra space at bottom for character counter line
+            paddingBottom: '12px',
             borderRadius: '8px',
             boxSizing: 'border-box',
             lineHeight: '1.5'
           }}
         />
-        {/* Character counter inside textarea at bottom-right, always visible */}
+        {/* Character counter below textarea, always visible */}
         <div 
-          className={`absolute text-xs pointer-events-none select-none transition-colors ${
+          className={`text-xs text-right mt-1 transition-colors ${
             isNearLimit ? 'text-red-500 font-semibold' : 'text-gray-400'
           }`}
-          style={{
-            bottom: '12px',
-            right: '12px',
-            backgroundColor: 'rgba(39, 39, 42, 0.9)', // Semi-transparent background
-            padding: '2px 6px',
-            borderRadius: '4px'
-          }}
         >
           {characterCount}/{maxLength}
         </div>

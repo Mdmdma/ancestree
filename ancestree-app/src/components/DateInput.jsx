@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Button from './Button';
+import { formatDateToGerman, formatDateToISO } from '../dateUtils';
 
 /**
  * Reusable DateInput component with consistent styling
  * Features:
- * - Label support
+ * - Date displayed in dd.mm.yyyy format
+ * - Text input with format enforcement
+ * - Calendar button to open native date picker
  * - Clear button for resetting date
  * - Error state styling
  * - Optional helper text
@@ -23,25 +26,126 @@ const DateInput = ({
   className = '',
   ...props
 }) => {
+  const hiddenDateInputRef = useRef(null);
+  
+  // Convert ISO date to German format for display, or keep as-is if already German
+  const getDisplayValue = (val) => {
+    if (!val) return '';
+    // If already in German format (contains dots), return as-is
+    if (val.includes('.')) return val;
+    // Convert from ISO to German format
+    return formatDateToGerman(val);
+  };
+  
+  // Local state for the text input (German format)
+  const [displayValue, setDisplayValue] = useState(getDisplayValue(value));
+  
+  // Sync displayValue when external value changes
+  useEffect(() => {
+    setDisplayValue(getDisplayValue(value));
+  }, [value]);
+
   const handleClear = () => {
+    setDisplayValue('');
     if (onClear) {
       onClear();
+    } else if (onChange) {
+      onChange({ target: { value: '' } });
     }
   };
 
+  // Handle text input change with format enforcement
+  const handleTextChange = (e) => {
+    let input = e.target.value;
+    
+    // Remove any non-digit and non-dot characters
+    input = input.replace(/[^\d.]/g, '');
+    
+    // Auto-insert dots after day and month
+    if (input.length === 2 && !input.includes('.')) {
+      input = input + '.';
+    } else if (input.length === 5 && input.charAt(2) === '.' && input.indexOf('.', 3) === -1) {
+      input = input + '.';
+    }
+    
+    // Limit to 10 characters (dd.mm.yyyy)
+    if (input.length > 10) {
+      input = input.substring(0, 10);
+    }
+    
+    setDisplayValue(input);
+    
+    // Only propagate to parent if we have a complete date or empty
+    if (input === '' || input.length === 10) {
+      const isoDate = input ? formatDateToISO(input) : '';
+      if (onChange) {
+        onChange({ target: { value: isoDate } });
+      }
+    }
+  };
+  
+  // Handle blur to validate and format incomplete dates
+  const handleBlur = () => {
+    // If incomplete, clear the display
+    if (displayValue && displayValue.length !== 10) {
+      // Try to parse partial input
+      const parts = displayValue.split('.');
+      if (parts.length === 3 && parts[0] && parts[1] && parts[2] && parts[2].length === 4) {
+        // Complete date with correct format
+        const formatted = `${parts[0].padStart(2, '0')}.${parts[1].padStart(2, '0')}.${parts[2]}`;
+        setDisplayValue(formatted);
+        const isoDate = formatDateToISO(formatted);
+        if (onChange) {
+          onChange({ target: { value: isoDate } });
+        }
+      }
+    }
+  };
+
+  // Handle calendar button click
+  const handleCalendarClick = () => {
+    if (readOnly) return;
+    if (hiddenDateInputRef.current) {
+      hiddenDateInputRef.current.showPicker();
+    }
+  };
+
+  // Handle date selection from native picker
+  const handleDatePickerChange = (e) => {
+    const isoDate = e.target.value;
+    if (isoDate) {
+      setDisplayValue(formatDateToGerman(isoDate));
+      if (onChange) {
+        onChange({ target: { value: isoDate } });
+      }
+    }
+  };
+
+  // Get the ISO value for the hidden date input
+  const getISOValue = () => {
+    if (!value) return '';
+    // If already ISO format (contains dashes), return as-is
+    if (value.includes('-')) return value;
+    // Convert from German to ISO
+    return formatDateToISO(value);
+  };
+
   return (
-    <div>
+    <div className={className}>
       {label && (
         <label className="block mb-1 font-bold text-sm text-white">
           {label}
         </label>
       )}
       <div className="flex gap-1 items-center mb-2.5">
+        {/* Text input for dd.mm.yyyy format */}
         <input
-          type="date"
-          value={value}
-          onChange={onChange}
+          type="text"
+          value={displayValue}
+          onChange={handleTextChange}
+          onBlur={handleBlur}
           readOnly={readOnly}
+          placeholder="dd.mm.yyyy"
           style={{
             flex: 1,
             padding: '8px 12px',
@@ -57,7 +161,48 @@ const DateInput = ({
           }}
           {...props}
         />
-        {showClearButton && value && (
+        
+        {/* Hidden native date input for calendar picker */}
+        <input
+          ref={hiddenDateInputRef}
+          type="date"
+          value={getISOValue()}
+          onChange={handleDatePickerChange}
+          style={{
+            position: 'absolute',
+            opacity: 0,
+            width: 0,
+            height: 0,
+            pointerEvents: 'none'
+          }}
+          tabIndex={-1}
+        />
+        
+        {/* Calendar button */}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={handleCalendarClick}
+            style={{
+              padding: '6px 10px',
+              backgroundColor: '#4b5563',
+              border: '1px solid #6b7280',
+              borderRadius: '6px',
+              color: 'white',
+              fontSize: '14px',
+              height: '34px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title="Open calendar"
+          >
+            📅
+          </button>
+        )}
+        
+        {showClearButton && displayValue && (
           <Button
             onClick={handleClear}
             variant="danger"
