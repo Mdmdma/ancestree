@@ -74,6 +74,10 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     requireEmail: true
   });
 
+  // Family emails state
+  const [familyEmails, setFamilyEmails] = useState([]);
+  const [loadingFamilyEmails, setLoadingFamilyEmails] = useState(false);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -92,6 +96,24 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
 
     // Always fetch admin settings when panel opens
     fetchPublicAdminSettings();
+
+    // Fetch family emails (before authentication)
+    const fetchFamilyEmails = async () => {
+      try {
+        setLoadingFamilyEmails(true);
+        const { encryptedApi } = await import('./encryptedApi');
+        const emails = await encryptedApi.getAllFamilyEmails();
+        setFamilyEmails(emails);
+      } catch (err) {
+        console.error('Failed to fetch family emails:', err);
+        // Silently fail - user might not have access yet
+      } finally {
+        setLoadingFamilyEmails(false);
+      }
+    };
+
+    // Always fetch family emails when panel opens
+    fetchFamilyEmails();
 
     // fetch protected settings if authenticated
     const fetchSettings = async () => {
@@ -316,22 +338,36 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10000,
-        backdropFilter: 'blur(4px)'
-      }}
-      onClick={onClose}
-    >
+    <>
+      <style>{`
+        .contact-buttons-container {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        @media (min-width: 768px) {
+          .contact-buttons-container {
+            flex-direction: row;
+          }
+        }
+      `}</style>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          backdropFilter: 'blur(4px)'
+        }}
+        onClick={onClose}
+      >
       <div
         style={{
           backgroundColor: 'var(--login-bg)',
@@ -404,43 +440,101 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
 
           {!isAuthenticated ? (
             <>
-              {/* Contact Administrator Section - shown before authentication */}
-              {adminEmail && (
+              {/* Contact Section - shown before authentication */}
+              {(adminEmail || familyEmails.length > 0) && (
                 <div style={{
                   backgroundColor: 'var(--login-panel-bg)',
                   padding: '16px',
                   borderRadius: '8px',
-                  marginBottom: '12px',
-                  textAlign: 'center'
+                  marginBottom: '12px'
                 }}>
-                  <p style={{ 
-                    fontSize: '13px', 
-                    color: 'var(--login-text-secondary)', 
-                    marginBottom: '10px',
-                    marginTop: 0
-                  }}>
-                    {appConfig.ui.adminPanel.contactAdmin.message}
-                  </p>
-                  <a
-                    href={`mailto:${adminEmail}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-block',
-                      padding: '10px 20px',
-                      backgroundColor: '#3498db',
-                      color: 'white',
-                      textDecoration: 'none',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#2980b9'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#3498db'}
-                  >
-                    📧 {adminEmail}
-                  </a>
+                  <div className="contact-buttons-container">
+                    {/* Contact Administrator */}
+                    {adminEmail && (
+                      <div className="contact-button-item" style={{
+                        textAlign: 'center',
+                        flex: '1',
+                        minWidth: '250px'
+                      }}>
+                        <p style={{ 
+                          fontSize: '13px', 
+                          color: 'var(--login-text-secondary)', 
+                          marginBottom: '10px',
+                          marginTop: 0
+                        }}>
+                          {appConfig.ui.adminPanel.contactAdmin.message}
+                        </p>
+                        <a
+                          href={`mailto:${adminEmail}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-block',
+                            width: '100%',
+                            maxWidth: '100%',
+                            padding: '10px 20px',
+                            backgroundColor: '#3498db',
+                            color: 'white',
+                            textDecoration: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            transition: 'background-color 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#2980b9'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#3498db'}
+                        >
+                          📧 {adminEmail}
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Contact Family */}
+                    {familyEmails.length > 0 && (
+                      <div className="contact-button-item" style={{
+                        textAlign: 'center',
+                        flex: '1',
+                        minWidth: '250px'
+                      }}>
+                        <p style={{ 
+                          fontSize: '13px', 
+                          color: 'var(--login-text-secondary)', 
+                          marginBottom: '10px',
+                          marginTop: 0
+                        }}>
+                          {appConfig.ui.adminPanel.contactFamily.message}
+                        </p>
+                        <a
+                          href={`mailto:${familyEmails.join(',')}?subject=${encodeURIComponent(appConfig.ui.adminPanel.contactFamily.subject)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-block',
+                            width: '100%',
+                            maxWidth: '100%',
+                            padding: '10px 20px',
+                            backgroundColor: '#27ae60',
+                            color: 'white',
+                            textDecoration: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            transition: 'background-color 0.2s',
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#229954'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#27ae60'}
+                          title={familyEmails.join(', ')}
+                        >
+                          📧 {appConfig.ui.adminPanel.contactFamily.button}
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2286,6 +2380,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
         </div>
       )}
     </div>
+    </>
   );
 };
 

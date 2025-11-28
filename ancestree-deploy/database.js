@@ -309,12 +309,33 @@ const initializeAuthDb = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       version TEXT NOT NULL UNIQUE,
       release_date DATETIME NOT NULL,
+      content TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`, (err) => {
       if (err) {
         console.error('Error creating terms table:', err);
       } else {
         console.log('Terms table initialized');
+        
+        // Check if content column exists and add it if not
+        authDb.all("PRAGMA table_info(terms)", (err, columns) => {
+          if (err) {
+            console.error('Error checking terms table schema:', err);
+            return;
+          }
+          
+          const columnNames = columns.map(col => col.name);
+          
+          if (!columnNames.includes('content')) {
+            authDb.run("ALTER TABLE terms ADD COLUMN content TEXT", (err) => {
+              if (err) {
+                console.error('Error adding content column to terms table:', err);
+              } else {
+                console.log('Added content column to terms table');
+              }
+            });
+          }
+        });
         
         // Insert initial terms version if not exists
         authDb.get('SELECT id FROM terms WHERE version = ?', ['beta-1.0'], (err, row) => {

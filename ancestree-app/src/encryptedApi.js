@@ -468,6 +468,42 @@ export const encryptedApi = {
     
     return decryptedEdges;
   },
+
+  async getAllFamilyEmails() {
+    // Load all nodes (with decryption if enabled)
+    const nodes = await this.loadNodes();
+    
+    // Extract email addresses and validate them
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emails = [];
+    
+    for (const node of nodes) {
+      let email = node.data?.email;
+      if (email && typeof email === 'string' && email.trim() !== '') {
+        let trimmedEmail = email.trim();
+        
+        // Extract email from "Name" <email@example.com> format if present
+        const emailMatch = trimmedEmail.match(/<([^>]+)>/);
+        if (emailMatch) {
+          trimmedEmail = emailMatch[1].trim();
+        }
+        
+        // Remove any remaining quotes
+        trimmedEmail = trimmedEmail.replace(/^["']|["']$/g, '');
+        
+        // Validate email format
+        if (emailRegex.test(trimmedEmail)) {
+          // Avoid duplicates
+          if (!emails.includes(trimmedEmail)) {
+            emails.push(trimmedEmail);
+          }
+        }
+      }
+    }
+    
+    console.log('[EncryptedAPI] Found', emails.length, 'valid email addresses in family tree');
+    return emails;
+  },
   
   async loadImages() {
     const images = await baseApi.loadImages();

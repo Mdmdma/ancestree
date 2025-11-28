@@ -295,6 +295,12 @@ export const appConfig = {
         message: "Kontaktiere den Ersteller deines Familienstammbaums:",
         noEmailSet: "Keine E-Mail-Adresse hinterlegt"
       },
+      contactFamily: {
+        message: "Kontaktiere alle Familienmitglieder im Stammbaum:",
+        button: "Die ganze Familie kontaktieren",
+        subject: "Auskünfte zum Stammbaum",
+        noEmailsFound: "Keine E-Mail-Adressen im Stammbaum gefunden"
+      },
       menu: {
         familyParameters: "Famillienparameter",
         passwords: "Passwörter",
