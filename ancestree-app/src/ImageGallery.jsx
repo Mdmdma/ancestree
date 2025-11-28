@@ -35,10 +35,13 @@ const ImageThumbnail = React.memo(({ image, onClick }) => {
       <div style={{ padding: '10px' }}>
         {image.description ? (
           <div style={{ fontSize: '12px', color: '#ffffff', marginBottom: '5px' }}>
-            {image.description.length > 80 
-              ? image.description.substring(0, 80) + '...'
-              : image.description
-            }
+            {(() => {
+              // For gallery thumbnails, show first paragraph only and truncate if needed
+              const firstParagraph = image.description.split('\n\n')[0].replace(/\n/g, ' ');
+              return firstParagraph.length > 80 
+                ? firstParagraph.substring(0, 80) + '...'
+                : firstParagraph;
+            })()}
           </div>
         ) : (
           <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
@@ -593,9 +596,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             pointerEvents: 'none' // Prevent this from interfering with drag events
           }}
         >
-          <div className="upload-icon" style={{ fontSize: '48px', marginBottom: '10px' }}>
-            📤
-          </div>
+         
           <div className="upload-title" style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', color: '#ffffff' }}>
             {appConfig.ui.imageGallery.upload.dragDropTitle}
           </div>
@@ -744,7 +745,6 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           disabled={uploadingImage}
           variant="success"
           size="large"
-          icon={uploadingImage ? '⏳' : '📤'}
         >
           {uploadingImage 
             ? appConfig.ui.imageGallery.confirm.uploadingButton

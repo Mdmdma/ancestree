@@ -742,7 +742,7 @@ const PictureSlideshow = ({
                 />
               ) : (
                 <div>
-                  <p 
+                  <div 
                     className="slideshow-description-text"
                     style={{ 
                       margin: '0 0 10px 0', 
@@ -750,8 +750,21 @@ const PictureSlideshow = ({
                       fontStyle: currentImage?.description ? 'normal' : 'italic'
                     }}
                   >
-                    {currentImage?.description || config.noDescription}
-                  </p>
+                    {currentImage?.description ? (
+                      currentImage.description.split('\n\n').map((paragraph, idx) => (
+                        <p key={idx} style={{ marginTop: idx === 0 ? 0 : '1em', marginBottom: 0 }}>
+                          {paragraph.split('\n').map((line, lineIdx) => (
+                            <React.Fragment key={lineIdx}>
+                              {lineIdx > 0 && <br />}
+                              {line}
+                            </React.Fragment>
+                          ))}
+                        </p>
+                      ))
+                    ) : (
+                      config.noDescription
+                    )}
+                  </div>
                   <Button
                     onClick={() => setEditingDescription(true)}
                     variant="primary"

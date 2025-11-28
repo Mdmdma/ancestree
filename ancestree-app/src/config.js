@@ -296,7 +296,7 @@ export const appConfig = {
         noEmailSet: "Keine E-Mail-Adresse hinterlegt"
       },
       menu: {
-        familyParameters: "Familienparameter",
+        familyParameters: "Famillienparameter",
         passwords: "Passwörter",
         security: "Sicherheit",
         visibleFields: "Sichtbare Felder",
@@ -309,8 +309,8 @@ export const appConfig = {
         displayNameLabel: "Anzeigename",
         adminEmailLabel: "Admin E-Mail",
         adminEmailHint: "Wird für Kontoanfragen und wichtige Benachrichtigungen verwendet",
-        purposeLabel: "Zweck / Beschreibung",
-        saveButton: "Familienparameter speichern"
+        purposeLabel: "Wieso das Ganze",
+        saveButton: "Speichern"
       },
       passwords: {
         title: "Passwörter",

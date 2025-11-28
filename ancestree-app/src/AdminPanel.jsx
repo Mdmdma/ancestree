@@ -382,11 +382,24 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
             marginBottom: '12px'
           }}>
             <h3 style={{ marginTop: 0, fontSize: '16px', marginBottom: '8px' }}>
-              {appConfig.ui.adminPanel.familyParameters.title}
+              {appConfig.ui.adminPanel.familyParameters.purposeLabel}
             </h3>
-            <p style={{ fontSize: '13px', color: 'var(--login-text-secondary)', marginBottom: '8px' }}>
-              {purposePreview || appConfig.ui.adminPanelCommon.noDescription}
-            </p>
+            <div style={{ fontSize: '13px', color: 'var(--login-text-secondary)', marginBottom: '8px' }}>
+              {purposePreview ? (
+                purposePreview.split('\n\n').map((paragraph, idx) => (
+                  <p key={idx} style={{ marginTop: idx === 0 ? 0 : '1em', marginBottom: 0 }}>
+                    {paragraph.split('\n').map((line, lineIdx) => (
+                      <React.Fragment key={lineIdx}>
+                        {lineIdx > 0 && <br />}
+                        {line}
+                      </React.Fragment>
+                    ))}
+                  </p>
+                ))
+              ) : (
+                appConfig.ui.adminPanelCommon.noDescription
+              )}
+            </div>
           </div>
 
           {!isAuthenticated ? (
