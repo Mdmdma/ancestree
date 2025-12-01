@@ -51,27 +51,80 @@ PersonTag.displayName = 'PersonTag';
 
 // Optimized SlideshowImage component - only re-renders when image or question status changes
 const SlideshowImage = React.memo(({ currentImage, isFullscreen, imageStyle, fullscreenImageStyle }) => {
+  const [imageError, setImageError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 2;
+
+  // Reset error state when image changes
+  useEffect(() => {
+    setImageError(false);
+    setRetryCount(0);
+  }, [currentImage?.id]);
+
   if (!currentImage) return null;
+
+  const handleImageError = (e) => {
+    console.error('Error loading image:', currentImage);
+    
+    // Try to reload the image a couple of times (iOS sometimes needs this)
+    if (retryCount < maxRetries) {
+      console.log(`Retrying image load (attempt ${retryCount + 1}/${maxRetries})...`);
+      setRetryCount(prev => prev + 1);
+      // Force reload by adding cache-busting parameter
+      const img = e.target;
+      const originalSrc = currentImage.s3Url || currentImage.url;
+      const separator = originalSrc.includes('?') ? '&' : '?';
+      img.src = `${originalSrc}${separator}_retry=${Date.now()}`;
+    } else {
+      setImageError(true);
+      e.target.style.display = 'none';
+    }
+  };
+
+  // Get image URL with potential cache-busting for retries
+  const getImageSrc = () => {
+    const baseUrl = currentImage.s3Url || currentImage.url;
+    if (retryCount > 0) {
+      const separator = baseUrl.includes('?') ? '&' : '?';
+      return `${baseUrl}${separator}_retry=${retryCount}`;
+    }
+    return baseUrl;
+  };
 
   return (
     <div style={{
       position: 'relative',
-      maxWidth: '100%',
-      maxHeight: '100%',
+      width: '100%',
+      height: '100%',
       display: 'flex',
       justifyContent: 'center',
-      alignItems: 'center'
+      alignItems: 'center',
+      overflow: 'hidden'
     }}>
-      <img
-        src={currentImage.s3Url || currentImage.url}
-        alt={currentImage.description || 'Bild'}
-        style={isFullscreen ? fullscreenImageStyle : imageStyle}
-        onError={(e) => {
-          console.error('Error loading image:', currentImage);
-          e.target.style.display = 'none';
-        }}
-      />
-      {currentImage.has_open_questions && (
+      {imageError ? (
+        <div style={{
+          color: '#999',
+          textAlign: 'center',
+          padding: '20px'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '10px' }}>📷</div>
+          <div>Bild konnte nicht geladen werden</div>
+        </div>
+      ) : (
+        <img
+          src={getImageSrc()}
+          alt={currentImage.description || 'Bild'}
+          style={isFullscreen ? fullscreenImageStyle : imageStyle}
+          onError={handleImageError}
+          // iOS Safari compatibility: crossorigin helps with CORS on S3
+          crossOrigin="anonymous"
+          // Eager loading ensures immediate fetch
+          loading="eager"
+          // Prevent iOS from trying to lazy load
+          decoding="async"
+        />
+      )}
+      {currentImage.has_open_questions && !imageError && (
         <div style={{
           position: 'absolute',
           top: 0,
@@ -437,7 +490,8 @@ const PictureSlideshow = ({
   const contentStyle = {
     display: 'flex',
     flex: 1,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    minHeight: 0 // Important: allows flex children to shrink below content size
   };
 
   const imageContainerStyle = {
@@ -446,12 +500,17 @@ const PictureSlideshow = ({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    backgroundColor: '#000000'
+    backgroundColor: '#000000',
+    overflow: 'hidden', // Prevent image from overflowing container
+    minWidth: 0, // Allow container to shrink
+    minHeight: 0 // Allow container to shrink
   };
 
   const imageStyle = {
     maxWidth: '100%',
     maxHeight: '100%',
+    width: 'auto',
+    height: 'auto',
     objectFit: 'contain'
   };
 
@@ -530,8 +589,8 @@ const PictureSlideshow = ({
   if (loading) {
     console.log('PictureSlideshow: Rendering loading state');
     return (
-      <div style={overlayStyle}>
-        <div style={modalStyle}>
+      <div className="slideshow-overlay" style={overlayStyle}>
+        <div className="slideshow-modal" style={modalStyle}>
           <div style={headerStyle}>
             <h3 style={{ margin: 0, color: '#ffffff' }}>{config.loadingTitle}</h3>
             <div style={{ width: '80px' }}>
@@ -550,8 +609,8 @@ const PictureSlideshow = ({
 
   if (error) {
     return (
-      <div style={overlayStyle}>
-        <div style={modalStyle}>
+      <div className="slideshow-overlay" style={overlayStyle}>
+        <div className="slideshow-modal" style={modalStyle}>
           <div style={headerStyle}>
             <h3 style={{ margin: 0, color: '#ffffff' }}>{config.errorTitle}</h3>
             <div style={{ width: '80px' }}>
@@ -577,8 +636,8 @@ const PictureSlideshow = ({
       : config.title;
 
     return (
-      <div style={overlayStyle}>
-        <div style={modalStyle}>
+      <div className="slideshow-overlay" style={overlayStyle}>
+        <div className="slideshow-modal" style={modalStyle}>
           <div style={headerStyle}>
             <h3 style={{ margin: 0, color: '#ffffff' }}>{emptyTitle}</h3>
             <div style={{ width: '80px' }}>
@@ -604,25 +663,22 @@ const PictureSlideshow = ({
     : `${config.title} (${currentIndex + 1}/${images.length})`;
 
   return (
-    <div style={isFullscreen ? fullscreenOverlayStyle : overlayStyle}>
+    <div className="slideshow-overlay" style={isFullscreen ? fullscreenOverlayStyle : overlayStyle}>
       <div className="slideshow-modal" style={isFullscreen ? fullscreenModalStyle : modalStyle}>
         <div className="slideshow-header" style={headerStyle}>
           <h3 style={{ margin: 0, color: '#ffffff' }}>
             {title}
           </h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Question Mark Button with Info Text */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'nowrap' }}>
+            {/* Question Mark Button - shows full text on desktop, just ? on mobile */}
             <Button
               onClick={toggleImageQuestion}
               variant={currentImage?.has_open_questions ? 'danger' : 'secondary'}
               size="medium"
-              style={{ 
-                whiteSpace: 'normal',
-                width: 'auto',
-                maxWidth: 'none'
-              }}
+              className="slideshow-question-button"
             >
-              {config.questionButton}
+              <span className="slideshow-question-full">{config.questionButton}</span>
+              <span className="slideshow-question-icon">?</span>
             </Button>
 
             {isFullscreen ? (
@@ -647,12 +703,12 @@ const PictureSlideshow = ({
           <div className="slideshow-image-container" style={imageContainerStyle}>
             {images.length > 1 && (
               <button
+                className="slideshow-nav-button slideshow-nav-prev"
                 onClick={prevImage}
                 style={{
                   position: 'absolute',
-                  top: '50%',
+                  bottom: '20px',
                   left: '20px',
-                  transform: 'translateY(-50%)',
                   width: '50px',
                   height: '50px',
                   backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -670,8 +726,8 @@ const PictureSlideshow = ({
                 }}
                 onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'}
-                onMouseDown={(e) => e.target.style.transform = 'translateY(-50%) scale(0.95)'}
-                onMouseUp={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
+                onMouseDown={(e) => e.target.style.transform = 'scale(0.95)'}
+                onMouseUp={(e) => e.target.style.transform = 'scale(1)'}
               >
                 {config.previousButton}
               </button>
@@ -686,12 +742,12 @@ const PictureSlideshow = ({
             
             {images.length > 1 && (
               <button
+                className="slideshow-nav-button slideshow-nav-next"
                 onClick={nextImage}
                 style={{
                   position: 'absolute',
-                  top: '50%',
+                  bottom: '20px',
                   right: '20px',
-                  transform: 'translateY(-50%)',
                   width: '50px',
                   height: '50px',
                   backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -709,8 +765,8 @@ const PictureSlideshow = ({
                 }}
                 onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'}
-                onMouseDown={(e) => e.target.style.transform = 'translateY(-50%) scale(0.95)'}
-                onMouseUp={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
+                onMouseDown={(e) => e.target.style.transform = 'scale(0.95)'}
+                onMouseUp={(e) => e.target.style.transform = 'scale(1)'}
               >
                 {config.nextButton}
               </button>

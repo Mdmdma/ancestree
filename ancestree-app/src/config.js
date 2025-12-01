@@ -578,7 +578,7 @@ export const appConfig = {
 
     // Family Gallery Slideshow component
     familyGallery: {
-      title: "👨‍👩‍👧‍👦 Familien-Fotoalbum",
+      title: "‍‍Fotoalbum",
       loadingTitle: "Lade Familienbilder...",
       loadingMessage: "Familienbilder werden geladen...",
       errorTitle: "Fehler",
