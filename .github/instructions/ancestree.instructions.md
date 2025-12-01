@@ -255,6 +255,62 @@ const nodes = await api.get('/nodes'); // Don't use this!
 - Throttle batch operations (e.g., when geocoding many addresses) and show progress.
 - For large trees, avoid rendering all nodes in heavy components — use virtualization for lists.
 
+## Mobile/Android Platform Requirements
+
+### CRITICAL: File Upload Handling on Android
+Android browsers handle file selection differently than desktop browsers. **Failure to follow these rules will cause `ERR_UPLOAD_FILE_CHANGED` errors on Android.**
+
+**The Problem:**
+- Android file pickers return **content URIs** (e.g., `content://...`) instead of direct file paths
+- These content URIs become **stale almost immediately** after the file selection event
+- Any async operation (even a brief delay) can cause the file reference to become unreadable
+- The browser throws `ERR_UPLOAD_FILE_CHANGED` or `NotReadableError` when trying to read stale references
+
+**MANDATORY Pattern for File Uploads:**
+```jsx
+// ✅ CORRECT - Read file into memory IMMEDIATELY in the event handler
+const handleFileSelection = async (file) => {
+  // Read file into memory RIGHT AWAY - before any other async operations
+  const arrayBuffer = await file.arrayBuffer();
+  const stableBlob = new Blob([arrayBuffer], { type: file.type });
+  
+  // Create a stable File object that won't become stale
+  const stableFile = new File([stableBlob], file.name, { 
+    type: file.type,
+    lastModified: file.lastModified 
+  });
+  
+  // Now safe to store in state, use for preview, upload later, etc.
+  setSelectedFile(stableFile);
+};
+
+// ❌ WRONG - Storing the raw file reference and reading it later
+const handleFileSelection = (file) => {
+  setSelectedFile(file);  // This reference WILL become stale on Android!
+};
+
+const confirmUpload = async () => {
+  await uploadImage(selectedFile);  // ERR_UPLOAD_FILE_CHANGED on Android!
+};
+```
+
+**Key Rules:**
+1. **Read file to memory immediately** in the file input `onChange` or drop handler
+2. **Never store raw `File` objects** from Android file pickers in React state
+3. **Always create a stable Blob/File** from the ArrayBuffer before storing
+4. **Create preview URLs** from the stable blob, not the original file
+5. **Sanitize filenames** - Android paths can contain full paths like `/storage/emulated/0/...`
+
+**Reference Implementation:** See `ImageGallery.jsx` → `handleFileSelection()`
+
+### Filename Sanitization
+Android file names can contain:
+- Full device paths (`/storage/emulated/0/DCIM/Camera/IMG_123.jpg`)
+- Content URI artifacts
+- Special characters that break URL handling
+
+Always use the `sanitizeFilename()` helper in `api.js` for cross-platform compatibility.
+
 ## Security & Secrets
 - Do not commit API keys or production DB files. Use `.env` and environment-specific config.
 - Sanitize inputs on the server; use parameterized queries for SQLite to avoid injection.

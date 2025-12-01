@@ -4,6 +4,52 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 // Export the base URL for use in other components
 export { API_BASE_URL };
 
+/**
+ * Sanitize filename for cross-platform compatibility (Android, iOS, web)
+ * - Extracts just the filename from any path format (Windows backslash, Unix forward slash)
+ * - Removes problematic characters while keeping the extension
+ * - Falls back to a safe default name if needed
+ */
+const sanitizeFilename = (filename) => {
+  if (!filename || typeof filename !== 'string') {
+    return 'image.jpg';
+  }
+  
+  // Extract just the filename from any path format
+  // Handle both forward slashes (Unix/Android) and backslashes (Windows)
+  let baseName = filename.split(/[\\/]/).pop() || filename;
+  
+  // Remove any query strings or fragments (sometimes present on mobile)
+  baseName = baseName.split('?')[0].split('#')[0];
+  
+  // If the filename is empty after extraction, use a default
+  if (!baseName || baseName.trim() === '') {
+    return 'image.jpg';
+  }
+  
+  // Extract extension and base name
+  const lastDot = baseName.lastIndexOf('.');
+  let name = lastDot > 0 ? baseName.substring(0, lastDot) : baseName;
+  let ext = lastDot > 0 ? baseName.substring(lastDot) : '.jpg';
+  
+  // Sanitize the name part - keep alphanumeric, dashes, underscores
+  name = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  
+  // Ensure we have a valid name
+  if (!name || name.trim() === '' || name === '_') {
+    name = 'image';
+  }
+  
+  // Ensure extension is lowercase and valid
+  ext = ext.toLowerCase();
+  const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  if (!validExtensions.includes(ext)) {
+    ext = '.jpg';
+  }
+  
+  return name + ext;
+};
+
 // Authentication token management
 let authToken = localStorage.getItem('authToken');
 
@@ -601,7 +647,8 @@ export const api = {
   },
   
   // Step 2: Upload file directly to S3 using presigned URL
-  async uploadToS3(uploadUrl, file, onProgress = null) {
+  // Accepts either a File or Blob object
+  async uploadToS3(uploadUrl, fileOrBlob, onProgress = null) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       
@@ -636,9 +683,9 @@ export const api = {
       });
       
       xhr.open('PUT', uploadUrl);
-      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.setRequestHeader('Content-Type', fileOrBlob.type);
       xhr.timeout = 120000; // 2 minutes for large files
-      xhr.send(file);
+      xhr.send(fileOrBlob);
     });
   },
   
@@ -666,6 +713,8 @@ export const api = {
   },
   
   // Combined upload function (handles all 3 steps)
+  // Note: For Android compatibility, the file should already be read into memory
+  // (as a stable File/Blob) before calling this function. See ImageGallery.jsx.
   async uploadImage(file, description, uploadedBy = 'user', onProgress = null) {
     // Validate file on client side before attempting upload
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -678,14 +727,19 @@ export const api = {
       throw new Error(`File too large. Maximum size is ${maxSize / 1024 / 1024}MB.`);
     }
 
+    // Sanitize filename for cross-platform compatibility (Android paths can be problematic)
+    const safeFilename = sanitizeFilename(file.name);
+    const fileType = file.type;
+    const fileSize = file.size;
+
     // Use retry logic for the upload
     return this.retryWithBackoff(async (attempt) => {
       // Step 1: Get presigned upload URL from backend
-      if (onProgress) onProgress(5, 0, file.size);
-      const { uploadUrl, s3Key } = await this.getPresignedUploadUrl(file.name, file.type, file.size);
+      if (onProgress) onProgress(5, 0, fileSize);
+      const { uploadUrl, s3Key } = await this.getPresignedUploadUrl(safeFilename, fileType, fileSize);
       
       // Step 2: Upload directly to S3
-      if (onProgress) onProgress(10, 0, file.size);
+      if (onProgress) onProgress(10, 0, fileSize);
       await this.uploadToS3(uploadUrl, file, (percent, loaded, total) => {
         // Scale progress from 10% to 90%
         if (onProgress) {
@@ -695,17 +749,17 @@ export const api = {
       });
       
       // Step 3: Confirm upload and save metadata
-      if (onProgress) onProgress(95, file.size, file.size);
+      if (onProgress) onProgress(95, fileSize, fileSize);
       const result = await this.confirmImageUpload(
         s3Key, 
-        file.name, 
+        safeFilename, 
         description, 
-        file.size, 
-        file.type, 
+        fileSize, 
+        fileType, 
         uploadedBy
       );
       
-      if (onProgress) onProgress(100, file.size, file.size);
+      if (onProgress) onProgress(100, fileSize, fileSize);
       return result;
     }, 3, 1000); // 3 retries, starting with 1 second delay
   },

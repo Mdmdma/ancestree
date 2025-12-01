@@ -174,11 +174,12 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     const file = event.target.files?.[0];
     if (!file) return;
     
-    handleFileSelection(file);
+    await handleFileSelection(file);
   };
 
   // Handle file selection (from input or drag-drop)
-  const handleFileSelection = (file) => {
+  // CRITICAL: Must read file into memory immediately on Android to avoid ERR_UPLOAD_FILE_CHANGED
+  const handleFileSelection = async (file) => {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
@@ -192,11 +193,26 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       return;
     }
 
-    // Create preview URL
-    const url = URL.createObjectURL(file);
-    setSelectedFile(file);
-    setPreviewUrl(url);
-    setViewMode('confirm');
+    try {
+      // Read file into memory IMMEDIATELY - Android content URIs become stale quickly
+      const arrayBuffer = await file.arrayBuffer();
+      const stableBlob = new Blob([arrayBuffer], { type: file.type });
+      
+      // Create a stable File object from the blob with the original filename
+      const stableFile = new File([stableBlob], file.name, { 
+        type: file.type,
+        lastModified: file.lastModified 
+      });
+
+      // Create preview URL from the stable blob
+      const url = URL.createObjectURL(stableBlob);
+      setSelectedFile(stableFile);
+      setPreviewUrl(url);
+      setViewMode('confirm');
+    } catch (error) {
+      console.error('Failed to read file:', error);
+      alert('Failed to read the selected file. Please try again.');
+    }
   };
 
   // Confirm and upload the image
