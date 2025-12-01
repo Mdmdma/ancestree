@@ -261,6 +261,20 @@ button:focus-visible {
 
 /* Mobile-specific styles */
 @media screen and (max-width: 768px) {
+  /* 
+   * MOBILE INPUT FONT SIZE - Controls minimum font size for all input fields
+   * Set to 16px to prevent iOS Safari auto-zoom on input focus
+   * Adjust this single value to change all mobile input sizes
+   */
+  :root {
+    --mobile-input-font-size: 16px;
+  }
+
+  /* Apply minimum font size to all input fields to prevent iOS auto-zoom */
+  input, textarea, select {
+    font-size: var(--mobile-input-font-size) !important;
+  }
+
   /* Make handles 100% bigger (double size) on mobile */
   .react-flow__handle {
     width: 20px !important;
@@ -571,7 +585,7 @@ button:focus-visible {
   /* Description textarea on mobile - minimal when editing */
   .slideshow-description-textarea {
     min-height: 60px !important;
-    font-size: 12px !important;
+    font-size: var(--mobile-input-font-size) !important;
     padding: 8px !important;
   }
   
@@ -597,7 +611,7 @@ button:focus-visible {
   .gallery-description-textarea {
     height: 60px !important;
     min-height: 60px !important;
-    font-size: 12px !important;
+    font-size: var(--mobile-input-font-size) !important;
     padding: 8px !important;
   }
 
@@ -653,7 +667,7 @@ button:focus-visible {
 
   .confirm-description {
     height: 60px !important;
-    font-size: 13px !important;
+    font-size: var(--mobile-input-font-size) !important;
     padding: 8px !important;
   }
 
@@ -759,11 +773,10 @@ button:focus-visible {
     padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
   }
   
-  /* Chat input fields */
+  /* Chat input fields - font-size controlled by --mobile-input-font-size */
   .chat-component input,
   .chat-component textarea {
     padding: 6px 8px !important;
-    font-size: 13px !important;
   }
   
   .chat-component textarea {
