@@ -562,6 +562,28 @@ const FamilyTree = ({
     }
   }, [onEdgesChange]);
 
+  // Callback to prevent deletion of the last bloodline node
+  const handleBeforeDelete = useCallback(async ({ nodes: nodesToDelete }) => {
+    // Count current bloodline nodes (person nodes with bloodline: true)
+    // Family nodes are not counted as they are structural, not person nodes
+    const currentBloodlineNodes = nodes.filter(node => 
+      node.type === 'person' && node.data.bloodline === true
+    );
+    
+    // Count how many bloodline nodes are being deleted
+    const bloodlineNodesToDelete = nodesToDelete.filter(node => 
+      node.type === 'person' && node.data.bloodline === true
+    );
+    
+    // If deleting all remaining bloodline nodes, prevent deletion
+    if (bloodlineNodesToDelete.length >= currentBloodlineNodes.length) {
+      alert(`${appConfig.ui.alerts.lastBloodlineNodeDelete.title}\n\n${appConfig.ui.alerts.lastBloodlineNodeDelete.message}`);
+      return false; // Prevent deletion
+    }
+    
+    return true; // Allow deletion
+  }, [nodes]);
+
   // Load initial data from database
   useEffect(() => {
     const loadData = async () => {
@@ -2262,6 +2284,7 @@ const FamilyTree = ({
         onInit={handleInit}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
+        onBeforeDelete={handleBeforeDelete}
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}

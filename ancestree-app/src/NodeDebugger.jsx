@@ -3,6 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import TextInput from './components/TextInput';
 import DateInput from './components/DateInput';
 import Button from './components/Button';
+import { appConfig } from './config';
 
 export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
   const { deleteElements } = useReactFlow();
@@ -81,6 +82,18 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
 
   const handleDelete = async () => {
     if (!editingNode) return;
+    
+    // Check if this is the last bloodline node
+    if (editingNode.type === 'person' && editingNode.data.bloodline) {
+      const bloodlineNodes = nodes.filter(n => 
+        n.type === 'person' && n.data.bloodline === true
+      );
+      
+      if (bloodlineNodes.length <= 1) {
+        alert(`${appConfig.ui.alerts.lastBloodlineNodeDelete.title}\n\n${appConfig.ui.alerts.lastBloodlineNodeDelete.message}`);
+        return; // Prevent deletion
+      }
+    }
     
     if (window.confirm(`Are you sure you want to delete node "${formData.name} ${formData.surname}"?`)) {
       try {

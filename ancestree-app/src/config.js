@@ -607,6 +607,10 @@ export const appConfig = {
       nodeCreationLocked: {
         title: "⚠️ Knotenerstellung gesperrt",
         message: "Die Knotenerstellung ist derzeit vom Administrator deaktiviert. Bitte kontaktiere den Administrator, um die Knotenerstellung freizuschalten."
+      },
+      lastBloodlineNodeDelete: {
+        title: "⚠️ Löschen nicht möglich",
+        message: "Die letzte Blutlinie-Person kann nicht gelöscht werden. Es muss mindestens eine Person in der Blutlinie vorhanden sein."
       }
     },
 

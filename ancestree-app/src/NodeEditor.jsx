@@ -10,7 +10,7 @@ import { queueGeocoding } from './geocodingService';
 import { api } from './api';
 import { isFieldIncomplete } from './completionUtils';
 
-function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edges = [], socket, completionSettings }) {
+function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, nodes = [], edges = [], socket, completionSettings }) {
   const { deleteElements } = useReactFlow();
   
   const [formData, setFormData] = useState({
@@ -252,6 +252,18 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, edge
   };
 
   const handleDelete = () => {
+    // Check if this is the last bloodline node
+    if (node.type === 'person' && node.data.bloodline) {
+      const bloodlineNodes = nodes.filter(n => 
+        n.type === 'person' && n.data.bloodline === true
+      );
+      
+      if (bloodlineNodes.length <= 1) {
+        alert(`${appConfig.ui.alerts.lastBloodlineNodeDelete.title}\n\n${appConfig.ui.alerts.lastBloodlineNodeDelete.message}`);
+        return; // Prevent deletion
+      }
+    }
+    
     // Use React Flow's deleteElements method to trigger the same deletion as Delete key
     // This will handle all the same logic as the keyboard delete key
     deleteElements({ nodes: [{ id: node.id }] });
