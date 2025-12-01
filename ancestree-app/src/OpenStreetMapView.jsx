@@ -509,10 +509,11 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
   return (
     <div 
       ref={containerRef}
+      className={isFullscreen ? 'map-fullscreen-container' : ''}
       style={{ 
         display: 'flex', 
         flexDirection: 'column',
-        backgroundColor: '#09380dff',
+        backgroundColor: isFullscreen ? '#000' : '#09380dff',
         color: 'white',
         position: isFullscreen ? 'fixed' : 'relative',
         top: isFullscreen ? 0 : 'auto',
@@ -520,12 +521,14 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
         right: isFullscreen ? 0 : 'auto',
         bottom: isFullscreen ? 0 : 'auto',
         zIndex: isFullscreen ? 9999 : 'auto',
-        width: isFullscreen ? '100vw' : '100%',
-        height: isFullscreen ? '100vh' : '100%'
+        width: isFullscreen ? '100%' : '100%',
+        height: isFullscreen ? '100%' : '100%',
+        overflow: 'hidden'
       }}
     >
-      {/* Header */}
-      <div className="mobile-hide-map-header" style={{ 
+      {/* Header - hidden in fullscreen mode */}
+      {!isFullscreen && (
+        <div className="mobile-hide-map-header" style={{ 
         padding: '20px', 
         borderBottom: '1px solid #0a4b11ff',
         backgroundColor: '#0a4b11ff'
@@ -547,24 +550,6 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
               }}
             >
               {loading ? '🔄' : '↻'} {appConfig.ui.mapView.refreshButton}
-            </button>
-            <button
-              onClick={toggleFullscreen}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              {isFullscreen ? '⊗' : '⛶'}
             </button>
           </div>
         </div>
@@ -621,9 +606,51 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
           </div>
         )}
       </div>
+      )}
 
       {/* Map Container */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div 
+        className={isFullscreen ? 'map-fullscreen-inner' : ''}
+        style={{ 
+          flex: 1, 
+          position: isFullscreen ? 'absolute' : 'relative',
+          top: isFullscreen ? 0 : 'auto',
+          left: isFullscreen ? 0 : 'auto',
+          right: isFullscreen ? 0 : 'auto',
+          bottom: isFullscreen ? 0 : 'auto',
+          width: '100%',
+          height: isFullscreen ? '100%' : 'auto',
+          minHeight: isFullscreen ? '100%' : 'auto'
+        }}
+      >
+        {/* Fullscreen button - overlaid on map */}
+        <button
+          onClick={toggleFullscreen}
+          className="map-fullscreen-button"
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            zIndex: 1000,
+            padding: '8px 12px',
+            backgroundColor: 'rgba(33, 150, 243, 0.9)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+            minWidth: '36px',
+            minHeight: '36px'
+          }}
+          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+        >
+          {isFullscreen ? '⊗' : '⛶'}
+        </button>
+
         {loading && (
           <div style={{
             position: 'absolute',
@@ -677,7 +704,12 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
             style={{ 
               width: '100%', 
               height: '100%',
-              minHeight: '400px'
+              minHeight: isFullscreen ? '100%' : '400px',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0
             }}
             zoomControl={true}
             scrollWheelZoom={true}
@@ -706,6 +738,36 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
       </div>
 
       <style>{`
+        /* Fullscreen container - ensure it covers everything */
+        .map-fullscreen-container {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          height: 100dvh !important;
+          z-index: 99999 !important;
+          background: #000 !important;
+        }
+        
+        .map-fullscreen-inner {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        
+        .map-fullscreen-container .leaflet-container {
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 100% !important;
+        }
+
         .custom-leaflet-marker {
           background: transparent;
           border: none;

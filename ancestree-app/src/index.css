@@ -361,6 +361,30 @@ button:focus-visible {
   .map-container {
     min-height: 200px !important;
   }
+
+  /* Map fullscreen mode - override all constraints */
+  .map-fullscreen-active {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    z-index: 99999 !important;
+    overflow: hidden !important;
+  }
+
+  /* Ensure the map inside fullscreen takes all space */
+  .map-fullscreen-active .leaflet-container {
+    height: 100% !important;
+    min-height: 100% !important;
+  }
   
   /* Slideshow adjustments for mobile */
   .slideshow-modal {
