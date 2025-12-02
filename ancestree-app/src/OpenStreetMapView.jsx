@@ -112,7 +112,7 @@ const MapController = ({ locations, selectedNode }) => {
       // Smooth fly to selected location with moderate zoom
       map.flyTo(
         [selectedLocation.latitude, selectedLocation.longitude],
-        Math.max(map.getZoom(), 13), // At least zoom 13, but don't zoom out if already closer
+        Math.max(map.getZoom(), 10), // At least zoom 13, but don't zoom out if already closer
         {
           duration: 0.8,
           easeLinearity: 0.25
@@ -701,7 +701,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
           <MapContainer
             ref={mapRef}
             center={mapCenter}
-            zoom={13}
+            zoom={10}
             style={{ 
               width: '100%', 
               height: '100%',

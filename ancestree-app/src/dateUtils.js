@@ -2,6 +2,8 @@
  * Utility functions for date formatting and conversion
  */
 
+import { isSkipMarker } from './skipMarkerUtils';
+
 /**
  * Convert ISO date (YYYY-MM-DD) to German format (dd.mm.yyyy)
  * @param {string} isoDate - Date in YYYY-MM-DD format
@@ -10,6 +12,11 @@
 export const formatDateToGerman = (isoDate) => {
   if (!isoDate || isoDate.trim() === '') {
     return '';
+  }
+  
+  // Skip marker should be returned as-is (though usually filtered before display)
+  if (isSkipMarker(isoDate)) {
+    return isoDate;
   }
   
   try {
@@ -42,6 +49,11 @@ export const formatDateToISO = (germanDate) => {
     return '';
   }
   
+  // Skip marker should be returned as-is
+  if (isSkipMarker(germanDate)) {
+    return germanDate;
+  }
+  
   try {
     // Handle German format: dd.mm.yyyy
     const parts = germanDate.split('.');
@@ -72,6 +84,11 @@ export const formatDisplayDate = (date) => {
     return '';
   }
   
+  // Skip marker should be returned as-is (though usually filtered before display)
+  if (isSkipMarker(date)) {
+    return date;
+  }
+  
   // If it's already in German format, return as is
   if (date.includes('.')) {
     return date;
@@ -88,6 +105,11 @@ export const formatDisplayDate = (date) => {
  */
 export const getBirthYear = (birthDate) => {
   if (!birthDate) return null;
+  
+  // Skip marker returns null
+  if (isSkipMarker(birthDate)) {
+    return null;
+  }
   
   // Handle ISO format (YYYY-MM-DD)
   if (birthDate.includes('-')) {

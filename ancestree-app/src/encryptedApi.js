@@ -22,6 +22,7 @@ import {
   CHAT_MESSAGE_ENCRYPTED_FIELDS,
   ADMIN_ENCRYPTED_FIELDS
 } from './encryptionFieldDefinitions';
+import { isSkipMarker } from './skipMarkerUtils';
 
 /**
  * Encrypt node data before sending to backend
@@ -481,6 +482,11 @@ export const encryptedApi = {
       let email = node.data?.email;
       if (email && typeof email === 'string' && email.trim() !== '') {
         let trimmedEmail = email.trim();
+        
+        // Skip marker emails should not be included in group emails
+        if (isSkipMarker(trimmedEmail)) {
+          continue;
+        }
         
         // Extract email from "Name" <email@example.com> format if present
         const emailMatch = trimmedEmail.match(/<([^>]+)>/);

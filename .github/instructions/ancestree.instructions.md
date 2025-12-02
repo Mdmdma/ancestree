@@ -329,6 +329,54 @@ Always use the `sanitizeFilename()` helper in `api.js` for cross-platform compat
 - Do not commit API keys or production DB files. Use `.env` and environment-specific config.
 - Sanitize inputs on the server; use parameterized queries for SQLite to avoid injection.
 
+## Skip Marker System ("000" Values)
+
+The skip marker system allows users to mark fields as "intentionally empty" without leaving them blank. This is useful for marking a node as "complete" when certain information is unknown or unavailable.
+
+### Skip Marker Values
+- **Standard fields**: `000` (text, email, date, address fields)
+- **Phone field**: `+000` (phone numbers require the `+` prefix)
+
+### Core Utility File
+All skip marker logic is centralized in `skipMarkerUtils.js`:
+```javascript
+import { isSkipMarker, isFieldFilled, getDisplayValue, filterAddressForGeocoding, SKIP_MARKER, SKIP_MARKER_PHONE } from './skipMarkerUtils';
+```
+
+### Behavior by Context
+
+| Context | Behavior |
+|---------|----------|
+| **Node Editor** | `000` is displayed and editable (user sees the value) |
+| **PersonNode (Tree)** | `000` is hidden (displays as blank) |
+| **Completion Check** | `000` counts as "filled" (node shows as complete) |
+| **Geocoding** | `000` fields are excluded, but geocoding proceeds with remaining address fields |
+| **Group Email** | `000` emails are filtered out from the mailto: link |
+| **Data Export** | `000` is exported as-is (preserved in export) |
+
+### Validation Bypass
+Skip markers bypass normal validation:
+- **Email field**: `000` bypasses email format validation
+- **Phone field**: `+000` bypasses phone format validation  
+- **Date field**: `000` bypasses date format validation (no auto-formatting)
+
+### Implementation Files
+- `skipMarkerUtils.js` - Core utility functions
+- `NodeEditor.jsx` - Input validation bypass for email/phone
+- `DateInput.jsx` - Date validation bypass
+- `PersonNode.jsx` - Display filtering
+- `completionUtils.js` - Completion status checking
+- `geocodingService.js` - Address filtering for geocoding
+- `encryptedApi.js` - Email filtering for group emails
+- `dateUtils.js` - Date formatting with skip marker handling
+
+### Using Skip Markers in New Features
+When adding new fields that should support skip markers:
+1. Import utilities: `import { isSkipMarker, getDisplayValue } from './skipMarkerUtils';`
+2. For validation: Check `isSkipMarker(value)` before applying validation rules
+3. For display: Use `getDisplayValue(value)` to hide skip markers in UI
+4. For completion: Use `isFieldFilled(value)` to treat skip markers as filled
+
 ## Contributor Workflow
 - Keep PRs focused and small. Include migration notes when DB schema changes.
 

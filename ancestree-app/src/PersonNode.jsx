@@ -3,6 +3,7 @@ import { Position } from "@xyflow/react";
 import CustomHandle from "./CustomHandle";
 import { checkNodeCompletion } from "./completionUtils";
 import { formatDisplayDate } from "./dateUtils";
+import { getDisplayValue, isSkipMarker } from "./skipMarkerUtils";
 
 export default function PersonNode({ data, selected }) {
   const { name, surname, birthDate, deathDate, street, city, zip, country, phone, email, latitude, longitude, isDebugMode, completionSettings } = data;
@@ -12,15 +13,28 @@ export default function PersonNode({ data, selected }) {
   const showIncompleteWarning = completionSettings?.showMissingRequired && !isComplete;
   const showCompleteIndicator = completionSettings?.showMissingRequired && isComplete;
 
-  // Format address display
+  // Get display values (filters out skip markers)
+  const displayName = getDisplayValue(name);
+  const displaySurname = getDisplayValue(surname);
+  const displayBirthDate = getDisplayValue(birthDate);
+  const displayDeathDate = getDisplayValue(deathDate);
+  const displayPhone = getDisplayValue(phone, 'phone');
+  const displayEmail = getDisplayValue(email);
+
+  // Format address display (filtering out skip markers)
   const formatAddress = () => {
     const parts = [];
-    if (street) parts.push(street);
-    if (city || zip) {
-      const cityZip = [zip, city].filter(Boolean).join(" ");
+    const displayStreet = getDisplayValue(street);
+    const displayCity = getDisplayValue(city);
+    const displayZip = getDisplayValue(zip);
+    const displayCountry = getDisplayValue(country);
+    
+    if (displayStreet) parts.push(displayStreet);
+    if (displayCity || displayZip) {
+      const cityZip = [displayZip, displayCity].filter(Boolean).join(" ");
       if (cityZip) parts.push(cityZip);
     }
-    if (country) parts.push(country);
+    if (displayCountry) parts.push(displayCountry);
     return parts.join(", ");
   };
 
@@ -83,7 +97,7 @@ export default function PersonNode({ data, selected }) {
             textOverflow: "ellipsis",
             whiteSpace: "nowrap"
           }}>
-            {name}
+            {displayName}
           </div>
         </div>
         <HandleComponent />
@@ -115,16 +129,16 @@ export default function PersonNode({ data, selected }) {
       <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
         <div style={{ flex: "1" }}>
           <div style={{ fontWeight: "bold", fontSize: "1rem", color: "var(--node-person-text-primary)" }}>
-            {name} {surname}
+            {displayName} {displaySurname}
           </div>
-          {birthDate && (
+          {displayBirthDate && (
             <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-secondary)" }}>
-              * {formatDisplayDate(birthDate)}
+              * {formatDisplayDate(displayBirthDate)}
             </div>
           )}
-          {deathDate && (
+          {displayDeathDate && (
             <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-secondary)" }}>
-              † {formatDisplayDate(deathDate)}
+              † {formatDisplayDate(displayDeathDate)}
             </div>
           )}
         </div>
@@ -138,18 +152,18 @@ export default function PersonNode({ data, selected }) {
         </div>
       )}
       
-      {phone && (
+      {displayPhone && (
         <div style={{ width: "100%" }}>
           <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-tertiary)" }}>
-            📞 {phone}
+            📞 {displayPhone}
           </div>
         </div>
       )}
       
-      {email && (
+      {displayEmail && (
         <div style={{ width: "100%" }}>
           <div style={{ fontSize: "0.75rem", color: "var(--node-person-text-tertiary)" }}>
-            ✉️ {email}
+            ✉️ {displayEmail}
           </div>
         </div>
       )}

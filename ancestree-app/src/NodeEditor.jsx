@@ -9,6 +9,7 @@ import { useTranslation } from './locales/LanguageContext';
 import { queueGeocoding } from './geocodingService';
 import { api } from './api';
 import { isFieldIncomplete } from './completionUtils';
+import { isSkipMarker, SKIP_MARKER, SKIP_MARKER_PHONE } from './skipMarkerUtils';
 
 function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, nodes = [], edges = [], socket, completionSettings }) {
   const { t } = useTranslation();
@@ -164,30 +165,41 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
     
     // Special handling for phone field - enforce + prefix and only numbers
     if (field === 'phone') {
-      // Always ensure the + is at the start
-      if (!value.startsWith('+')) {
-        value = '+' + value.replace(/\+/g, ''); // Add + at start and remove any other +
-      }
-      // Remove any non-digit characters except the leading +
-      value = '+' + value.substring(1).replace(/\D/g, '');
-      
-      // Validate phone format (+ followed by digits)
-      if (value.length > 1 && !/^\+\d*$/.test(value)) {
-        setPhoneError(t.ui.nodeEditor.validation.phoneFormat);
-        isValid = false;
-      } else {
+      // Check for skip marker first (allow +000)
+      if (value === SKIP_MARKER_PHONE || value === SKIP_MARKER) {
+        value = SKIP_MARKER_PHONE; // Normalize to +000
         setPhoneError('');
+      } else {
+        // Always ensure the + is at the start
+        if (!value.startsWith('+')) {
+          value = '+' + value.replace(/\+/g, ''); // Add + at start and remove any other +
+        }
+        // Remove any non-digit characters except the leading +
+        value = '+' + value.substring(1).replace(/\D/g, '');
+        
+        // Validate phone format (+ followed by digits)
+        if (value.length > 1 && !/^\+\d*$/.test(value)) {
+          setPhoneError(t.ui.nodeEditor.validation.phoneFormat);
+          isValid = false;
+        } else {
+          setPhoneError('');
+        }
       }
     }
     
     // Email validation
     if (field === 'email') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (value && !emailRegex.test(value)) {
-        setEmailError(t.ui.nodeEditor.validation.emailFormat);
-        isValid = false;
-      } else {
+      // Check for skip marker first (allow 000)
+      if (isSkipMarker(value)) {
         setEmailError('');
+      } else {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (value && !emailRegex.test(value)) {
+          setEmailError(t.ui.nodeEditor.validation.emailFormat);
+          isValid = false;
+        } else {
+          setEmailError('');
+        }
       }
     }
     

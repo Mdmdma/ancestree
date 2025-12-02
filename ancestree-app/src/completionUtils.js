@@ -2,6 +2,8 @@
  * Utility functions for checking node completion status based on required fields
  */
 
+import { isFieldFilled } from './skipMarkerUtils';
+
 /**
  * Check if a person node has all required fields filled
  * @param {Object} nodeData - The node's data object
@@ -19,57 +21,57 @@ export const checkNodeCompletion = (nodeData, completionSettings) => {
   const isDeceased = nodeData.deathDate && nodeData.deathDate.trim() !== '';
 
   // Check name
-  if (completionSettings.requireName && (!nodeData.name || nodeData.name.trim() === '')) {
+  if (completionSettings.requireName && !isFieldFilled(nodeData.name)) {
     missingFields.push('name');
   }
 
   // Check surname
-  if (completionSettings.requireSurname && (!nodeData.surname || nodeData.surname.trim() === '')) {
+  if (completionSettings.requireSurname && !isFieldFilled(nodeData.surname)) {
     missingFields.push('surname');
   }
 
   // Check maiden name
-  if (completionSettings.requireMaidenName && (!nodeData.maidenName || nodeData.maidenName.trim() === '')) {
+  if (completionSettings.requireMaidenName && !isFieldFilled(nodeData.maidenName)) {
     missingFields.push('maidenName');
   }
 
   // Check birth date
-  if (completionSettings.requireBirthDate && (!nodeData.birthDate || nodeData.birthDate.trim() === '')) {
+  if (completionSettings.requireBirthDate && !isFieldFilled(nodeData.birthDate)) {
     missingFields.push('birthDate');
   }
 
   // Check street fields (street AND house number both required)
   if (completionSettings.requireStreetFields) {
-    if (!nodeData.street || nodeData.street.trim() === '') {
+    if (!isFieldFilled(nodeData.street)) {
       missingFields.push('street');
     }
-    if (!nodeData.housenumber || nodeData.housenumber.trim() === '') {
+    if (!isFieldFilled(nodeData.housenumber)) {
       missingFields.push('housenumber');
     }
   }
 
   // Check city and ZIP (both required)
   if (completionSettings.requireCityZip) {
-    if (!nodeData.city || nodeData.city.trim() === '') {
+    if (!isFieldFilled(nodeData.city)) {
       missingFields.push('city');
     }
-    if (!nodeData.zip || nodeData.zip.trim() === '') {
+    if (!isFieldFilled(nodeData.zip)) {
       missingFields.push('zip');
     }
   }
 
   // Check country
-  if (completionSettings.requireCountry && (!nodeData.country || nodeData.country.trim() === '')) {
+  if (completionSettings.requireCountry && !isFieldFilled(nodeData.country)) {
     missingFields.push('country');
   }
 
   // Check phone (not required if person is deceased)
-  if (completionSettings.requirePhone && !isDeceased && (!nodeData.phone || nodeData.phone.trim() === '')) {
+  if (completionSettings.requirePhone && !isDeceased && !isFieldFilled(nodeData.phone, 'phone')) {
     missingFields.push('phone');
   }
 
   // Check email (not required if person is deceased)
-  if (completionSettings.requireEmail && !isDeceased && (!nodeData.email || nodeData.email.trim() === '')) {
+  if (completionSettings.requireEmail && !isDeceased && !isFieldFilled(nodeData.email)) {
     missingFields.push('email');
   }
 

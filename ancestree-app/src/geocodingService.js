@@ -7,6 +7,7 @@
 import { geocodeAddress, generateAddressHash, createRateLimiter } from './geocodingUtils';
 import { isBatchOperationInProgress } from './encryptionSession';
 import { encryptedApi } from './encryptedApi';
+import { filterAddressForGeocoding, isSkipMarker } from './skipMarkerUtils';
 
 // Singleton state
 const state = {
@@ -62,14 +63,17 @@ export const needsGeocoding = async (node) => {
   
   const { street, housenumber, city, zip, country, addressHash: storedHash } = node.data;
   
-  // If no address components, no geocoding needed
-  if (!street && !housenumber && !city && !zip && !country) {
-    console.log(`[GeocodingService] Node ${node.id} has no address components, skipping`);
+  // Filter out skip markers before checking
+  const filteredAddress = filterAddressForGeocoding({ street, housenumber, city, zip, country });
+  
+  // If no address components after filtering, no geocoding needed
+  if (!filteredAddress.street && !filteredAddress.housenumber && !filteredAddress.city && !filteredAddress.zip && !filteredAddress.country) {
+    console.log(`[GeocodingService] Node ${node.id} has no address components (after filtering skip markers), skipping`);
     return false;
   }
   
   // Check if any address field is encrypted (starts with "enc:")
-  const hasEncryptedField = [street, housenumber, city, zip, country].some(
+  const hasEncryptedField = [filteredAddress.street, filteredAddress.housenumber, filteredAddress.city, filteredAddress.zip, filteredAddress.country].some(
     field => field && typeof field === 'string' && field.startsWith('enc:')
   );
   
@@ -78,15 +82,21 @@ export const needsGeocoding = async (node) => {
     return false;
   }
   
-  // Calculate current address hash
-  const currentHash = await generateAddressHash(street, housenumber, city, zip, country);
+  // Calculate current address hash using filtered address
+  const currentHash = await generateAddressHash(
+    filteredAddress.street,
+    filteredAddress.housenumber,
+    filteredAddress.city,
+    filteredAddress.zip,
+    filteredAddress.country
+  );
   
   console.log(`[GeocodingService] Node ${node.id} hash check:`, {
-    street,
-    housenumber,
-    city,
-    zip,
-    country,
+    street: filteredAddress.street,
+    housenumber: filteredAddress.housenumber,
+    city: filteredAddress.city,
+    zip: filteredAddress.zip,
+    country: filteredAddress.country,
     currentHash,
     storedHash,
     needsGeocoding: currentHash !== storedHash
@@ -195,17 +205,32 @@ const processQueue = async () => {
       const { node } = item;
       const { street, housenumber, city, zip, country } = node.data;
       
-      console.log(`[GeocodingService] Geocoding node ${node.id}: ${street} ${housenumber}, ${city}, ${zip}, ${country}`);
+      // Filter out skip markers for geocoding
+      const filteredAddress = filterAddressForGeocoding({ street, housenumber, city, zip, country });
       
-      // Use all address fields for better accuracy
-      const result = await geocodeAddress(street, housenumber, city, zip, country);
+      console.log(`[GeocodingService] Geocoding node ${node.id}: ${filteredAddress.street} ${filteredAddress.housenumber}, ${filteredAddress.city}, ${filteredAddress.zip}, ${filteredAddress.country}`);
+      
+      // Use filtered address fields for geocoding
+      const result = await geocodeAddress(
+        filteredAddress.street,
+        filteredAddress.housenumber,
+        filteredAddress.city,
+        filteredAddress.zip,
+        filteredAddress.country
+      );
       
       if (result && result.latitude && result.longitude) {
         // Geocoding succeeded
         console.log(`[GeocodingService] Successfully geocoded node ${node.id}: ${result.latitude}, ${result.longitude}`);
         
-        // Generate new address hash
-        const newHash = await generateAddressHash(street, housenumber, city, zip, country);
+        // Generate new address hash using filtered address
+        const newHash = await generateAddressHash(
+          filteredAddress.street,
+          filteredAddress.housenumber,
+          filteredAddress.city,
+          filteredAddress.zip,
+          filteredAddress.country
+        );
         
         // Get current timestamp for last_geocoded
         const timestamp = new Date().toISOString();
@@ -224,10 +249,16 @@ const processQueue = async () => {
         state.stats.successCount++;
       } else {
         // Geocoding failed - set coordinates to null
-        console.error(`[GeocodingService] Geocoding failed for node ${node.id}: ${street} ${housenumber}, ${city}, ${zip}, ${country}`);
+        console.error(`[GeocodingService] Geocoding failed for node ${node.id}: ${filteredAddress.street} ${filteredAddress.housenumber}, ${filteredAddress.city}, ${filteredAddress.zip}, ${filteredAddress.country}`);
         
-        // Generate new address hash anyway
-        const newHash = await generateAddressHash(street, housenumber, city, zip, country);
+        // Generate new address hash using filtered address
+        const newHash = await generateAddressHash(
+          filteredAddress.street,
+          filteredAddress.housenumber,
+          filteredAddress.city,
+          filteredAddress.zip,
+          filteredAddress.country
+        );
         const timestamp = new Date().toISOString();
         
         // Update node with null coordinates
@@ -251,12 +282,19 @@ const processQueue = async () => {
       
       // On error, try to update with null coordinates
       try {
+        const filteredAddress = filterAddressForGeocoding({
+          street: item.node.data.street,
+          housenumber: item.node.data.housenumber,
+          city: item.node.data.city,
+          zip: item.node.data.zip,
+          country: item.node.data.country
+        });
         const newHash = await generateAddressHash(
-          item.node.data.street,
-          item.node.data.housenumber,
-          item.node.data.city,
-          item.node.data.zip,
-          item.node.data.country
+          filteredAddress.street,
+          filteredAddress.housenumber,
+          filteredAddress.city,
+          filteredAddress.zip,
+          filteredAddress.country
         );
         const timestamp = new Date().toISOString();
         

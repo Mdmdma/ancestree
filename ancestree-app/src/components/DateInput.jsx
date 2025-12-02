@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Button from './Button';
 import { formatDateToGerman, formatDateToISO } from '../dateUtils';
+import { isSkipMarker, SKIP_MARKER } from '../skipMarkerUtils';
 
 /**
  * Reusable DateInput component with consistent styling
@@ -31,6 +32,8 @@ const DateInput = ({
   // Convert ISO date to German format for display, or keep as-is if already German
   const getDisplayValue = (val) => {
     if (!val) return '';
+    // If it's a skip marker, return as-is
+    if (isSkipMarker(val)) return val;
     // If already in German format (contains dots), return as-is
     if (val.includes('.')) return val;
     // Convert from ISO to German format
@@ -57,6 +60,18 @@ const DateInput = ({
   // Handle text input change with format enforcement
   const handleTextChange = (e) => {
     let input = e.target.value;
+    
+    // Check for skip marker - allow "000" to be entered and saved directly
+    if (input === SKIP_MARKER || input === '00' || input === '0') {
+      setDisplayValue(input);
+      // Only propagate complete skip marker
+      if (input === SKIP_MARKER) {
+        if (onChange) {
+          onChange({ target: { value: SKIP_MARKER } });
+        }
+      }
+      return;
+    }
     
     // Remove any non-digit and non-dot characters
     input = input.replace(/[^\d.]/g, '');
@@ -86,6 +101,11 @@ const DateInput = ({
   
   // Handle blur to validate and format incomplete dates
   const handleBlur = () => {
+    // Skip marker is valid as-is
+    if (isSkipMarker(displayValue)) {
+      return;
+    }
+    
     // If incomplete, clear the display
     if (displayValue && displayValue.length !== 10) {
       // Try to parse partial input
@@ -124,6 +144,8 @@ const DateInput = ({
   // Get the ISO value for the hidden date input
   const getISOValue = () => {
     if (!value) return '';
+    // Skip marker should not be converted
+    if (isSkipMarker(value)) return '';
     // If already ISO format (contains dashes), return as-is
     if (value.includes('-')) return value;
     // Convert from German to ISO
