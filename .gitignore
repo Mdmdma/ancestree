@@ -57,6 +57,9 @@ pids
 coverage/
 *.lcov
 
+# Logs
+logs/
+
 # Build outputs
 dist/
 build/
