@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { LanguageProvider } from './locales/LanguageContext'
 
 // Log build information for deployment verification
 console.log('%c🌳 Ancestree App', 'font-size: 20px; font-weight: bold; color: #4CAF50;');
@@ -10,6 +11,8 @@ console.log('%cTo verify deployment, check this timestamp matches your deploymen
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </React.StrictMode>,
 )

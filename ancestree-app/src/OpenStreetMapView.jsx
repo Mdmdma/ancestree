@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import { subscribeToGeocodingUpdates } from './geocodingService';
 
 // Fix Leaflet's default icon path issues with Vite
@@ -326,6 +326,7 @@ const AnimatedMarker = ({
 };
 
 const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChange }) => {
+  const { t } = useTranslation();
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -395,7 +396,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
 
         locationMap.get(key).people.push({
           nodeId: node.id,
-          name: node.data.name || appConfig.ui.mapView.unknownName,
+          name: node.data.name || t.ui.mapView.unknownName,
           surname: node.data.surname || ''
         });
       });
@@ -405,7 +406,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
       console.log(`[OpenStreetMapView] Loaded ${groupedLocations.length} unique locations with ${nodesWithLocations.length} people`);
       setLocations(groupedLocations);
     } catch (err) {
-      setError(appConfig.ui.mapView.errors.failedToLoad);
+      setError(t.ui.mapView.errors.failedToLoad);
       console.error('Error loading locations:', err);
     } finally {
       setLoading(false);
@@ -534,7 +535,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
         backgroundColor: '#0a4b11ff'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>{appConfig.ui.mapView.title}</h3>
+          <h3 style={{ margin: 0 }}>{t.ui.mapView.title}</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button 
               onClick={handleRefresh}
@@ -549,7 +550,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
                 fontSize: '14px'
               }}
             >
-              {loading ? '🔄' : '↻'} {appConfig.ui.mapView.refreshButton}
+              {loading ? '🔄' : '↻'} {t.ui.mapView.refreshButton}
             </button>
           </div>
         </div>
@@ -573,7 +574,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
               wordWrap: 'break-word',
               overflowWrap: 'break-word'
             }}>
-              {appConfig.ui.mapView.selectedPersonAddress} {selectedNode.data.name} {selectedNode.data.surname}
+              {t.ui.mapView.selectedPersonAddress} {selectedNode.data.name} {selectedNode.data.surname}
             </div>
             {selectedNode.data.city ? (
               <div style={{ 
@@ -588,7 +589,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
               </div>
             ) : (
               <div style={{ fontSize: '14px', opacity: 0.7, fontStyle: 'italic' }}>
-                {appConfig.ui.mapView.noAddressAvailable}
+                {t.ui.mapView.noAddressAvailable}
               </div>
             )}
           </div>
@@ -646,7 +647,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
             minWidth: '36px',
             minHeight: '36px'
           }}
-          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          title={isFullscreen ? t.ui.mapView.fullscreenExit : t.ui.mapView.fullscreenEnter}
         >
           {isFullscreen ? '⊗' : '⛶'}
         </button>
@@ -666,7 +667,7 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
             color: 'white',
             fontSize: '18px'
           }}>
-            {appConfig.ui.mapView.loadingLocations}
+            {t.ui.mapView.loadingLocations}
           </div>
         )}
         
@@ -687,11 +688,11 @@ const OpenStreetMapView = ({ nodes, selectedNode, onPersonSelect, onMapModeChang
             backgroundColor: '#09380dff'
           }}>
             <div style={{ fontSize: '48px', marginBottom: '20px' }}>
-              {appConfig.ui.mapView.mapIcon}
+              {t.ui.mapView.mapIcon}
             </div>
-            <h3>{appConfig.ui.mapView.noLocationsTitle}</h3>
+            <h3>{t.ui.mapView.noLocationsTitle}</h3>
             <p style={{ opacity: 0.8 }}>
-              {appConfig.ui.mapView.noLocationsMessage}
+              {t.ui.mapView.noLocationsMessage}
             </p>
           </div>
         )}

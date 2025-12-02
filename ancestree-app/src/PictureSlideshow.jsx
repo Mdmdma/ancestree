@@ -1,6 +1,6 @@
 import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import { api } from './api';
 import ChatComponent from './ChatComponent';
 import DescriptionTextarea from './components/DescriptionTextarea';
@@ -158,6 +158,7 @@ const PictureSlideshow = ({
   onPersonSelect,
   socket
 }) => {
+  const { t } = useTranslation();
   console.log('PictureSlideshow: Component called with mode:', mode, 'personId:', personId);
   const [images, setImages] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -439,7 +440,7 @@ const PictureSlideshow = ({
   }, []);
 
   // Get appropriate config based on mode
-  const config = mode === 'person' ? appConfig.ui.slideshow : appConfig.ui.familyGallery;
+  const config = mode === 'person' ? t.ui.slideshow : t.ui.familyGallery;
 
   // Styles
   const overlayStyle = {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api';
-import { appConfig } from './config';
+import { useLanguage } from './locales/LanguageContext';
 import { runEncryptionPerformanceTest, formatTestResults, getDatabaseFieldEstimates } from './encryptionPerformanceTest';
 import { enableEncryption, disableEncryption } from './encryptionBatchOperations';
 import { updateEncryptionStatus, getFamilyPassword, updatePassword, pauseKeyCheck, resumeKeyCheck } from './encryptionSession';
@@ -8,8 +8,10 @@ import { exportFamilyDataWithMetadata } from './exportUtils';
 import TextInput from './components/TextInput';
 import Button from './components/Button';
 import DescriptionTextarea from './components/DescriptionTextarea';
+import LanguagePicker from './components/LanguagePicker';
 
 const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyName, onDataReload }) => {
+  const { translations: appConfig } = useLanguage();
   const [adminPassword, setAdminPassword] = useState('');
   const [newFamilyPassword, setNewFamilyPassword] = useState('');
   const [confirmFamilyPassword, setConfirmFamilyPassword] = useState('');
@@ -409,6 +411,18 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
             {appConfig.ui.adminPanelCommon.closeButton}
           </button>
         </div>
+        
+        {/* Language Picker - shown before authentication */}
+        {!isAuthenticated && (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            marginBottom: '16px' 
+          }}>
+            <LanguagePicker />
+          </div>
+        )}
+        
         {/* Authentication / Preview Section */}
         <div style={{ marginBottom: '20px' }}>
           <div style={{
@@ -658,7 +672,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                   <DescriptionTextarea
                     value={purposePreview}
                     onChange={(e) => setPurposePreview(e.target.value)}
-                    placeholder="Describe the purpose of this family tree..."
+                    placeholder={appConfig.ui.adminPanel.familyParameters.purposePlaceholder}
                     maxLength={3000}
                     showButtons={false}
                   />
@@ -667,7 +681,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       // Validate email format
                       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                       if (adminEmail && !emailRegex.test(adminEmail)) {
-                        setEmailError('Please enter a valid email address');
+                        setEmailError(appConfig.ui.login.validation.invalidEmail);
                         return;
                       }
                       
@@ -752,7 +766,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                       <TextInput
                         label={appConfig.ui.adminPanelCommon.currentFamilyPasswordLabel}
                         type="password"
-                        placeholder="Current Family Password"
+                        placeholder={appConfig.ui.adminPanel.passwords.currentFamilyPasswordPlaceholder}
                         value={currentFamilyPassword}
                         onChange={(e) => setCurrentFamilyPassword(e.target.value)}
                         disabled={loading || encryptionProgress !== null}
@@ -760,14 +774,14 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                     )}
                     <TextInput
                       type="password"
-                      placeholder="New Family Password"
+                      placeholder={appConfig.ui.adminPanel.passwords.newFamilyPasswordPlaceholder}
                       value={newFamilyPassword}
                       onChange={(e) => setNewFamilyPassword(e.target.value)}
                       disabled={loading || encryptionProgress !== null}
                     />
                     <TextInput
                       type="password"
-                      placeholder="Confirm Family Password"
+                      placeholder={appConfig.ui.adminPanel.passwords.confirmFamilyPasswordPlaceholder}
                       value={confirmFamilyPassword}
                       onChange={(e) => setConfirmFamilyPassword(e.target.value)}
                       disabled={loading || encryptionProgress !== null}
@@ -787,13 +801,13 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                     <TextInput
                       label={appConfig.ui.adminPanel.passwords.adminPasswordLabel}
                       type="password"
-                      placeholder="New Admin Password"
+                      placeholder={appConfig.ui.adminPanel.passwords.newAdminPasswordPlaceholder}
                       value={newAdminPassword}
                       onChange={(e) => setNewAdminPassword(e.target.value)}
                     />
                     <TextInput
                       type="password"
-                      placeholder="Confirm Admin Password"
+                      placeholder={appConfig.ui.adminPanel.passwords.confirmAdminPasswordPlaceholder}
                       value={confirmAdminPassword}
                       onChange={(e) => setConfirmAdminPassword(e.target.value)}
                     />
@@ -2225,7 +2239,7 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
             
             <input
               type="password"
-              placeholder="Enter family password"
+              placeholder={appConfig.ui.adminPanel.encryption.enterPasswordPlaceholder}
               value={passwordForEncryption}
               onChange={(e) => setPasswordForEncryption(e.target.value)}
               onKeyDown={(e) => {

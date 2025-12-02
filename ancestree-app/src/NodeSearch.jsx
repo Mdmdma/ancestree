@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import { formatDisplayDate } from './dateUtils';
 
 const NodeSearch = ({ nodes, onNodeSelect }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
@@ -252,7 +253,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
         <input
           ref={searchInputRef}
           type="text"
-          placeholder={isSelectingNode ? appConfig.ui.nodeSearch.navigatingPlaceholder : appConfig.ui.nodeSearch.placeholder}
+          placeholder={isSelectingNode ? t.ui.nodeSearch.navigatingPlaceholder : t.ui.nodeSearch.placeholder}
           value={searchTerm}
           onChange={handleSearchChange}
           onKeyDown={handleKeyDown}
@@ -340,7 +341,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
               fontSize: '14px',
               textAlign: 'center'
             }}>
-              {appConfig.ui.nodeSearch.searchingMessage}
+              {t.ui.nodeSearch.searchingMessage}
             </div>
           ) : (!searchResults.results || searchResults.results.length === 0) && searchTerm.trim() ? (
             <div style={{
@@ -349,7 +350,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
               fontSize: '14px',
               textAlign: 'center'
             }}>
-              {appConfig.ui.nodeSearch.noResultsMessage.replace('{searchTerm}', searchTerm)}
+              {t.ui.nodeSearch.noResultsMessage.replace('{searchTerm}', searchTerm)}
             </div>
           ) : (
             <>
@@ -362,10 +363,10 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
                   borderBottom: '1px solid #eee'
                 }}>
                   {searchResults.hasMore 
-                    ? appConfig.ui.nodeSearch.resultCountLimited.replace('{total}', searchResults.total)
+                    ? t.ui.nodeSearch.resultCountLimited.replace('{total}', searchResults.total)
                     : searchResults.total === 1 
-                      ? appConfig.ui.nodeSearch.resultCountSingle.replace('{count}', searchResults.total)
-                      : appConfig.ui.nodeSearch.resultCountMultiple.replace('{count}', searchResults.total)
+                      ? t.ui.nodeSearch.resultCountSingle.replace('{count}', searchResults.total)
+                      : t.ui.nodeSearch.resultCountMultiple.replace('{count}', searchResults.total)
                   }
                 </div>
               )}
@@ -397,7 +398,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
                         marginBottom: birthDate ? '4px' : '0'
                       }}
                       dangerouslySetInnerHTML={{
-                        __html: highlightSearchTerm(fullName || appConfig.ui.nodeSearch.unnamedPerson, searchTerm)
+                        __html: highlightSearchTerm(fullName || t.ui.nodeSearch.unnamedPerson, searchTerm)
                       }}
                     />
                     {birthDate && (
@@ -405,7 +406,7 @@ const NodeSearch = ({ nodes, onNodeSelect }) => {
                         fontSize: '12px',
                         color: 'var(--search-text-muted, #666666)'
                       }}>
-                        {appConfig.ui.nodeSearch.bornLabel} {birthDate}
+                        {t.ui.nodeSearch.bornLabel} {birthDate}
                       </div>
                     )}
                   </div>

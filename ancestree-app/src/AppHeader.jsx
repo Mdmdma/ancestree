@@ -1,8 +1,10 @@
 import React from 'react';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import Button from './components/Button';
 
 const AppHeader = ({ user, onLogout, onAdminClick }) => {
+  const { t } = useTranslation();
+  
   return (
     <article className="container app-header" style={{ 
       display: 'flex', 
@@ -22,7 +24,7 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
             icon="🚪"
             className="bg-[var(--header-bg)] text-[var(--header-text)] hover:bg-[var(--header-bg)] hover:opacity-90"
           >
-            {appConfig.header.logoutButton}
+            {t.header.logoutButton}
           </Button>
         </div>
       )}
@@ -48,14 +50,14 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
         fontSize: '2rem',
         lineHeight: '1.2'
       }}>
-        {user?.displayName ? `${appConfig.header.familyPrefix} ${user.displayName}` : appConfig.header.title}
+        {user?.displayName ? `${t.header.familyPrefix} ${user.displayName}` : t.header.title}
       </h1>
       <p className="mobile-hide-subtitle" style={{ 
         margin: '0 0 3px 0', 
         fontSize: '0.9rem',
         lineHeight: '1.2'
       }}>
-        {appConfig.header.subtitle}
+        {t.header.subtitle}
       </p>
       <p className="mobile-hide-description" style={{ 
         margin: '0', 
@@ -63,7 +65,7 @@ const AppHeader = ({ user, onLogout, onAdminClick }) => {
         lineHeight: '1.2',
         opacity: 0.8
       }}>
-        {appConfig.header.description}
+        {t.header.description}
       </p>
     </article>
   );

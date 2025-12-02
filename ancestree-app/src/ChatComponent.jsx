@@ -1,13 +1,14 @@
 import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import { isEncryptionEnabled, getDerivedKey } from './encryptionSession';
 import { decryptValueFast } from './encryptionUtilsOptimized';
 import { CHAT_MESSAGE_ENCRYPTED_FIELDS } from './encryptionFieldDefinitions';
 import Button from './components/Button';
 
 const ChatComponent = ({ imageId, onError, socket }) => {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
@@ -43,7 +44,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     } catch (error) {
       console.error('Error loading chat messages:', error);
       if (onError) {
-        onError(appConfig.ui.chat.errorLoading + ': ' + error.message);
+        onError(t.ui.chat.errorLoading + ': ' + error.message);
       }
     } finally {
       setLoading(false);
@@ -144,18 +145,18 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     e.preventDefault();
     
     if (!userName.trim()) {
-      alert(appConfig.ui.chat.nameRequired);
+      alert(t.ui.chat.nameRequired);
       return;
     }
     
     if (!message.trim()) {
-      alert(appConfig.ui.chat.messageRequired);
+      alert(t.ui.chat.messageRequired);
       return;
     }
     
     // Validate message length (max 300 characters)
     if (message.trim().length > 300) {
-      alert(appConfig.ui.chat.messageTooLong);
+      alert(t.ui.chat.messageTooLong);
       return;
     }
 
@@ -173,7 +174,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     } catch (error) {
       console.error('Error sending message:', error);
       if (onError) {
-        onError(appConfig.ui.chat.errorSending + ': ' + error.message);
+        onError(t.ui.chat.errorSending + ': ' + error.message);
       }
     } finally {
       setSending(false);
@@ -217,13 +218,13 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffMinutes < 1) {
-      return appConfig.ui.chat.timeFormat.justNow;
+      return t.ui.chat.timeFormat.justNow;
     } else if (diffMinutes < 60) {
-      return appConfig.ui.chat.timeFormat.minutesAgo.replace('{minutes}', diffMinutes);
+      return t.ui.chat.timeFormat.minutesAgo.replace('{minutes}', diffMinutes);
     } else if (diffHours < 24) {
-      return appConfig.ui.chat.timeFormat.hoursAgo.replace('{hours}', diffHours);
+      return t.ui.chat.timeFormat.hoursAgo.replace('{hours}', diffHours);
     } else if (diffDays < 7) {
-      return appConfig.ui.chat.timeFormat.daysAgo.replace('{days}', diffDays);
+      return t.ui.chat.timeFormat.daysAgo.replace('{days}', diffDays);
     } else {
       // Format in user's local timezone
       return messageTime.toLocaleDateString() + ' ' + messageTime.toLocaleTimeString([], { 
@@ -235,7 +236,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
 
   // Handle message deletion (optional feature)
   const handleDeleteMessage = useCallback(async (messageId) => {
-    if (!confirm(appConfig.ui.chat.deleteConfirm)) {
+    if (!confirm(t.ui.chat.deleteConfirm)) {
       return;
     }
 
@@ -245,7 +246,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
     } catch (error) {
       console.error('Error deleting message:', error);
       if (onError) {
-        onError(appConfig.ui.chat.errorDeleting + ': ' + error.message);
+        onError(t.ui.chat.errorDeleting + ': ' + error.message);
       }
     }
   }, [imageId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -406,17 +407,17 @@ const ChatComponent = ({ imageId, onError, socket }) => {
         }
       `}</style>
       <div style={headerStyle}>
-        {appConfig.ui.chat.title}
+        {t.ui.chat.title}
       </div>
       
       <div style={messagesContainerStyle} ref={messagesContainerRef}>
         {loading ? (
           <div style={emptyStateStyle}>
-            {appConfig.ui.chat.loadingMessages}
+            {t.ui.chat.loadingMessages}
           </div>
         ) : messages.length === 0 ? (
           <div style={emptyStateStyle}>
-            {appConfig.ui.chat.noMessages}
+            {t.ui.chat.noMessages}
           </div>
         ) : (
           <>
@@ -433,7 +434,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
                       variant="danger"
                       size="small"
                     >
-                      {appConfig.ui.chat.deleteButton}
+                      {t.ui.chat.deleteButton}
                     </Button>
                   </div>
               </div>
@@ -450,7 +451,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
           type="text"
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
-          placeholder={appConfig.ui.chat.namePlaceholder}
+          placeholder={t.ui.chat.namePlaceholder}
           style={inputStyle}
           required
         />
@@ -459,7 +460,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleTextareaKeyDown}
-            placeholder={appConfig.ui.chat.messagePlaceholder}
+            placeholder={t.ui.chat.messagePlaceholder}
             style={textareaStyle}
             maxLength={300}
             required
@@ -475,7 +476,7 @@ const ChatComponent = ({ imageId, onError, socket }) => {
           icon="📤"
           disabled={sending}
         >
-          {sending ? appConfig.ui.chat.sendingButton : appConfig.ui.chat.sendButton}
+          {sending ? t.ui.chat.sendingButton : t.ui.chat.sendButton}
         </Button>
       </form>
     </div>

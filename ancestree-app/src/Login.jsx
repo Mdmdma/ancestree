@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { api, getLastFamilyName } from './api.js';
 import { initializeSession } from './encryptionSession';
-import { appConfig } from './config.js';
+import { useLanguage } from './locales/LanguageContext';
 import TextInput from './components/TextInput';
 import Button from './components/Button';
 import ContactButton from './ContactButton';
+import LanguagePicker from './components/LanguagePicker';
 import TermsAndConditions, { TERMS_VERSION } from './TermsAndConditions';
 
 export default function Login({ onLoginSuccess }) {
+  const { translations: appConfig } = useLanguage();
   const [familyName, setFamilyName] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
@@ -56,7 +58,7 @@ export default function Login({ onLoginSuccess }) {
     if (isRegistering && adminEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(adminEmail)) {
-        setEmailError('Please enter a valid email address');
+        setEmailError(appConfig.ui.login.validation.invalidEmail);
         setLoading(false);
         return;
       }
@@ -64,14 +66,14 @@ export default function Login({ onLoginSuccess }) {
 
     // Require email for registration
     if (isRegistering && !adminEmail) {
-      setEmailError('Admin email is required');
+      setEmailError(appConfig.ui.login.validation.emailRequired);
       setLoading(false);
       return;
     }
 
     // Require terms acceptance for registration
     if (isRegistering && !termsAccepted) {
-      setTermsError('Sie müssen die Nutzungsbedingungen akzeptieren');
+      setTermsError(appConfig.ui.login.terms.termsRequired);
       setLoading(false);
       return;
     }
@@ -151,6 +153,16 @@ export default function Login({ onLoginSuccess }) {
       alignItems: 'center',
       justifyContent: 'center'
     }}>
+      {/* Language Picker - Top Right */}
+      <div style={{
+        position: 'absolute',
+        top: '16px',
+        right: '16px',
+        zIndex: 1001
+      }}>
+        <LanguagePicker compact />
+      </div>
+
       {/* Main Login Container */}
       <div style={{
         backgroundColor: 'var(--login-panel-bg)',
@@ -299,7 +311,7 @@ export default function Login({ onLoginSuccess }) {
                   }}
                 />
                 <span>
-                  Ich akzeptiere die{' '}
+                  {appConfig.ui.login.terms.checkboxText}{' '}
                   <button
                     type="button"
                     onClick={() => setShowTerms(true)}
@@ -313,9 +325,9 @@ export default function Login({ onLoginSuccess }) {
                       fontSize: 'inherit'
                     }}
                   >
-                    Nutzungsbedingungen und Datenschutzerklärung
+                    {appConfig.ui.login.terms.termsLink}
                   </button>
-                  {' '}und bestätige, dass ich mindestens 16 Jahre alt bin.
+                  {' '}{appConfig.ui.login.terms.ageConfirmation}
                 </span>
               </label>
               {termsError && (
@@ -340,7 +352,7 @@ export default function Login({ onLoginSuccess }) {
               marginTop: '8px',
               lineHeight: '1.4'
             }}>
-              Mit der Anmeldung akzeptieren Sie die{' '}
+              {appConfig.ui.login.terms.loginNotice}{' '}
               <button
                 type="button"
                 onClick={() => setShowTerms(true)}
@@ -354,7 +366,7 @@ export default function Login({ onLoginSuccess }) {
                   fontSize: 'inherit'
                 }}
               >
-                Nutzungsbedingungen und Datenschutzerklärung
+                {appConfig.ui.login.terms.termsLink}
               </button>.
             </p>
           )}

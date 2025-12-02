@@ -3,9 +3,10 @@ import { useReactFlow } from '@xyflow/react';
 import TextInput from './components/TextInput';
 import DateInput from './components/DateInput';
 import Button from './components/Button';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 
 export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
+  const { t } = useTranslation();
   const { deleteElements } = useReactFlow();
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [editingNode, setEditingNode] = useState(null);
@@ -90,7 +91,7 @@ export default function NodeDebugger({ nodes, edges, onUpdateNode }) {
       );
       
       if (bloodlineNodes.length <= 1) {
-        alert(`${appConfig.ui.alerts.lastBloodlineNodeDelete.title}\n\n${appConfig.ui.alerts.lastBloodlineNodeDelete.message}`);
+        alert(`${t.ui.alerts.lastBloodlineNodeDelete.title}\n\n${t.ui.alerts.lastBloodlineNodeDelete.message}`);
         return; // Prevent deletion
       }
     }

@@ -4,7 +4,7 @@ import ImageGallery from './ImageGallery';
 import OpenStreetMapView from './OpenStreetMapView';
 import ElkDebugOverlay from './ElkDebugOverlay';
 import NodeSearch from './NodeSearch';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 
 const Sidebar = ({ 
   activeTab, 
@@ -28,6 +28,7 @@ const Sidebar = ({
   socket,
   completionSettings
 }) => {
+  const { t } = useTranslation();
   const { autoLayout, fitTreeToView } = treeOperations || {};
 
   // Determine if sidebar should be expanded on mobile
@@ -93,7 +94,7 @@ const Sidebar = ({
             fontWeight: activeTab === 'editor' ? 'bold' : 'normal'
           }}
         >
-          {appConfig.ui.tabs.editor}
+          {t.ui.tabs.editor}
         </button>
         <button
           onClick={() => setActiveTab('images')}
@@ -109,7 +110,7 @@ const Sidebar = ({
             fontWeight: activeTab === 'images' ? 'bold' : 'normal'
           }}
         >
-          {appConfig.ui.tabs.photos}
+          {t.ui.tabs.photos}
         </button>
         <button
           onClick={() => setActiveTab('map')}
@@ -125,7 +126,7 @@ const Sidebar = ({
             fontWeight: activeTab === 'map' ? 'bold' : 'normal'
           }}
         >
-          {appConfig.ui.tabs.map}
+          {t.ui.tabs.map}
         </button>
       </div>
 
@@ -153,9 +154,9 @@ const Sidebar = ({
               />
             ) : (
               <div style={{ color: 'var(--sidebar-text)' }}>
-                <h3 className="mobile-hide-tab-title">{appConfig.ui.editor.selectPersonTitle}</h3>
-                <p className="mobile-hide-instructions">{appConfig.ui.editor.selectPersonDescription}</p>
-                <p className="mobile-hide-instructions">{appConfig.ui.editor.addPersonDescription}</p>
+                <h3 className="mobile-hide-tab-title">{t.ui.editor.selectPersonTitle}</h3>
+                <p className="mobile-hide-instructions">{t.ui.editor.selectPersonDescription}</p>
+                <p className="mobile-hide-instructions">{t.ui.editor.addPersonDescription}</p>
                 
                 <div style={{ marginTop: '30px' }}>
                   <button 
@@ -174,7 +175,7 @@ const Sidebar = ({
                     onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-primary-hover)'}
                     onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-primary-bg)'}
                   >
-                    {appConfig.ui.editor.buttons.autoLayout}
+                    {t.ui.editor.buttons.autoLayout}
                   </button>
                   
                   <button 
@@ -193,27 +194,27 @@ const Sidebar = ({
                     onMouseOver={(e) => e.target.style.backgroundColor = 'var(--button-secondary-hover)'}
                     onMouseOut={(e) => e.target.style.backgroundColor = 'var(--button-secondary-bg)'}
                   >
-                    {appConfig.ui.editor.buttons.fitToView}
+                    {t.ui.editor.buttons.fitToView}
                   </button>
                   
                   <p className="mobile-hide-instructions" style={{ fontSize: '0.8rem', opacity: 0.8, margin: '0 0 20px 0' }}>
-                    {appConfig.ui.editor.shortcutsHelp.autoLayout}<br/>
-                    {appConfig.ui.editor.shortcutsHelp.fitToView}
+                    {t.ui.editor.shortcutsHelp.autoLayout}<br/>
+                    {t.ui.editor.shortcutsHelp.fitToView}
                   </p>
                   
                   {showDebug && (
                     <div style={{ marginTop: '15px' }}>
-                      <h4 style={{ color: 'white', marginBottom: '10px' }}>{appConfig.ui.editor.debug.title}</h4>
+                      <h4 style={{ color: 'white', marginBottom: '10px' }}>{t.ui.editor.debug.title}</h4>
                       <ElkDebugOverlay debugInfo={debugInfo} />
                     </div>
                   )}
                 </div>
                 
                 <div className="mobile-hide-instructions" style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-                  <h4>{appConfig.ui.editor.connectionRules.title}</h4>
-                  <p>{appConfig.ui.editor.connectionRules.parent}</p>
-                  <p>{appConfig.ui.editor.connectionRules.child}</p>
-                  <p>{appConfig.ui.editor.connectionRules.partner}</p>
+                  <h4>{t.ui.editor.connectionRules.title}</h4>
+                  <p>{t.ui.editor.connectionRules.parent}</p>
+                  <p>{t.ui.editor.connectionRules.child}</p>
+                  <p>{t.ui.editor.connectionRules.partner}</p>
                 </div>
               </div>
             )}

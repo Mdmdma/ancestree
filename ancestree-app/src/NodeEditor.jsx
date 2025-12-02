@@ -5,12 +5,13 @@ import AddressAutocomplete from './components/AddressAutocomplete';
 import TextInput from './components/TextInput';
 import DateInput from './components/DateInput';
 import Button from './components/Button';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import { queueGeocoding } from './geocodingService';
 import { api } from './api';
 import { isFieldIncomplete } from './completionUtils';
 
 function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, nodes = [], edges = [], socket, completionSettings }) {
+  const { t } = useTranslation();
   const { deleteElements } = useReactFlow();
   
   const [formData, setFormData] = useState({
@@ -172,7 +173,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
       
       // Validate phone format (+ followed by digits)
       if (value.length > 1 && !/^\+\d*$/.test(value)) {
-        setPhoneError('Telefonnummer muss mit + beginnen und nur Zahlen enthalten');
+        setPhoneError(t.ui.nodeEditor.validation.phoneFormat);
         isValid = false;
       } else {
         setPhoneError('');
@@ -183,7 +184,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
     if (field === 'email') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (value && !emailRegex.test(value)) {
-        setEmailError('Bitte gib eine gültige E-Mail-Adresse ein');
+        setEmailError(t.ui.nodeEditor.validation.emailFormat);
         isValid = false;
       } else {
         setEmailError('');
@@ -259,7 +260,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
       );
       
       if (bloodlineNodes.length <= 1) {
-        alert(`${appConfig.ui.alerts.lastBloodlineNodeDelete.title}\n\n${appConfig.ui.alerts.lastBloodlineNodeDelete.message}`);
+        alert(`${t.ui.alerts.lastBloodlineNodeDelete.title}\n\n${t.ui.alerts.lastBloodlineNodeDelete.message}`);
         return; // Prevent deletion
       }
     }
@@ -281,7 +282,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
   if (isFamilyNode) {
     return (
       <div>
-        <h3 style={{ color: 'white' }}>{appConfig.ui.nodeEditor.title}</h3>
+        <h3 style={{ color: 'white' }}>{t.ui.nodeEditor.title}</h3>
         
         {/* Delete Button for Family Node */}
         <div style={{ marginTop: '20px' }}>
@@ -291,7 +292,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
             size="large"
             className="w-full"
           >
-            {appConfig.ui.nodeEditor.buttons.deleteFamily}
+            {t.ui.nodeEditor.buttons.deleteFamily}
           </Button>
         </div>
       </div>
@@ -301,11 +302,11 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
   // For person nodes, show all fields
   return (
     <div>
-      <h3 style={{ color: 'white' }}>{appConfig.ui.nodeEditor.title}</h3>
+      <h3 style={{ color: 'white' }}>{t.ui.nodeEditor.title}</h3>
       
       <TextInput
         ref={nameInputRef}
-        label={appConfig.ui.nodeEditor.labels.name}
+        label={t.ui.nodeEditor.labels.name}
         value={formData.name}
         onChange={(e) => handleInputChange('name', e.target.value)}
         inputRef={nameInputRef}
@@ -313,29 +314,29 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
       />
 
       <TextInput
-        label={appConfig.ui.nodeEditor.labels.surname}
+        label={t.ui.nodeEditor.labels.surname}
         value={formData.surname}
         onChange={(e) => handleInputChange('surname', e.target.value)}
         error={completionSettings?.showMissingRequired && isFieldIncomplete('surname', formData, completionSettings) ? ' ' : ''}
       />
 
       <TextInput
-        label={appConfig.ui.nodeEditor.labels.maidenName}
+        label={t.ui.nodeEditor.labels.maidenName}
         value={formData.maidenName}
         onChange={(e) => handleInputChange('maidenName', e.target.value)}
-        placeholder={appConfig.ui.nodeEditor.placeholders.maidenName}
+        placeholder={t.ui.nodeEditor.placeholders.maidenName}
         error={completionSettings?.showMissingRequired && isFieldIncomplete('maidenName', formData, completionSettings) ? ' ' : ''}
       />
 
       <DateInput
-        label={appConfig.ui.nodeEditor.labels.birthDate}
+        label={t.ui.nodeEditor.labels.birthDate}
         value={formData.birthDate}
         onChange={(e) => handleInputChange('birthDate', e.target.value)}
         error={completionSettings?.showMissingRequired && isFieldIncomplete('birthDate', formData, completionSettings) ? ' ' : ''}
       />
 
       <DateInput
-        label={appConfig.ui.nodeEditor.labels.deathDate}
+        label={t.ui.nodeEditor.labels.deathDate}
         value={formData.deathDate}
         onChange={(e) => handleInputChange('deathDate', e.target.value || null)}
         showClearButton={true}
@@ -346,10 +347,10 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
       {showPhoneField && (
         <TextInput
           type="tel"
-          label={appConfig.ui.nodeEditor.labels.phone}
+          label={t.ui.nodeEditor.labels.phone}
           value={formData.phone || '+'}
           onChange={(e) => handleInputChange('phone', e.target.value)}
-          placeholder={appConfig.ui.nodeEditor.placeholders.phone}
+          placeholder={t.ui.nodeEditor.placeholders.phone}
           error={phoneError || (completionSettings?.showMissingRequired && isFieldIncomplete('phone', formData, completionSettings) ? ' ' : '')}
         />
       )}
@@ -358,22 +359,22 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
       {showEmailField && (
         <TextInput
           type="email"
-          label={appConfig.ui.nodeEditor.labels.email}
+          label={t.ui.nodeEditor.labels.email}
           value={formData.email}
           onChange={(e) => handleInputChange('email', e.target.value)}
-          placeholder={appConfig.ui.nodeEditor.placeholders.email}
+          placeholder={t.ui.nodeEditor.placeholders.email}
           error={emailError || (completionSettings?.showMissingRequired && isFieldIncomplete('email', formData, completionSettings) ? ' ' : '')}
         />
       )}
 
       {/* Unified Address Autocomplete */}
       <label className="block text-sm font-medium text-gray-300 mb-1">
-        {appConfig.ui.nodeEditor.labels.addressAutocomplete}
+        {t.ui.nodeEditor.labels.addressAutocomplete}
       </label>
       <AddressAutocomplete
         value={addressAutocompleteValue}
         onSelect={handleAddressSelect}
-        placeholder={appConfig.ui.nodeEditor.placeholders.addressAutocomplete}
+        placeholder={t.ui.nodeEditor.placeholders.addressAutocomplete}
         inputStyle={{
           width: '100%',
           padding: '8px 12px',
@@ -392,19 +393,19 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
         <div className="flex gap-2">
           <div style={{ flex: '0 0 65%' }}>
             <TextInput
-              label={appConfig.ui.nodeEditor.labels.street}
+              label={t.ui.nodeEditor.labels.street}
               value={formData.street}
               onChange={(e) => handleInputChange('street', e.target.value)}
-              placeholder={appConfig.ui.nodeEditor.placeholders.street}
+              placeholder={t.ui.nodeEditor.placeholders.street}
               error={completionSettings?.showMissingRequired && isFieldIncomplete('street', formData, completionSettings) ? ' ' : ''}
             />
           </div>
           <div style={{ flex: '0 0 35%' }}>
             <TextInput
-              label={appConfig.ui.nodeEditor.labels.housenumber}
+              label={t.ui.nodeEditor.labels.housenumber}
               value={formData.housenumber}
               onChange={(e) => handleInputChange('housenumber', e.target.value)}
-              placeholder={appConfig.ui.nodeEditor.placeholders.housenumber}
+              placeholder={t.ui.nodeEditor.placeholders.housenumber}
               maxLength={10}
               error={completionSettings?.showMissingRequired && isFieldIncomplete('housenumber', formData, completionSettings) ? ' ' : ''}
             />
@@ -415,39 +416,39 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
       <div className="flex gap-2">
         <div style={{ flex: '0 0 65%' }}>
           <TextInput
-            label={appConfig.ui.nodeEditor.labels.city}
+            label={t.ui.nodeEditor.labels.city}
             value={formData.city}
             onChange={(e) => handleInputChange('city', e.target.value)}
-            placeholder={appConfig.ui.nodeEditor.placeholders.city}
+            placeholder={t.ui.nodeEditor.placeholders.city}
             error={completionSettings?.showMissingRequired && isFieldIncomplete('city', formData, completionSettings) ? ' ' : ''}
           />
         </div>
         <div style={{ flex: '0 0 35%' }}>
           <TextInput
-            label={appConfig.ui.nodeEditor.labels.zip}
+            label={t.ui.nodeEditor.labels.zip}
             value={formData.zip}
             onChange={(e) => handleInputChange('zip', e.target.value)}
-            placeholder={appConfig.ui.nodeEditor.placeholders.zip}
+            placeholder={t.ui.nodeEditor.placeholders.zip}
             error={completionSettings?.showMissingRequired && isFieldIncomplete('zip', formData, completionSettings) ? ' ' : ''}
           />
         </div>
       </div>
 
       <TextInput
-        label={appConfig.ui.nodeEditor.labels.country}
+        label={t.ui.nodeEditor.labels.country}
         value={formData.country}
         onChange={(e) => handleInputChange('country', e.target.value.toUpperCase())}
-        placeholder={appConfig.ui.nodeEditor.placeholders.country}
+        placeholder={t.ui.nodeEditor.placeholders.country}
         maxLength={2}
         error={completionSettings?.showMissingRequired && isFieldIncomplete('country', formData, completionSettings) ? ' ' : ''}
       />
 
       {isDebugMode && (
         <div style={{ marginTop: '20px', borderTop: '1px solid #444', paddingTop: '15px' }}>
-          <h4 style={{ color: '#FFF', margin: '0 0 15px 0', fontSize: '16px' }}>{appConfig.ui.nodeEditor.debug.title}</h4>
+          <h4 style={{ color: '#FFF', margin: '0 0 15px 0', fontSize: '16px' }}>{t.ui.nodeEditor.debug.title}</h4>
           
           <TextInput
-            label={appConfig.ui.nodeEditor.debug.nodeId}
+            label={t.ui.nodeEditor.debug.nodeId}
             value={node.id}
             readOnly={true}
           />
@@ -458,7 +459,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
             fontWeight: 'bold',
             fontSize: '14px',
             color: 'white'
-          }}>{appConfig.ui.nodeEditor.debug.bloodlineStatus}</label>
+          }}>{t.ui.nodeEditor.debug.bloodlineStatus}</label>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
             <input
               type="checkbox"
@@ -467,7 +468,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
               style={{ marginRight: '8px' }}
             />
             <span style={{ color: 'white' }}>
-              {formData.bloodline ? appConfig.ui.nodeEditor.debug.bloodlineOnStatus : appConfig.ui.nodeEditor.debug.bloodlineOffStatus}
+              {formData.bloodline ? t.ui.nodeEditor.debug.bloodlineOnStatus : t.ui.nodeEditor.debug.bloodlineOffStatus}
             </span>
           </div>
 
@@ -475,7 +476,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
             <div className="flex-1">
               <TextInput
                 type="number"
-                label={appConfig.ui.nodeEditor.debug.xPosition}
+                label={t.ui.nodeEditor.debug.xPosition}
                 value={formData.positionX}
                 onChange={(e) => handleInputChange('positionX', e.target.value)}
               />
@@ -483,7 +484,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
             <div className="flex-1">
               <TextInput
                 type="number"
-                label={appConfig.ui.nodeEditor.debug.yPosition}
+                label={t.ui.nodeEditor.debug.yPosition}
                 value={formData.positionY}
                 onChange={(e) => handleInputChange('positionY', e.target.value)}
               />
@@ -492,7 +493,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
 
           {/* Connection Info */}
           <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#333', borderRadius: '5px' }}>
-            <h5 style={{ margin: '0 0 10px 0', color: '#FF5722' }}>{appConfig.ui.nodeEditor.debug.connections}</h5>
+            <h5 style={{ margin: '0 0 10px 0', color: '#FF5722' }}>{t.ui.nodeEditor.debug.connections}</h5>
             {(() => {
               const nodeEdges = edges.filter(edge => edge.source === node.id || edge.target === node.id);
               const connectionsByType = nodeEdges.reduce((acc, edge) => {
@@ -502,7 +503,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
               
               return (
                 <div style={{ fontSize: '12px', color: '#ccc' }}>
-                  <div>{appConfig.ui.nodeEditor.debug.totalConnections} {nodeEdges.length}</div>
+                  <div>{t.ui.nodeEditor.debug.totalConnections} {nodeEdges.length}</div>
                   {Object.entries(connectionsByType).map(([type, count]) => (
                     <div key={type} style={{ marginLeft: '10px' }}>
                       {type}: {count}
@@ -523,7 +524,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
           size="large"
           className="w-full mb-2.5"
         >
-          {appConfig.ui.nodeEditor.buttons.pictures}
+          {t.ui.nodeEditor.buttons.pictures}
         </Button>
       </div>
 
@@ -535,7 +536,7 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
           size="large"
           className="w-full"
         >
-          {appConfig.ui.nodeEditor.buttons.delete}
+          {t.ui.nodeEditor.buttons.delete}
         </Button>
       </div>
 

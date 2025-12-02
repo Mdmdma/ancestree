@@ -7,7 +7,7 @@ import {
   useEdgesState,
   useReactFlow,
 } from '@xyflow/react';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import PersonNode from './PersonNode';
 import FamilyNode from './FamilyNode';
@@ -117,7 +117,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
   if (sourceNode.type === 'family' && targetNode.type === 'family') {
     return { 
       isValid: false, 
-      message: appConfig.ui.editor.validationMessages.familyToFamily
+      message: t.ui.editor.validationMessages.familyToFamily
     };
   }
   
@@ -127,7 +127,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
         (sourceHandle === 'child' && targetHandle === 'parent')) {
       return { 
         isValid: false, 
-        message: appConfig.ui.editor.validationMessages.directParentChild
+        message: t.ui.editor.validationMessages.directParentChild
       };
     }
   }
@@ -141,7 +141,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     if (!isBloodlineNode(sourceNode) && sourceHandle?.includes('partner') && !isBloodlineNode(targetNode)) {
       return { 
         isValid: false, 
-        message: appConfig.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', sourceNode.data.name)
+        message: t.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', sourceNode.data.name)
       };
     }
     
@@ -150,7 +150,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     if (!isBloodlineNode(targetNode) && targetHandle?.includes('partner') && !isBloodlineNode(sourceNode)) {
       return { 
         isValid: false, 
-        message: appConfig.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', targetNode.data.name)
+        message: t.ui.editor.validationMessages.partnerNodePartnerHandle.replace('{name}', targetNode.data.name)
       };
     }
     
@@ -163,7 +163,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
       if (existingPartnerConnections.length >= 1) {
         return { 
           isValid: false, 
-          message: appConfig.ui.editor.validationMessages.partnerNodeMultiplePartners.replace('{name}', sourceNode.data.name)
+          message: t.ui.editor.validationMessages.partnerNodeMultiplePartners.replace('{name}', sourceNode.data.name)
         };
       }
     }
@@ -177,7 +177,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
       if (existingPartnerConnections.length >= 1) {
         return { 
           isValid: false, 
-          message: appConfig.ui.editor.validationMessages.partnerNodeMultiplePartners.replace('{name}', targetNode.data.name)
+          message: t.ui.editor.validationMessages.partnerNodeMultiplePartners.replace('{name}', targetNode.data.name)
         };
       }
     }
@@ -186,7 +186,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     if (isBloodlineNode(sourceNode) && isBloodlineNode(targetNode)) {
       return { 
         isValid: false, 
-        message: appConfig.ui.editor.validationMessages.bloodlineToBloodlinePartner
+        message: t.ui.editor.validationMessages.bloodlineToBloodlinePartner
       };
     }
   }
@@ -195,14 +195,14 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
   if (sourceNode.type === 'person' && !isBloodlineNode(sourceNode) && sourceHandle === 'parent') {
     return { 
       isValid: false, 
-      message: appConfig.ui.editor.validationMessages.partnerNodeParentHandle.replace('{name}', sourceNode.data.name)
+      message: t.ui.editor.validationMessages.partnerNodeParentHandle.replace('{name}', sourceNode.data.name)
     };
   }
   
   if (targetNode.type === 'person' && !isBloodlineNode(targetNode) && targetHandle === 'parent') {
     return { 
       isValid: false, 
-      message: appConfig.ui.editor.validationMessages.partnerNodeParentHandle.replace('{name}', targetNode.data.name)
+      message: t.ui.editor.validationMessages.partnerNodeParentHandle.replace('{name}', targetNode.data.name)
     };
   }
   
@@ -212,7 +212,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     if (parentConnectionCount >= 1) {
       return { 
         isValid: false, 
-        message: appConfig.ui.editor.validationMessages.bloodlineMultipleParents
+        message: t.ui.editor.validationMessages.bloodlineMultipleParents
           .replace('{name}', sourceNode.data.name)
           .replace('{count}', parentConnectionCount.toString())
       };
@@ -224,7 +224,7 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     if (parentConnectionCount >= 1) {
       return { 
         isValid: false, 
-        message: appConfig.ui.editor.validationMessages.bloodlineMultipleParents
+        message: t.ui.editor.validationMessages.bloodlineMultipleParents
           .replace('{name}', targetNode.data.name)
           .replace('{count}', parentConnectionCount.toString())
       };
@@ -241,6 +241,7 @@ const FamilyTree = ({
   socketData,
   onCompletionSettingsLoad
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -577,7 +578,7 @@ const FamilyTree = ({
     
     // If deleting all remaining bloodline nodes, prevent deletion
     if (bloodlineNodesToDelete.length >= currentBloodlineNodes.length) {
-      alert(`${appConfig.ui.alerts.lastBloodlineNodeDelete.title}\n\n${appConfig.ui.alerts.lastBloodlineNodeDelete.message}`);
+      alert(`${t.ui.alerts.lastBloodlineNodeDelete.title}\n\n${t.ui.alerts.lastBloodlineNodeDelete.message}`);
       return false; // Prevent deletion
     }
     
@@ -1784,7 +1785,7 @@ const FamilyTree = ({
               }
               
               const familyNodeData = {
-                name: `${appConfig.ui.defaultNames.family} ${familyEstablishmentYear}`,
+                name: `${t.ui.defaultNames.family} ${familyEstablishmentYear}`,
                 surname: sourceNode.data.surname || '',
                 birthDate: `${familyEstablishmentYear}-01-01`,
                 street: sourceNode.data.street || '',
@@ -1882,7 +1883,7 @@ const FamilyTree = ({
               }
               
               const newNodeData = {
-                name: appConfig.ui.defaultNames.partner,
+                name: t.ui.defaultNames.partner,
                 surname: sourceNode.data.surname || '',
                 birthDate: '',
                 deathDate: '',
@@ -1946,9 +1947,9 @@ const FamilyTree = ({
             // Determine name based on source handle
             let personName;
             if (sourceHandle === 'childrenconnection') {
-              personName = appConfig.ui.defaultNames.child;
+              personName = t.ui.defaultNames.child;
             } else {
-              personName = appConfig.ui.defaultNames.parent;
+              personName = t.ui.defaultNames.parent;
             }
             
             // Calculate birth year based on family establishment year
@@ -2190,7 +2191,7 @@ const FamilyTree = ({
               console.error('Failed to create node:', error);
               if (error.message && error.message.includes('locked')) {
                 setTimeout(() => {
-                  alert(`${appConfig.ui.alerts.nodeCreationLocked.title}\n\n${appConfig.ui.alerts.nodeCreationLocked.message}`);
+                  alert(`${t.ui.alerts.nodeCreationLocked.title}\n\n${t.ui.alerts.nodeCreationLocked.message}`);
                 }, 100);
               } else {
                 setTimeout(() => {
@@ -2246,7 +2247,7 @@ const FamilyTree = ({
   }, [nodes, edges, autoLayout, fitTreeToView, zoomToNode, updateNode, refreshData, onNodeUpdate]);
 
   if (loading) {
-    return <div>{appConfig.ui.loading.familyTree}</div>;
+    return <div>{t.ui.loading.familyTree}</div>;
   }
 
   // Show a blocking overlay during batch operations (encryption/decryption/password change)
@@ -2347,8 +2348,8 @@ const FamilyTree = ({
             }}
           />
           {isCollaborating 
-            ? appConfig.ui.collaboration.usersCollaborating.replace('{count}', userCount)
-            : appConfig.ui.collaboration.userOnline.replace('{count}', userCount)
+            ? t.ui.collaboration.usersCollaborating.replace('{count}', userCount)
+            : t.ui.collaboration.userOnline.replace('{count}', userCount)
           }
         </div>
       )}

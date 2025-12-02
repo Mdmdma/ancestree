@@ -17,6 +17,7 @@ Ancestree is a family tree visualization and management web app. It combines a R
 - Backend: Node.js (Express), SQLite with family-based database architecture
 - Real-time: Socket.io for WebSocket collaboration features
 - Security: Client-side AES-256 encryption for all sensitive data
+- Internationalization: Static file-based i18n with React Context (German + English)
 - Deployment: Simple Node server, static frontend served by Vite or built assets
 - External services: OpenStreetMap (OSM) for maps and Nominatim for geocoding, AWS S3 (for image storage)
 
@@ -82,6 +83,13 @@ Ancestree is a family tree visualization and management web app. It combines a R
 - `components/Button.jsx` - Reusable button component (Tailwind)
 - `components/DescriptionTextarea.jsx` - Styled textarea
 - `components/AddressAutocomplete.jsx` - Address input with OSM geocoding
+- `components/LanguagePicker.jsx` - Language selector dropdown
+
+**Internationalization (i18n)** - See `.github/instructions/i18n.instructions.md` for detailed guidelines
+- `locales/LanguageContext.jsx` - React context, provider, hooks (`useTranslation`, `useLanguage`)
+- `locales/de.js` - German translations (PRIMARY SOURCE - add new text here first)
+- `locales/en.js` - English translations
+- `locales/index.js` - Locale exports and configuration
 
 ### Backend (`ancestree-backend/`)
 - `server.js` - Express routes, authentication, WebSocket server, cleanup logic
@@ -200,6 +208,12 @@ const nodes = await api.get('/nodes'); // Don't use this!
 - Avoid recreating heavy objects (maps, markers) unnecessarily; update in place when possible to preserve state/animation.
 - Keep UI responsive: display loading states, avoid blocking main thread during geocoding or heavy loops.
 - Use descriptive variable names; keep helper functions small and single-purpose.
+
+### Internationalization (i18n)
+- **All user-facing text must use the translation system** - no hardcoded strings
+- **German is the source language** - add new text to `de.js` first, then translate to `en.js`
+- Use `useTranslation` hook: `const { t } = useTranslation();` then access `t.ui.section.key`
+- See `.github/instructions/i18n.instructions.md` for complete guidelines
 
 ## Accessibility & UX
 - Provide keyboard accessible controls and focus management for dialogs/modals.
@@ -377,3 +391,6 @@ Always use the `sanitizeFilename()` helper in `api.js` for cross-platform compat
 ## Contacts & Context
 - Repo owner: Mdmdma (main branch).  
 - Use existing project docs for setup (`MAP_SETUP.md` for OpenStreetMap integration).
+
+## Related Instructions Files
+- **[i18n.instructions.md](./i18n.instructions.md)** - Complete internationalization guidelines, adding translations, locale file structure

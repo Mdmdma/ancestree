@@ -1,13 +1,13 @@
 import { encryptedApi } from './encryptedApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import PictureSlideshow from './PictureSlideshow';
 import DescriptionTextarea from './components/DescriptionTextarea';
 import Button from './components/Button';
 
 // Memoized ImageThumbnail component to prevent unnecessary re-renders
-const ImageThumbnail = React.memo(({ image, onClick }) => {
+const ImageThumbnail = React.memo(({ image, onClick, translations }) => {
   return (
     <div
       style={{
@@ -45,11 +45,11 @@ const ImageThumbnail = React.memo(({ image, onClick }) => {
           </div>
         ) : (
           <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
-            {appConfig.ui.imageGallery.gallery.noDescription}
+            {translations.noDescription}
           </div>
         )}
         <div style={{ fontSize: '10px', color: '#aaaaaa' }}>
-          {image.people.length} {image.people.length !== 1 ? appConfig.ui.imageGallery.gallery.personsTagged : appConfig.ui.imageGallery.gallery.personTagged}
+          {image.people.length} {image.people.length !== 1 ? translations.personsTagged : translations.personTagged}
         </div>
       </div>
     </div>
@@ -59,12 +59,14 @@ const ImageThumbnail = React.memo(({ image, onClick }) => {
   return prevProps.image.id === nextProps.image.id &&
          prevProps.image.has_open_questions === nextProps.image.has_open_questions &&
          prevProps.image.description === nextProps.image.description &&
-         prevProps.image.people.length === nextProps.image.people.length;
+         prevProps.image.people.length === nextProps.image.people.length &&
+         prevProps.translations === nextProps.translations;
 });
 
 ImageThumbnail.displayName = 'ImageThumbnail';
 
 const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
+  const { t } = useTranslation();
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -183,13 +185,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert(appConfig.ui.imageGallery.errors.invalidFileType);
+      alert(t.ui.imageGallery.errors.invalidFileType);
       return;
     }
 
     // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
-      alert(appConfig.ui.imageGallery.errors.fileSizeExceeded);
+      alert(t.ui.imageGallery.errors.fileSizeExceeded);
       return;
     }
 
@@ -239,15 +241,15 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         await loadImages(); // Refresh the gallery
         resetUploadState();
         setViewMode('gallery');
-        alert(appConfig.ui.imageGallery.success.uploadSuccess);
+        alert(t.ui.imageGallery.success.uploadSuccess);
       } else {
-        const errorMessage = result.error || appConfig.ui.imageGallery.errors.unknownError;
+        const errorMessage = result.error || t.ui.imageGallery.errors.unknownError;
         setUploadError(errorMessage);
-        alert(appConfig.ui.imageGallery.errors.uploadFailed + errorMessage);
+        alert(t.ui.imageGallery.errors.uploadFailed + errorMessage);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      const errorMessage = error.message || appConfig.ui.imageGallery.errors.unknownError;
+      const errorMessage = error.message || t.ui.imageGallery.errors.unknownError;
       setUploadError(errorMessage);
       
       // Provide more user-friendly error messages
@@ -262,7 +264,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         displayMessage = 'File is too large. Maximum file size is 10MB.';
       }
       
-      alert(appConfig.ui.imageGallery.errors.uploadFailed + displayMessage);
+      alert(t.ui.imageGallery.errors.uploadFailed + displayMessage);
     } finally {
       setUploadingImage(false);
     }
@@ -312,7 +314,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
 
   // Handle image deletion
   const handleDeleteImage = async (imageId) => {
-    if (!confirm(appConfig.ui.imageGallery.confirmations.deleteImage)) {
+    if (!confirm(t.ui.imageGallery.confirmations.deleteImage)) {
       return;
     }
 
@@ -322,13 +324,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         await loadImages();
         setSelectedImage(null);
         setViewMode('gallery');
-        alert(appConfig.ui.imageGallery.success.deleteSuccess);
+        alert(t.ui.imageGallery.success.deleteSuccess);
       } else {
-        alert(appConfig.ui.imageGallery.errors.deleteFailed + (result.error || appConfig.ui.imageGallery.errors.unknownError));
+        alert(t.ui.imageGallery.errors.deleteFailed + (result.error || t.ui.imageGallery.errors.unknownError));
       }
     } catch (error) {
       console.error('Delete error:', error);
-      alert(appConfig.ui.imageGallery.errors.deleteFailed + error.message);
+      alert(t.ui.imageGallery.errors.deleteFailed + error.message);
     }
   };
 
@@ -358,7 +360,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         if (result.error && result.error.includes('already tagged')) {
           console.log('Person is already tagged in this image');
         } else {
-          alert(appConfig.ui.imageGallery.errors.tagFailed + (result.error || appConfig.ui.imageGallery.errors.unknownError));
+          alert(t.ui.imageGallery.errors.tagFailed + (result.error || t.ui.imageGallery.errors.unknownError));
         }
       }
     } catch (error) {
@@ -366,7 +368,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       if (error.message && error.message.includes('already tagged')) {
         console.log('Person is already tagged in this image');
       } else {
-        alert(appConfig.ui.imageGallery.errors.tagFailed + error.message);
+        alert(t.ui.imageGallery.errors.tagFailed + error.message);
       }
     }
   };
@@ -402,13 +404,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         // Also refresh the main gallery to update the person count
         await loadImages();
         
-        console.log(appConfig.ui.imageGallery.success.personRemoved);
+        console.log(t.ui.imageGallery.success.personRemoved);
       } else {
-        alert(appConfig.ui.imageGallery.errors.removeFailed + (result.error || appConfig.ui.imageGallery.errors.unknownError));
+        alert(t.ui.imageGallery.errors.removeFailed + (result.error || t.ui.imageGallery.errors.unknownError));
       }
     } catch (error) {
       console.error('Remove error:', error);
-      alert(appConfig.ui.imageGallery.errors.removeFailed + error.message);
+      alert(t.ui.imageGallery.errors.removeFailed + error.message);
     }
   };
 
@@ -479,7 +481,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7B1FA2'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#9C27B0'}
         >
-          {appConfig.ui.familyGallery.galleryButton}
+          {t.ui.familyGallery.galleryButton}
         </Button>
         
         <Button
@@ -487,7 +489,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           variant="success"
           size="medium"
         >
-          {appConfig.ui.imageGallery.gallery.uploadButton}
+          {t.ui.imageGallery.gallery.uploadButton}
         </Button>
         
         <Button
@@ -496,14 +498,14 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           variant="primary"
           size="medium"
         >
-          {appConfig.ui.imageGallery.gallery.refreshButton}
+          {t.ui.imageGallery.gallery.refreshButton}
         </Button>
       </div>
 
       {images.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#cccccc' }}>
-          <p>{appConfig.ui.imageGallery.gallery.noImagesTitle}</p>
-          <p>{appConfig.ui.imageGallery.gallery.noImagesDescription}</p>
+          <p>{t.ui.imageGallery.gallery.noImagesTitle}</p>
+          <p>{t.ui.imageGallery.gallery.noImagesDescription}</p>
         </div>
       ) : (
         <div style={{
@@ -517,6 +519,11 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             <ImageThumbnail
               key={image.id || `image-${index}`}
               image={image}
+              translations={{
+                noDescription: t.ui.imageGallery.gallery.noDescription,
+                personTagged: t.ui.imageGallery.gallery.personTagged,
+                personsTagged: t.ui.imageGallery.gallery.personsTagged
+              }}
               onClick={() => {
                 setSelectedImage(image);
                 setViewMode('view');
@@ -562,7 +569,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             color: '#4CAF50',
             textAlign: 'center'
           }}>
-            {appConfig.ui.imageGallery.upload.dropHereMessage}
+            {t.ui.imageGallery.upload.dropHereMessage}
           </div>
         </div>
       )}
@@ -573,7 +580,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           variant="secondary"
           size="medium"
         >
-          {appConfig.ui.imageGallery.upload.backButton}
+          {t.ui.imageGallery.upload.backButton}
         </Button>
       </div>
 
@@ -614,10 +621,10 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         >
          
           <div className="upload-title" style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', color: '#ffffff' }}>
-            {appConfig.ui.imageGallery.upload.dragDropTitle}
+            {t.ui.imageGallery.upload.dragDropTitle}
           </div>
           <div className="upload-formats" style={{ fontSize: '14px', color: '#cccccc', marginBottom: '15px' }}>
-            {appConfig.ui.imageGallery.upload.supportedFormats}
+            {t.ui.imageGallery.upload.supportedFormats}
           </div>
           <div className="upload-button-text" style={{
             display: 'inline-block',
@@ -628,7 +635,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             fontSize: '14px',
             fontWeight: 'bold'
           }}>
-            {appConfig.ui.imageGallery.upload.selectFileButton}
+            {t.ui.imageGallery.upload.selectFileButton}
           </div>
         </div>
       </div>
@@ -659,9 +666,9 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           maxWidth: '400px',
           boxSizing: 'border-box'
         }}>
-          <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{appConfig.ui.imageGallery.upload.howItWorksTitle}</h5>
+          <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{t.ui.imageGallery.upload.howItWorksTitle}</h5>
           <ol style={{ paddingLeft: '20px', margin: 0, lineHeight: '1.6', wordWrap: 'break-word' }}>
-            {appConfig.ui.imageGallery.upload.steps.map((step, index) => (
+            {t.ui.imageGallery.upload.steps.map((step, index) => (
               <li key={index} style={{ marginBottom: '5px' }}>{step}</li>
             ))}
           </ol>
@@ -682,26 +689,26 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           variant="secondary"
           size="medium"
         >
-          {appConfig.ui.imageGallery.confirm.backButton}
+          {t.ui.imageGallery.confirm.backButton}
         </Button>
         <Button
           onClick={resetUploadState}
           variant="danger"
           size="medium"
         >
-          {appConfig.ui.imageGallery.confirm.cancelButton}
+          {t.ui.imageGallery.confirm.cancelButton}
         </Button>
       </div>
 
       <h4 className="confirm-title" style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
-        {appConfig.ui.imageGallery.confirm.title}
+        {t.ui.imageGallery.confirm.title}
       </h4>
 
       {/* Image Preview */}
       <div className="confirm-preview" style={{ marginBottom: '20px' }}>
         <img
           src={previewUrl}
-          alt={appConfig.ui.imageGallery.confirm.previewAlt}
+          alt={t.ui.imageGallery.confirm.previewAlt}
           style={{
             width: '100%',
             maxHeight: '300px',
@@ -721,11 +728,11 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         borderRadius: '8px',
         border: '1px solid #444'
       }}>
-        <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{appConfig.ui.imageGallery.confirm.fileInfoTitle}</h5>
+        <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{t.ui.imageGallery.confirm.fileInfoTitle}</h5>
         <div style={{ fontSize: '14px', lineHeight: '1.5', color: '#cccccc' }}>
-          <div><strong>{appConfig.ui.imageGallery.confirm.filenameLabel}</strong> {selectedFile?.name}</div>
-          <div><strong>{appConfig.ui.imageGallery.confirm.sizeLabel}</strong> {selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : '0'} MB</div>
-          <div><strong>{appConfig.ui.imageGallery.confirm.typeLabel}</strong> {selectedFile?.type}</div>
+          <div><strong>{t.ui.imageGallery.confirm.filenameLabel}</strong> {selectedFile?.name}</div>
+          <div><strong>{t.ui.imageGallery.confirm.sizeLabel}</strong> {selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : '0'} MB</div>
+          <div><strong>{t.ui.imageGallery.confirm.typeLabel}</strong> {selectedFile?.type}</div>
         </div>
       </div>
 
@@ -738,18 +745,18 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           border: '1px solid #444'
         }}>
           <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: '#ffffff', margin: '0 0 10px 0' }}>
-            {appConfig.ui.imageGallery.confirm.descriptionLabel}
+            {t.ui.imageGallery.confirm.descriptionLabel}
           </label>
           <DescriptionTextarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={appConfig.ui.imageGallery.confirm.descriptionPlaceholder}
+            placeholder={t.ui.imageGallery.confirm.descriptionPlaceholder}
             maxLength={1000}
             minHeight="120px"
             showButtons={false}
           />
           <div className="confirm-hint" style={{ fontSize: '12px', color: '#cccccc', marginTop: '8px' }}>
-            {appConfig.ui.imageGallery.confirm.descriptionHint}
+            {t.ui.imageGallery.confirm.descriptionHint}
           </div>
         </div>
       </div>
@@ -763,8 +770,8 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           size="large"
         >
           {uploadingImage 
-            ? appConfig.ui.imageGallery.confirm.uploadingButton
-            : appConfig.ui.imageGallery.confirm.uploadButton
+            ? t.ui.imageGallery.confirm.uploadingButton
+            : t.ui.imageGallery.confirm.uploadButton
           }
         </Button>
       </div>
@@ -778,7 +785,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           border: '1px solid #444'
         }}>
           <div style={{ fontSize: '14px', color: '#cccccc', marginBottom: '10px' }}>
-            {appConfig.ui.imageGallery.confirm.uploadingMessage}
+            {t.ui.imageGallery.confirm.uploadingMessage}
           </div>
           
           {/* Progress bar */}
@@ -857,21 +864,21 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           variant="secondary"
           size="medium"
         >
-          {appConfig.ui.imageGallery.view.backButton}
+          {t.ui.imageGallery.view.backButton}
         </Button>
         <Button
           onClick={() => setTaggingMode(!taggingMode)}
           variant={taggingMode ? 'danger' : 'success'}
           size="medium"
         >
-          {taggingMode ? appConfig.ui.imageGallery.view.cancelTaggingButton : appConfig.ui.imageGallery.view.tagPeopleButton}
+          {taggingMode ? t.ui.imageGallery.view.cancelTaggingButton : t.ui.imageGallery.view.tagPeopleButton}
         </Button>
         <Button
           onClick={() => handleDeleteImage(selectedImage.id)}
           variant="danger"
           size="medium"
         >
-          {appConfig.ui.imageGallery.view.deleteButton}
+          {t.ui.imageGallery.view.deleteButton}
         </Button>
       </div>
 
@@ -898,7 +905,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             alignItems: 'center', 
             marginBottom: '10px' 
           }}>
-            <h4 style={{ margin: 0, color: '#ffffff' }}>{appConfig.ui.imageGallery.view.descriptionTitle}</h4>
+            <h4 style={{ margin: 0, color: '#ffffff' }}>{t.ui.imageGallery.view.descriptionTitle}</h4>
             {!editingDescription && (
               <Button
                 onClick={startEditingDescription}
@@ -948,7 +955,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             alignItems: 'center', 
             marginBottom: '10px' 
           }}>
-            <h4 style={{ margin: 0, color: '#ffffff' }}>{appConfig.ui.imageGallery.view.descriptionTitle}</h4>
+            <h4 style={{ margin: 0, color: '#ffffff' }}>{t.ui.imageGallery.view.descriptionTitle}</h4>
             <Button
               onClick={startEditingDescription}
               variant="success"
@@ -963,7 +970,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
 
       {selectedImage.people && selectedImage.people.length > 0 && (
         <div>
-          <h4 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{appConfig.ui.imageGallery.view.taggedPeopleTitle} ({selectedImage.people.length})</h4>
+          <h4 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{t.ui.imageGallery.view.taggedPeopleTitle} ({selectedImage.people.length})</h4>
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
@@ -1013,8 +1020,8 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
 
       {(!selectedImage.people || selectedImage.people.length === 0) && (
         <div style={{ textAlign: 'center', padding: '20px', color: '#cccccc' }}>
-          <p>{appConfig.ui.imageGallery.view.noTaggedPeople}</p>
-          <p>{appConfig.ui.imageGallery.view.tagPeoplePrompt}</p>
+          <p>{t.ui.imageGallery.view.noTaggedPeople}</p>
+          <p>{t.ui.imageGallery.view.tagPeoplePrompt}</p>
         </div>
       )}
     </div>
@@ -1034,7 +1041,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     }}>
       <div className="mobile-hide-gallery-header" style={{ padding: '20px', flexShrink: 0 }}>
         <h3 style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
-          {appConfig.ui.imageGallery.title}
+          {t.ui.imageGallery.title}
         </h3>
       </div>
 

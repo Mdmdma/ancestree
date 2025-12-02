@@ -1,10 +1,13 @@
 import React from 'react';
+import { useTranslation } from './locales/LanguageContext';
 
 // Current terms version - increment this when terms change
 export const TERMS_VERSION = 'beta-1.1';
 export const TERMS_LAST_UPDATED = '28. November 2025';
 
 export default function TermsAndConditions({ isOpen, onClose }) {
+  const { t } = useTranslation();
+  
   if (!isOpen) return null;
 
   return (
@@ -94,7 +97,7 @@ export default function TermsAndConditions({ isOpen, onClose }) {
               cursor: 'pointer'
             }}
           >
-            Schliessen
+            {t.ui.termsAndConditions.closeButton}
           </button>
         </div>
       </div>

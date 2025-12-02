@@ -3,6 +3,7 @@ import TermsAndConditions, { TermsContent, TERMS_VERSION, TERMS_LAST_UPDATED } f
 import { api } from './api';
 import Button from './components/Button';
 import TextInput from './components/TextInput';
+import { useTranslation } from './locales/LanguageContext';
 
 /**
  * Dialog shown after login when user hasn't accepted the latest terms.
@@ -15,6 +16,7 @@ export default function TermsAcceptanceDialog({
   currentVersion, 
   userAcceptedVersion 
 }) {
+  const { t } = useTranslation();
   const [adminPassword, setAdminPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +28,7 @@ export default function TermsAcceptanceDialog({
     e.preventDefault();
     
     if (!adminPassword) {
-      setError('Bitte geben Sie das Admin-Passwort ein');
+      setError(t.ui.termsAcceptance.errors.adminPasswordRequired);
       return;
     }
     
@@ -37,7 +39,7 @@ export default function TermsAcceptanceDialog({
       await api.acceptTerms(adminPassword, currentVersion);
       onAccepted();
     } catch (err) {
-      setError(err.message || 'Fehler beim Akzeptieren der Nutzungsbedingungen');
+      setError(err.message || t.ui.termsAcceptance.errors.acceptFailed);
     } finally {
       setLoading(false);
     }
@@ -83,7 +85,7 @@ export default function TermsAcceptanceDialog({
           }}>
             <h2 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '24px' }}>📋</span>
-              Neue Nutzungsbedingungen
+              {t.ui.termsAcceptance.title}
             </h2>
           </div>
 
@@ -110,16 +112,14 @@ export default function TermsAcceptanceDialog({
                 gap: '8px'
               }}>
                 <span>⚠️</span>
-                Aktualisierung erforderlich
+                {t.ui.termsAcceptance.updateRequired}
               </h3>
               <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
-                Es gibt aktualisierte Nutzungsbedingungen und Datenschutzbestimmungen 
-                (Version <strong>{currentVersion}</strong>), die Sie akzeptieren müssen, 
-                um den Dienst weiterhin nutzen zu können.
+                {t.ui.termsAcceptance.updateRequiredMessage.replace('{version}', currentVersion)}
               </p>
               {userAcceptedVersion && (
                 <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--login-text-secondary, #888)' }}>
-                  Ihre aktuell akzeptierte Version: {userAcceptedVersion}
+                  {t.ui.termsAcceptance.currentAcceptedVersion.replace('{version}', userAcceptedVersion)}
                 </p>
               )}
             </div>
@@ -133,9 +133,7 @@ export default function TermsAcceptanceDialog({
               marginBottom: '20px'
             }}>
               <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
-                <strong>Hinweis:</strong> Als Kontoinhaber sind Sie dafür verantwortlich, 
-                alle Personen, die Zugang zu Ihrem Familienkonto haben, über die aktualisierten 
-                Bedingungen zu informieren.
+                <strong>Hinweis:</strong> {t.ui.termsAcceptance.accountOwnerNotice}
               </p>
             </div>
 
@@ -160,14 +158,14 @@ export default function TermsAcceptanceDialog({
                 }}
               >
                 <span>📄</span>
-                Vollständige Nutzungsbedingungen und Datenschutzerklärung lesen
+                {t.ui.termsAcceptance.readFullTerms}
               </button>
               <p style={{ 
                 margin: '8px 0 0 0', 
                 fontSize: '12px', 
                 color: 'var(--login-text-muted, #666)' 
               }}>
-                Version {TERMS_VERSION} | Stand: {TERMS_LAST_UPDATED}
+                {t.ui.termsAcceptance.versionInfo.replace('{version}', TERMS_VERSION).replace('{date}', TERMS_LAST_UPDATED)}
               </p>
             </div>
 
@@ -175,16 +173,16 @@ export default function TermsAcceptanceDialog({
             <form onSubmit={handleAccept}>
               <div style={{ marginBottom: '16px' }}>
                 <TextInput
-                  label="Admin-Passwort zur Bestätigung"
+                  label={t.ui.termsAcceptance.adminPasswordLabel}
                   type="password"
                   value={adminPassword}
                   onChange={(e) => {
                     setAdminPassword(e.target.value);
                     setError('');
                   }}
-                  placeholder="Admin-Passwort eingeben"
+                  placeholder={t.ui.termsAcceptance.adminPasswordPlaceholder}
                   error={error}
-                  helperText={!error ? "Das Admin-Passwort wird benötigt, um die neuen Bedingungen im Namen aller Familienmitglieder zu akzeptieren." : ""}
+                  helperText={!error ? t.ui.termsAcceptance.adminPasswordHint : ""}
                 />
               </div>
 
@@ -197,9 +195,7 @@ export default function TermsAcceptanceDialog({
                 marginBottom: '20px',
                 fontSize: '13px'
               }}>
-                <strong>⏰ Wichtig:</strong> Wenn Sie die neuen Bedingungen nicht innerhalb 
-                eines Monats nach deren Veröffentlichung akzeptieren, wird Ihr Konto und 
-                alle zugehörigen Daten gelöscht.
+                <strong>⏰ Wichtig:</strong> {t.ui.termsAcceptance.deadlineWarning}
               </div>
             </form>
           </div>
@@ -219,7 +215,7 @@ export default function TermsAcceptanceDialog({
               variant="secondary"
               size="medium"
             >
-              Später
+              {t.ui.termsAcceptance.laterButton}
             </Button>
             <Button
               type="button"
@@ -228,7 +224,7 @@ export default function TermsAcceptanceDialog({
               size="medium"
               disabled={loading || !adminPassword}
             >
-              {loading ? 'Wird akzeptiert...' : 'Nutzungsbedingungen akzeptieren'}
+              {loading ? t.ui.termsAcceptance.acceptingButton : t.ui.termsAcceptance.acceptButton}
             </Button>
           </div>
         </div>

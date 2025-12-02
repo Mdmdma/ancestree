@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { appConfig } from './config';
+import { useTranslation } from './locales/LanguageContext';
 import Button from './components/Button';
 
 const ContactButton = () => {
+  const { t } = useTranslation();
   const [showDialog, setShowDialog] = useState(false);
 
   return (
@@ -23,7 +24,7 @@ const ContactButton = () => {
           size="medium"
           className="bg-[#3498db] hover:bg-[#2980b9] shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
         >
-          {appConfig.ui.contact.buttonText}
+          {t.ui.contact.buttonText}
         </Button>
       </div>
 
@@ -75,7 +76,7 @@ const ContactButton = () => {
                   color: '#1f2937'
                 }}
               >
-                {appConfig.ui.contact.dialogTitle}
+                {t.ui.contact.dialogTitle}
               </h2>
               <button
                 onClick={() => setShowDialog(false)}
@@ -125,7 +126,7 @@ const ContactButton = () => {
                   color: '#374151'
                 }}
               >
-                {appConfig.ui.contact.description}
+                {t.ui.contact.description}
               </p>
             </div>
 
@@ -139,7 +140,7 @@ const ContactButton = () => {
               {/* Email Button */}
               <div style={{ flex: 1 }}>
                 <a
-                  href={`mailto:${appConfig.ui.contact.emailAddress}`}
+                  href={`mailto:${t.ui.contact.emailAddress}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -152,7 +153,7 @@ const ContactButton = () => {
                     size="medium"
                     className="bg-[#3498db] hover:bg-[#2980b9] shadow-md hover:shadow-lg w-full"
                   >
-                    {appConfig.ui.contact.emailButtonText}
+                    {t.ui.contact.emailButtonText}
                   </Button>
                 </a>
               </div>
@@ -160,7 +161,7 @@ const ContactButton = () => {
               {/* GitHub Button */}
               <div style={{ flex: 1 }}>
                 <a
-                  href={appConfig.ui.contact.githubUrl}
+                  href={t.ui.contact.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -173,7 +174,7 @@ const ContactButton = () => {
                     size="medium"
                     className="bg-[#2c3e50] hover:bg-[#1a252f] shadow-md hover:shadow-lg w-full"
                   >
-                    {appConfig.ui.contact.githubButtonText}
+                    {t.ui.contact.githubButtonText}
                   </Button>
                 </a>
               </div>
