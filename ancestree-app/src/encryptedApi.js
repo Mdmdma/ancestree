@@ -217,9 +217,14 @@ const decryptImageData = async (image) => {
     if (image[field] && typeof image[field] === 'string' && image[field].startsWith('enc:')) {
       try {
         decrypted[field] = await decryptValueFast(image[field], key, true);
+        // Log s3Key decryption specifically for debugging
+        if (field === 's3Key') {
+          console.log(`[EncryptionAPI] Successfully decrypted s3Key for image ${image.id}: ${decrypted[field]}`);
+        }
       } catch (error) {
         console.error('❌❌❌ [EncryptionAPI] IMAGE DECRYPTION FAILED ❌❌❌');
-        console.error(`[EncryptionAPI] Failed to decrypt image field "${field}":`, error);
+        console.error(`[EncryptionAPI] Failed to decrypt image field "${field}" for image ${image.id}:`, error);
+        console.error('[EncryptionAPI] Encrypted value preview:', image[field].substring(0, 50));
         console.error('[EncryptionAPI] Leaving field encrypted');
         // Keep the encrypted value instead of throwing
       }
@@ -536,33 +541,80 @@ export const encryptedApi = {
   },
   
   // Resolve presigned view URLs for images using their s3Keys
+  // This handles both decrypted s3Keys and encrypted s3Keys (via fallback to image IDs)
   async resolveImageUrls(images) {
     if (!images || images.length === 0) {
       return images;
     }
     
     try {
-      // Collect all s3Keys that need URLs
-      const s3Keys = images
-        .map(img => img.s3Key)
-        .filter(key => key && !key.startsWith('enc:')); // Skip encrypted keys
+      // Separate images into those with decrypted s3Keys and those with encrypted/missing s3Keys
+      const decryptedKeyImages = [];
+      const encryptedKeyImages = [];
       
-      if (s3Keys.length === 0) {
-        // If all keys are encrypted or missing, return images as-is
-        return images;
+      for (const image of images) {
+        if (image.s3Key && !image.s3Key.startsWith('enc:')) {
+          decryptedKeyImages.push(image);
+        } else {
+          // s3Key is still encrypted or missing - need to use fallback
+          encryptedKeyImages.push(image);
+          console.warn(`[EncryptedAPI] Image ${image.id} has encrypted/missing s3Key, will use ID-based fallback`);
+        }
       }
       
-      // Batch fetch presigned URLs
-      const { urls } = await baseApi.getPresignedViewUrlsByKeys(s3Keys);
+      let urlsFromKeys = {};
+      let urlsFromIds = {};
+      
+      // Batch fetch presigned URLs using s3Keys for decrypted images
+      if (decryptedKeyImages.length > 0) {
+        const s3Keys = decryptedKeyImages.map(img => img.s3Key);
+        try {
+          const response = await baseApi.getPresignedViewUrlsByKeys(s3Keys);
+          urlsFromKeys = response.urls || {};
+        } catch (error) {
+          console.error('[EncryptedAPI] Error fetching URLs by s3Keys:', error);
+        }
+      }
+      
+      // Fallback: fetch presigned URLs using image IDs for images with encrypted s3Keys
+      // This requires the backend to look up the s3Key from the database
+      if (encryptedKeyImages.length > 0) {
+        const imageIds = encryptedKeyImages.map(img => img.id).filter(id => id);
+        if (imageIds.length > 0) {
+          try {
+            const response = await baseApi.getPresignedViewUrls(imageIds);
+            urlsFromIds = response.urls || {};
+          } catch (error) {
+            console.error('[EncryptedAPI] Error fetching URLs by image IDs:', error);
+          }
+        }
+      }
       
       // Map presigned URLs back to images
       return images.map(image => {
-        if (image.s3Key && urls[image.s3Key]) {
+        let presignedUrl = null;
+        
+        // First try to find URL by s3Key
+        if (image.s3Key && urlsFromKeys[image.s3Key]) {
+          presignedUrl = urlsFromKeys[image.s3Key];
+        }
+        // Then try to find URL by image ID (fallback)
+        else if (image.id && urlsFromIds[image.id]) {
+          presignedUrl = urlsFromIds[image.id];
+        }
+        
+        if (presignedUrl) {
           return {
             ...image,
-            s3Url: urls[image.s3Key] // Replace with presigned URL
+            s3Url: presignedUrl
           };
         }
+        
+        // If still no URL, log a warning
+        if (!image.s3Url || image.s3Url === '') {
+          console.warn(`[EncryptedAPI] Could not resolve presigned URL for image ${image.id}`);
+        }
+        
         return image;
       });
     } catch (error) {
