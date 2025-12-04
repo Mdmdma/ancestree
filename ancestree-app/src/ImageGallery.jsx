@@ -171,6 +171,21 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     };
   }, [previewUrl]);
 
+  // Keyboard shortcut: Ctrl+Enter to upload when in confirm mode
+  useEffect(() => {
+    if (viewMode !== 'confirm') return;
+
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'Enter' && !uploadingImage && selectedFile) {
+        e.preventDefault();
+        confirmUpload();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, uploadingImage, selectedFile]);
+
   // Handle image upload
   const handleImageUpload = async (event) => {
     const file = event.target.files?.[0];
