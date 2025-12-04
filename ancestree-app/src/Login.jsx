@@ -347,7 +347,7 @@ export default function Login({ onLoginSuccess }) {
           {!isRegistering && (
             <p style={{
               fontSize: '12px',
-              color: 'var(--login-text-muted)',
+              color: 'var(--login-text-primary)',
               textAlign: 'center',
               marginTop: '8px',
               lineHeight: '1.4'

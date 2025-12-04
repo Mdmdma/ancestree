@@ -27,7 +27,7 @@ const TextInput = ({
   return (
     <div>
       {label && (
-        <label className="block mb-1 font-bold text-sm text-white">
+        <label className="block mb-1 font-bold text-sm" style={{ color: 'white' }}>
           {label}
         </label>
       )}
