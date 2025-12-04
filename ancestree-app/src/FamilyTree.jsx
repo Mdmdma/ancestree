@@ -355,7 +355,22 @@ const FamilyTree = ({
           return nds;
         }
         console.log('[SOCKET] Adding new node:', nodeToAdd.id);
-        return [...nds, nodeToAdd];
+        
+        // Add client-side UI properties including completionSettings
+        // Get completionSettings from an existing node (they all share the same settings)
+        const existingCompletionSettings = nds.length > 0 ? nds[0].data?.completionSettings : null;
+        const processedNode = {
+          ...nodeToAdd,
+          deletable: true,
+          selectable: true,
+          data: {
+            ...nodeToAdd.data,
+            isDebugMode: showDebug,
+            completionSettings: existingCompletionSettings
+          }
+        };
+        
+        return [...nds, processedNode];
       });
       addRecentChangeIndicator(nodeToAdd.id);
     });
@@ -388,7 +403,8 @@ const FamilyTree = ({
             ...n.data,              // Keep existing data first
             ...nodeToUpdate.data,    // Apply data updates from server
             isRecentChange: true,    // Mark as recently changed
-            isDebugMode: n.data.isDebugMode  // Preserve debug mode (client-only)
+            isDebugMode: n.data.isDebugMode,  // Preserve debug mode (client-only)
+            completionSettings: n.data.completionSettings  // Preserve completion settings (client-only)
             // Note: isSelected is NOT in node.data anymore (Strategy 3)
           },
           selected: n.selected  // Preserve React Flow's selection state
@@ -492,7 +508,7 @@ const FamilyTree = ({
       socket.off('edge:deleted');
       socket.off('edge:deleted');
     };
-  }, [socket, setNodes, setEdges]);
+  }, [socket, setNodes, setEdges, showDebug]);
 
   // Handle node changes including position updates
   const handleNodesChange = useCallback(async (changes) => {
