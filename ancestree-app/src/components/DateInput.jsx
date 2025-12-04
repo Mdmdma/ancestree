@@ -153,13 +153,13 @@ const DateInput = ({
   };
 
   return (
-    <div className={className}>
+    <div className={`w-full overflow-hidden ${className}`}>
       {label && (
         <label className="block mb-1 font-bold text-sm text-white">
           {label}
         </label>
       )}
-      <div className="flex gap-1 items-center mb-2.5">
+      <div className="flex gap-1 items-center mb-2.5 w-full">
         {/* Text input for dd.mm.yyyy format */}
         <input
           type="text"
@@ -169,7 +169,8 @@ const DateInput = ({
           readOnly={readOnly}
           placeholder="dd.mm.yyyy"
           style={{
-            flex: 1,
+            flex: '1 1 0',
+            minWidth: 0,
             padding: '8px 12px',
             backgroundColor: readOnly ? '#374151' : 'white',
             border: error ? '2px solid #ef4444' : '1px solid #d1d5db',
@@ -206,6 +207,7 @@ const DateInput = ({
             type="button"
             onClick={handleCalendarClick}
             style={{
+              flexShrink: 0,
               padding: '6px 10px',
               backgroundColor: '#4b5563',
               border: '1px solid #6b7280',
@@ -229,7 +231,7 @@ const DateInput = ({
             onClick={handleClear}
             variant="danger"
             size="small"
-            className="h-[34px] min-w-[34px] px-2"
+            className="h-[34px] min-w-[34px] px-2 flex-shrink-0"
             title="Clear date"
           >
             ✕
