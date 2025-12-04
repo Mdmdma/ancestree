@@ -75,6 +75,11 @@ export const checkNodeCompletion = (nodeData, completionSettings) => {
     missingFields.push('email');
   }
 
+  // Check tagged image
+  if (completionSettings.requireTaggedImage && !nodeData.hasTaggedImage) {
+    missingFields.push('taggedImage');
+  }
+
   return {
     isComplete: missingFields.length === 0,
     missingFields
@@ -114,7 +119,8 @@ export const getReadableFieldNames = (missingFields) => {
     zip: 'ZIP Code',
     country: 'Country',
     phone: 'Phone',
-    email: 'Email'
+    email: 'Email',
+    taggedImage: 'Tagged Image'
   };
 
   return missingFields.map(field => fieldNameMap[field] || field);

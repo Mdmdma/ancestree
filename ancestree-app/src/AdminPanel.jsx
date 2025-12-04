@@ -73,7 +73,8 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
     requireCityZip: true,
     requireCountry: true,
     requirePhone: true,
-    requireEmail: true
+    requireEmail: true,
+    requireTaggedImage: true
   });
 
   // Family emails state
@@ -1798,6 +1799,58 @@ const AdminPanel = ({ isOpen, onClose, isAuthenticated, onAuthenticate, familyNa
                           position: 'absolute',
                           top: '3px',
                           left: completionSettings.requireEmail ? '33px' : '3px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'white',
+                          transition: 'left 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Tagged Image */}
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <label style={{ color: 'white', flex: 1 }}>
+                        {appConfig.ui.adminPanel.completion.fields.taggedImage?.label || '📷 Tagged Image'}
+                        <div style={{ fontSize: '12px', color: '#bdc3c7', marginTop: '4px' }}>
+                          {appConfig.ui.adminPanel.completion.fields.taggedImage?.hint || 'Person must be tagged in at least one image'}
+                        </div>
+                      </label>
+                      <button
+                        disabled={loading}
+                        onClick={async () => {
+                          const newValue = !completionSettings.requireTaggedImage;
+                          setLoading(true);
+                          try {
+                            const { encryptedApi } = await import('./encryptedApi');
+                            const updatedSettings = { ...completionSettings, requireTaggedImage: newValue };
+                            await encryptedApi.updateCompletionSettings(updatedSettings);
+                            setCompletionSettings(updatedSettings);
+                            if (onDataReload) onDataReload();
+                          } catch (err) {
+                            setError(err.message || 'Failed to update setting');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: '60px',
+                          height: '30px',
+                          borderRadius: '15px',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          backgroundColor: completionSettings.requireTaggedImage ? '#27ae60' : '#7f8c8d',
+                          transition: 'background-color 0.3s ease',
+                          opacity: loading ? 0.6 : 1,
+                          padding: 0
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '3px',
+                          left: completionSettings.requireTaggedImage ? '33px' : '3px',
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',

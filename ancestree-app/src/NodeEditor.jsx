@@ -313,7 +313,28 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
   // For person nodes, show all fields
   return (
     <div>
-      <h3 style={{ color: 'white' }}>{t.ui.nodeEditor.title}</h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <h3 style={{ color: 'white', margin: 0 }}>{t.ui.nodeEditor.title}</h3>
+        
+        {/* Missing tagged image indicator */}
+        {completionSettings?.showMissingRequired && completionSettings?.requireTaggedImage && !node?.data?.hasTaggedImage && (
+          <div 
+            style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '2px solid #ef4444',
+              borderRadius: '6px',
+              cursor: 'help'
+            }}
+            title={t.ui.nodeEditor.missingTaggedImage || 'This person needs to be tagged in at least one image'}
+          >
+            <span style={{ fontSize: '16px' }}>📷</span>
+          </div>
+        )}
+      </div>
       
       <TextInput
         ref={nameInputRef}

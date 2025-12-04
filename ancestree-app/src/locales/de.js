@@ -161,7 +161,8 @@ export const de = {
         taggedPeopleTitle: "Markierte Personen",
         noTaggedPeople: "Noch keine Personen in diesem Bild markiert.",
         tagPeoplePrompt: "Klicke auf \"Personen markieren\", um Familienmitglieder zu markieren!",
-        removeButton: "Entfernen"
+        removeButton: "Entfernen",
+        loadingImage: "Bild wird geladen..."
       },
       
       // Error messages
@@ -216,6 +217,7 @@ export const de = {
     // Node Editor configuration
     nodeEditor: {
       title: 'Daten ergänzen',
+      missingTaggedImage: 'Diese Person muss in mindestens einem Bild markiert werden',
       labels: {
         name: 'Name:',
         surname: 'Nachname:',
@@ -410,6 +412,10 @@ export const de = {
           email: {
             label: "E-Mail",
             hint: "E-Mail-Adresse ist erforderlich"
+          },
+          taggedImage: {
+            label: "📷 Markiertes Bild",
+            hint: "Person muss in mindestens einem Bild markiert sein"
           }
         },
         success: "Vervollständigungseinstellungen aktualisiert",

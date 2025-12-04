@@ -563,6 +563,54 @@ const initializeFamilyDb = (familyDb) => {
         });
       }
     });
+
+    // Migration: Add has_tagged_image column to nodes table if it doesn't exist
+    familyDb.all("PRAGMA table_info(nodes)", (err, columns) => {
+      if (err) {
+        console.error('Error checking nodes table schema for has_tagged_image:', err);
+        return;
+      }
+      
+      const columnNames = columns.map(col => col.name);
+      
+      if (!columnNames.includes('has_tagged_image')) {
+        familyDb.run("ALTER TABLE nodes ADD COLUMN has_tagged_image BOOLEAN DEFAULT 0", (err) => {
+          if (err) {
+            console.error('Error adding has_tagged_image column to nodes:', err);
+          } else {
+            console.log('Added has_tagged_image column to nodes table');
+            // Compute initial values based on existing image_people data
+            familyDb.run(`UPDATE nodes SET has_tagged_image = 1 WHERE id IN (SELECT DISTINCT person_id FROM image_people)`, (err) => {
+              if (err) {
+                console.error('Error computing initial has_tagged_image values:', err);
+              } else {
+                console.log('Computed initial has_tagged_image values from existing data');
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Migration: Add require_tagged_image column to completion_settings table if it doesn't exist
+    familyDb.all("PRAGMA table_info(completion_settings)", (err, columns) => {
+      if (err) {
+        console.error('Error checking completion_settings table schema:', err);
+        return;
+      }
+      
+      const columnNames = columns.map(col => col.name);
+      
+      if (!columnNames.includes('require_tagged_image')) {
+        familyDb.run("ALTER TABLE completion_settings ADD COLUMN require_tagged_image BOOLEAN DEFAULT 1", (err) => {
+          if (err) {
+            console.error('Error adding require_tagged_image column to completion_settings:', err);
+          } else {
+            console.log('Added require_tagged_image column to completion_settings table');
+          }
+        });
+      }
+    });
   });
 };
 

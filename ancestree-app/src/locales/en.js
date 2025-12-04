@@ -161,7 +161,8 @@ export const en = {
         taggedPeopleTitle: "Tagged People",
         noTaggedPeople: "No people tagged in this image yet.",
         tagPeoplePrompt: "Click \"Tag People\" to tag family members!",
-        removeButton: "Remove"
+        removeButton: "Remove",
+        loadingImage: "Loading image..."
       },
       
       // Error messages
@@ -216,6 +217,7 @@ export const en = {
     // Node Editor configuration
     nodeEditor: {
       title: 'Add Information',
+      missingTaggedImage: 'This person needs to be tagged in at least one image',
       labels: {
         name: 'First Name:',
         surname: 'Last Name:',
@@ -410,6 +412,10 @@ export const en = {
           email: {
             label: "Email",
             hint: "Email address is required"
+          },
+          taggedImage: {
+            label: "📷 Tagged Image",
+            hint: "Person must be tagged in at least one image"
           }
         },
         success: "Completion settings updated",

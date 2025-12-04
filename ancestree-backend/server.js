@@ -578,6 +578,135 @@ function cleanupOrphanedImageReferences(familyDb, familyName) {
     }
   });
 }
+
+/**
+ * Update the has_tagged_image flag for a person/node
+ * Only writes to the database if the value actually changes
+ * Emits a socket event to update the UI in real-time when the value changes
+ * @param {object} familyDb - The family database connection
+ * @param {string} personId - The ID of the person/node
+ * @param {string} familyName - The family name for socket room
+ * @param {object} ioInstance - Socket.io instance for real-time updates
+ * @param {function} callback - Optional callback (err, changed)
+ */
+function updateHasTaggedImage(familyDb, personId, familyName, ioInstance, callback) {
+  // First, check the current value
+  familyDb.get(`SELECT * FROM nodes WHERE id = ?`, [personId], (err, nodeRow) => {
+    if (err) {
+      console.error(`Error checking has_tagged_image for node ${personId}:`, err.message);
+      if (callback) callback(err);
+      return;
+    }
+    
+    if (!nodeRow) {
+      console.warn(`Node ${personId} not found when updating has_tagged_image`);
+      if (callback) callback(null, false);
+      return;
+    }
+    
+    const currentValue = Boolean(nodeRow.has_tagged_image);
+    
+    // Check if this person is tagged in any image
+    familyDb.get(`SELECT COUNT(*) as count FROM image_people WHERE person_id = ?`, [personId], (err, countRow) => {
+      if (err) {
+        console.error(`Error counting image tags for node ${personId}:`, err.message);
+        if (callback) callback(err);
+        return;
+      }
+      
+      const newValue = countRow && countRow.count > 0;
+      
+      // Only update if the value has changed
+      if (currentValue !== newValue) {
+        familyDb.run(`UPDATE nodes SET has_tagged_image = ? WHERE id = ?`, [newValue ? 1 : 0, personId], function(updateErr) {
+          if (updateErr) {
+            console.error(`Error updating has_tagged_image for node ${personId}:`, updateErr.message);
+            if (callback) callback(updateErr);
+          } else {
+            console.log(`Updated has_tagged_image for node ${personId}: ${currentValue} -> ${newValue}`);
+            
+            // Emit socket event to update UI in real-time
+            if (ioInstance && familyName) {
+              const updatedNode = {
+                id: nodeRow.id,
+                type: nodeRow.type,
+                position: { x: nodeRow.position_x, y: nodeRow.position_y },
+                data: {
+                  name: nodeRow.name,
+                  surname: nodeRow.surname,
+                  maidenName: nodeRow.maiden_name,
+                  birthDate: nodeRow.birth_date,
+                  deathDate: nodeRow.death_date,
+                  street: nodeRow.street,
+                  housenumber: nodeRow.housenumber,
+                  city: nodeRow.city,
+                  zip: nodeRow.zip,
+                  country: nodeRow.country,
+                  phone: nodeRow.phone,
+                  email: nodeRow.email,
+                  latitude: nodeRow.latitude,
+                  longitude: nodeRow.longitude,
+                  addressHash: nodeRow.address_hash,
+                  lastGeocoded: nodeRow.last_geocoded,
+                  bloodline: Boolean(nodeRow.bloodline),
+                  hasTaggedImage: newValue  // Use the new value
+                }
+              };
+              console.log(`[SOCKET] Broadcasting node:updated for hasTaggedImage change to ${familyName}, Node ID: ${personId}`);
+              ioInstance.to(familyName).emit('node:updated', updatedNode);
+            }
+            
+            if (callback) callback(null, true);
+          }
+        });
+      } else {
+        // No change needed
+        if (callback) callback(null, false);
+      }
+    });
+  });
+}
+
+/**
+ * Update has_tagged_image for multiple people affected by an image deletion
+ * @param {object} familyDb - The family database connection
+ * @param {string} imageId - The ID of the image being deleted
+ * @param {function} callback - Optional callback (err)
+ */
+function updateHasTaggedImageForImageDeletion(familyDb, imageId, familyName, io, callback) {
+  // Get all people who were tagged in this image BEFORE deletion
+  familyDb.all(`SELECT person_id FROM image_people WHERE image_id = ?`, [imageId], (err, rows) => {
+    if (err) {
+      console.error(`Error getting people for image ${imageId}:`, err.message);
+      if (callback) callback(err);
+      return;
+    }
+    
+    if (!rows || rows.length === 0) {
+      if (callback) callback(null);
+      return;
+    }
+    
+    const personIds = rows.map(r => r.person_id);
+    let completed = 0;
+    let errors = 0;
+    
+    // After the image is deleted (with cascade), update each person's flag
+    personIds.forEach(personId => {
+      // This will run after the cascade delete has happened
+      updateHasTaggedImage(familyDb, personId, familyName, io, (err) => {
+        completed++;
+        if (err) errors++;
+        
+        if (completed === personIds.length) {
+          console.log(`Updated has_tagged_image for ${completed} people after image deletion (${errors} errors)`);
+          if (callback) callback(errors > 0 ? new Error(`${errors} errors updating flags`) : null);
+        }
+      });
+    });
+  });
+}
+
 // Run cleanup every 5 minutes (300000 ms)
 const CLEANUP_INTERVAL = 60 * 1000 * 5; // 5 minutes
 setInterval(cleanupNullKeys, CLEANUP_INTERVAL);
@@ -1811,7 +1940,8 @@ app.get('/api/completion/settings', authenticateToken, (req, res) => {
           requireCityZip: true,
           requireCountry: true,
           requirePhone: true,
-          requireEmail: true
+          requireEmail: true,
+          requireTaggedImage: true
         });
       }
 
@@ -1825,7 +1955,8 @@ app.get('/api/completion/settings', authenticateToken, (req, res) => {
         requireCityZip: Boolean(settings.require_city_zip),
         requireCountry: Boolean(settings.require_country),
         requirePhone: Boolean(settings.require_phone),
-        requireEmail: Boolean(settings.require_email)
+        requireEmail: Boolean(settings.require_email),
+        requireTaggedImage: settings.require_tagged_image !== undefined ? Boolean(settings.require_tagged_image) : true
       });
     });
   });
@@ -1843,7 +1974,8 @@ app.post('/api/completion/settings', authenticateToken, (req, res) => {
     requireCityZip,
     requireCountry,
     requirePhone,
-    requireEmail
+    requireEmail,
+    requireTaggedImage
   } = req.body;
 
   getFamilyDbById(req.user.id, (err, familyDb, familyName) => {
@@ -1871,13 +2003,14 @@ app.post('/api/completion/settings', authenticateToken, (req, res) => {
              require_country = ?,
              require_phone = ?,
              require_email = ?,
+             require_tagged_image = ?,
              updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`
         : `INSERT INTO completion_settings (
              show_missing_required, require_name, require_surname, require_maiden_name,
              require_birth_date, require_street_fields, require_city_zip, require_country,
-             require_phone, require_email
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+             require_phone, require_email, require_tagged_image
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
       const params = [
         showMissingRequired ? 1 : 0,
@@ -1889,7 +2022,8 @@ app.post('/api/completion/settings', authenticateToken, (req, res) => {
         requireCityZip ? 1 : 0,
         requireCountry ? 1 : 0,
         requirePhone ? 1 : 0,
-        requireEmail ? 1 : 0
+        requireEmail ? 1 : 0,
+        requireTaggedImage !== undefined ? (requireTaggedImage ? 1 : 0) : 1
       ];
 
       if (existingSettings) {
@@ -2029,7 +2163,8 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
           longitude: row.longitude,
           addressHash: row.address_hash,  // Convert to camelCase
           lastGeocoded: row.last_geocoded,  // Add missing field
-          bloodline: Boolean(row.bloodline)
+          bloodline: Boolean(row.bloodline),
+          hasTaggedImage: Boolean(row.has_tagged_image)
           // isSelected removed - this is client-only UI state
       }
     }));
@@ -2255,6 +2390,8 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
             maidenName: updatedRow.maiden_name,
             birthDate: updatedRow.birth_date,
             deathDate: updatedRow.death_date,
+            street: updatedRow.street,
+            housenumber: updatedRow.housenumber,
             city: updatedRow.city,
             zip: updatedRow.zip,
             country: updatedRow.country,
@@ -2264,7 +2401,8 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
             longitude: updatedRow.longitude,
             addressHash: updatedRow.address_hash,
             lastGeocoded: updatedRow.last_geocoded,
-            bloodline: Boolean(updatedRow.bloodline)
+            bloodline: Boolean(updatedRow.bloodline),
+            hasTaggedImage: Boolean(updatedRow.has_tagged_image)
             // isSelected removed - this is client-only UI state
           }
         };
@@ -3114,6 +3252,8 @@ app.post('/api/images/:imageId/people', authenticateToken, (req, res) => {
 
   try {
     const familyDb = getFamilyDb(familyName);
+    const ioInstance = req.app.get('io');
+    
     familyDb.run(`INSERT INTO image_people (image_id, person_id, position_x, position_y, width, height)
             VALUES (?, ?, ?, ?, ?, ?)`, 
     [imageId, personId, positionX, positionY, width, height], function(err) {
@@ -3123,6 +3263,9 @@ app.post('/api/images/:imageId/people', authenticateToken, (req, res) => {
         }
         return res.status(500).json({ error: err.message });
       }
+
+      // Update the has_tagged_image flag for this person and emit socket event
+      updateHasTaggedImage(familyDb, personId, familyName, ioInstance);
 
       res.json({
         success: true,
@@ -3148,6 +3291,8 @@ app.delete('/api/images/:imageId/people/:personId', authenticateToken, (req, res
 
   try {
     const familyDb = getFamilyDb(familyName);
+    const ioInstance = req.app.get('io');
+    
     familyDb.run(`DELETE FROM image_people WHERE image_id = ? AND person_id = ?`, 
     [imageId, personId], function(err) {
       if (err) {
@@ -3157,6 +3302,9 @@ app.delete('/api/images/:imageId/people/:personId', authenticateToken, (req, res
       if (this.changes === 0) {
         return res.status(404).json({ error: 'Person tag not found in image' });
       }
+
+      // Update the has_tagged_image flag for this person (may now be false if no other tags)
+      updateHasTaggedImage(familyDb, personId, familyName, ioInstance);
 
       res.json({ success: true, message: 'Person removed from image' });
     });
@@ -3394,6 +3542,7 @@ app.delete('/api/images/:id', authenticateToken, async (req, res) => {
 
   try {
     const familyDb = getFamilyDb(familyName);
+    const ioInstance = req.app.get('io');
     
     // First, get the s3_key to delete from S3
     familyDb.get(`SELECT s3_key FROM images WHERE id = ?`, [id], async (err, row) => {
@@ -3421,15 +3570,30 @@ app.delete('/api/images/:id', authenticateToken, async (req, res) => {
         }
       }
       
-      // Delete from database (this will cascade delete image_people records)
-      familyDb.run(`DELETE FROM images WHERE id = ?`, [id], function(err) {
+      // Get people tagged in this image BEFORE deletion so we can update their flags
+      familyDb.all(`SELECT person_id FROM image_people WHERE image_id = ?`, [id], (err, taggedPeople) => {
         if (err) {
-          return res.status(500).json({ error: err.message });
+          console.error('Error getting tagged people before image deletion:', err);
+          // Continue with deletion even if we can't get tagged people
         }
+        
+        // Delete from database (this will cascade delete image_people records)
+        familyDb.run(`DELETE FROM images WHERE id = ?`, [id], function(deleteErr) {
+          if (deleteErr) {
+            return res.status(500).json({ error: deleteErr.message });
+          }
 
-        res.json({ 
-          success: true, 
-          message: 'Image deleted successfully'
+          // Update has_tagged_image for all affected people
+          if (taggedPeople && taggedPeople.length > 0) {
+            taggedPeople.forEach(({ person_id }) => {
+              updateHasTaggedImage(familyDb, person_id, familyName, ioInstance);
+            });
+          }
+
+          res.json({ 
+            success: true, 
+            message: 'Image deleted successfully'
+          });
         });
       });
     });
