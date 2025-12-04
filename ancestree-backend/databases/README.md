@@ -45,7 +45,6 @@ CREATE TABLE nodes (
   birth_location TEXT,
   death_date TEXT,
   death_location TEXT,
-  preferred_image_id INTEGER,
   notes TEXT
 );
 

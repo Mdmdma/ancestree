@@ -844,10 +844,6 @@ export const encryptedApi = {
     return baseApi.getImageTags(imageId);
   },
   
-  async setPreferredImage(personId, imageId) {
-    return baseApi.setPreferredImage(personId, imageId);
-  },
-  
   // Chat operations with encryption
   async getChatMessages(imageId) {
     const messages = await baseApi.getChatMessages(imageId);

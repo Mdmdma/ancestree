@@ -577,18 +577,6 @@ function cleanupOrphanedImageReferences(familyDb, familyName) {
       console.log(`Cleaned up ${this.changes} orphaned image_people person references in ${familyName}`);
     }
   });
-  
-  // Clean up preferred_image_id references in nodes that point to non-existent images
-  familyDb.run(`UPDATE nodes 
-          SET preferred_image_id = NULL 
-          WHERE preferred_image_id IS NOT NULL 
-          AND preferred_image_id NOT IN (SELECT id FROM images)`, function(err) {
-    if (err) {
-      console.error(`Error cleaning up orphaned preferred image references in ${familyName}:`, err.message);
-    } else if (this.changes > 0) {
-      console.log(`Cleaned up ${this.changes} orphaned preferred image references in ${familyName}`);
-    }
-  });
 }
 // Run cleanup every 5 minutes (300000 ms)
 const CLEANUP_INTERVAL = 60 * 1000 * 5; // 5 minutes
@@ -2041,8 +2029,7 @@ app.get('/api/nodes', authenticateToken, (req, res) => {
           longitude: row.longitude,
           addressHash: row.address_hash,  // Convert to camelCase
           lastGeocoded: row.last_geocoded,  // Add missing field
-          bloodline: Boolean(row.bloodline),
-          preferredImageId: row.preferred_image_id
+          bloodline: Boolean(row.bloodline)
           // isSelected removed - this is client-only UI state
       }
     }));
@@ -2115,12 +2102,12 @@ app.post('/api/nodes', authenticateToken, async (req, res) => {
     familyDb.run(`INSERT INTO nodes (
       id, type, position_x, position_y, name, surname, maiden_name, birth_date, death_date,
       street, housenumber, city, zip, country, phone, email, latitude, longitude, address_hash, last_geocoded,
-      bloodline, preferred_image_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      bloodline
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       id, type, position.x, position.y, data.name, data.surname, data.maidenName,
       data.birthDate, data.deathDate, data.street, data.housenumber, data.city, data.zip, data.country, data.phone,
       data.email, data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
-      data.bloodline ? 1 : 0, data.preferredImageId || null
+      data.bloodline ? 1 : 0
     ], function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -2187,13 +2174,13 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
         position_x = ?, position_y = ?, name = ?, surname = ?, maiden_name = ?, birth_date = ?,
         death_date = ?, street = ?, housenumber = ?, city = ?, zip = ?, country = ?, phone = ?, email = ?,
         latitude = ?, longitude = ?, address_hash = ?, last_geocoded = ?,
-        bloodline = ?, preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP
+        bloodline = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?`;
       updateParams = [
         position?.x, position?.y, data.name, data.surname, data.maidenName, data.birthDate,
         data.deathDate, data.street, data.housenumber, data.city, data.zip, data.country, data.phone, data.email,
         data.latitude, data.longitude, data.addressHash, data.lastGeocoded,
-        data.bloodline ? 1 : 0, data.preferredImageId || null, id
+        data.bloodline ? 1 : 0, id
       ];
     } else {
       // Partial update - build dynamic query based on provided fields
@@ -2277,8 +2264,7 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
             longitude: updatedRow.longitude,
             addressHash: updatedRow.address_hash,
             lastGeocoded: updatedRow.last_geocoded,
-            bloodline: Boolean(updatedRow.bloodline),
-            preferredImageId: updatedRow.preferred_image_id
+            bloodline: Boolean(updatedRow.bloodline)
             // isSelected removed - this is client-only UI state
           }
         };
@@ -2301,33 +2287,6 @@ app.put('/api/nodes/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error updating node:', error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// Set preferred image for a person
-app.put('/api/nodes/:personId/preferred-image', authenticateToken, (req, res) => {
-  const { personId } = req.params;
-  const { imageId } = req.body;
-  const familyName = req.user.familyName;
-  
-  try {
-    const familyDb = getFamilyDb(familyName);
-    familyDb.run(`UPDATE nodes SET preferred_image_id = ?, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ?`, 
-    [imageId || null, personId], function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'Person not found' });
-      }
-      
-      res.json({ success: true, personId, imageId: imageId || null });
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update preferred image' });
   }
 });
 
@@ -2585,7 +2544,7 @@ app.post('/api/cleanup', authenticateToken, (req, res) => {
     let totalDuplicatesCleaned = 0;
     let totalOrphanedImagesCleaned = 0;
     let operations = 0;
-    const maxOperations = 7; // Increased to include orphaned image cleanup
+    const maxOperations = 6; // Number of cleanup operations
     
     function checkComplete() {
       operations++;
@@ -2655,18 +2614,6 @@ app.post('/api/cleanup', authenticateToken, (req, res) => {
     familyDb.run(`DELETE FROM image_people WHERE person_id NOT IN (SELECT id FROM nodes)`, function(err) {
       if (err) {
         res.status(500).json({ error: 'Error cleaning orphaned image_people person references: ' + err.message });
-        return;
-      }
-      totalOrphanedImagesCleaned += this.changes;
-      checkComplete();
-    });
-
-    // Clean up orphaned preferred image references
-    familyDb.run(`UPDATE nodes SET preferred_image_id = NULL 
-            WHERE preferred_image_id IS NOT NULL 
-            AND preferred_image_id NOT IN (SELECT id FROM images)`, function(err) {
-      if (err) {
-        res.status(500).json({ error: 'Error cleaning orphaned preferred images: ' + err.message });
         return;
       }
       totalOrphanedImagesCleaned += this.changes;

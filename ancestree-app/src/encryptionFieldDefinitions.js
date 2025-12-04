@@ -247,9 +247,7 @@ export const NEVER_ENCRYPT_FIELDS = [
   'image_id',
   'person_id',
   'imageId',
-  'personId',
-  'preferred_image_id',
-  'preferredImageId'
+  'personId'
 ];
 
 /**

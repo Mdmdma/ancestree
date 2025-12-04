@@ -934,22 +934,6 @@ export const api = {
     return response.blob();
   },
 
-  // Preferred image operations
-  async setPreferredImage(personId, imageId) {
-    const response = await fetch(`${API_BASE_URL}/nodes/${personId}/preferred-image`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ imageId })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to set preferred image');
-    }
-    
-    return response.json();
-  },
-
   // Chat operations
   async getChatMessages(imageId) {
     const response = await fetch(`${API_BASE_URL}/images/${imageId}/chat`, {

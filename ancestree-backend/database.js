@@ -384,14 +384,12 @@ const initializeFamilyDb = (familyDb) => {
       phone TEXT,
       email TEXT,
       bloodline BOOLEAN DEFAULT 1,
-      preferred_image_id TEXT,
       latitude REAL,
       longitude REAL,
       address_hash TEXT,
       last_geocoded DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (preferred_image_id) REFERENCES images (id) ON DELETE SET NULL
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
     // Edges table

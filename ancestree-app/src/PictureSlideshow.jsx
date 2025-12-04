@@ -152,8 +152,6 @@ const PictureSlideshow = ({
   mode = 'family', // 'family' or 'person'
   personId, 
   personName, 
-  preferredImageId, 
-  onPreferredImageChange,
   onClose, 
   onPersonSelect,
   socket
@@ -167,7 +165,6 @@ const PictureSlideshow = ({
   const [descriptionValue, setDescriptionValue] = useState('');
   const [editingDescription, setEditingDescription] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [settingPreferred, setSettingPreferred] = useState(false);
 
   // Handle question toggle
   const toggleImageQuestion = useCallback(async () => {
@@ -252,21 +249,8 @@ const PictureSlideshow = ({
       
       // If we have images, load details for the first one
       if (imagesData.length > 0) {
-        // For person mode, navigate to preferred image if available
-        if (mode === 'person' && preferredImageId) {
-          const preferredIndex = imagesData.findIndex(img => img.id === preferredImageId);
-          if (preferredIndex !== -1) {
-            setCurrentIndex(preferredIndex);
-            setDescriptionValue(imagesData[preferredIndex].description || '');
-            console.log('PictureSlideshow: Navigated to preferred image at index:', preferredIndex);
-          } else {
-            setCurrentIndex(0);
-            setDescriptionValue(imagesData[0].description || '');
-          }
-        } else {
-          setCurrentIndex(0);
-          setDescriptionValue(imagesData[0].description || '');
-        }
+        setCurrentIndex(0);
+        setDescriptionValue(imagesData[0].description || '');
         console.log('PictureSlideshow: First image:', imagesData[0]);
       } else {
         console.log('PictureSlideshow: No images found');
@@ -277,7 +261,7 @@ const PictureSlideshow = ({
     } finally {
       setLoading(false);
     }
-  }, [mode, personId, preferredImageId]);
+  }, [mode, personId]);
 
   useEffect(() => {
     console.log('PictureSlideshow: Component mounted, starting to load images...');
@@ -319,48 +303,6 @@ const PictureSlideshow = ({
       saveDescription();
     }
   }, [saveDescription]);
-
-  const setAsPreferredImage = useCallback(async () => {
-    if (!currentImage || mode !== 'person') return;
-    
-    try {
-      setSettingPreferred(true);
-      await api.setPreferredImage(personId, currentImage.id);
-      
-      // Call the callback to update the parent component
-      if (onPreferredImageChange) {
-        onPreferredImageChange(currentImage.id);
-      }
-      
-      alert(`Bild wurde als Profilbild für ${personName} gesetzt.`);
-    } catch (err) {
-      console.error('Error setting preferred image:', err);
-      alert('Fehler beim Setzen des Profilbildes: ' + err.message);
-    } finally {
-      setSettingPreferred(false);
-    }
-  }, [mode, personId, personName, onPreferredImageChange]);
-
-  const removeAsPreferredImage = useCallback(async () => {
-    if (mode !== 'person') return;
-    
-    try {
-      setSettingPreferred(true);
-      await api.setPreferredImage(personId, null);
-      
-      // Call the callback to update the parent component
-      if (onPreferredImageChange) {
-        onPreferredImageChange(null);
-      }
-      
-      alert(`Profilbild für ${personName} wurde entfernt.`);
-    } catch (err) {
-      console.error('Error removing preferred image:', err);
-      alert('Fehler beim Entfernen des Profilbildes: ' + err.message);
-    } finally {
-      setSettingPreferred(false);
-    }
-  }, [mode, personId, personName, onPreferredImageChange]);
 
   // Memoize current image to prevent unnecessary recalculations
   const currentImage = useMemo(() => {
@@ -832,69 +774,6 @@ const PictureSlideshow = ({
                 </div>
               )}
             </div>
-
-            {/* Preferred Image Controls - Only in person mode */}
-            {mode === 'person' && (
-              <div style={{ 
-                padding: '15px',
-                backgroundColor: '#333333',
-                borderRadius: '6px',
-                border: '1px solid #444'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <div>
-                    {currentImage?.id === preferredImageId ? (
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: '#4CAF50',
-                        fontSize: '14px'
-                      }}>
-                        <span style={{ marginRight: '8px' }}>⭐</span>
-                        <strong>Aktuelles Profilbild</strong>
-                      </div>
-                    ) : (
-                      <div style={{ 
-                        color: '#cccccc',
-                        fontSize: '14px'
-                      }}>
-                        Als Profilbild verwenden
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {currentImage?.id === preferredImageId ? (
-                      <div style={{ width: '140px' }}>
-                        <Button
-                          onClick={removeAsPreferredImage}
-                          disabled={settingPreferred}
-                          variant="danger"
-                          size="medium"
-                        >
-                          {settingPreferred ? 'Wird entfernt...' : 'Entfernen'}
-                        </Button>
-                      </div>
-                    ) : (
-                      <div style={{ width: '180px' }}>
-                        <Button
-                          onClick={setAsPreferredImage}
-                          disabled={settingPreferred}
-                          variant="success"
-                          size="medium"
-                        >
-                          {settingPreferred ? 'Wird gesetzt...' : 'Als Profilbild setzen'}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Tagged People Section */}
             <div>

@@ -359,7 +359,6 @@ export const encryptedApi = {
   tagPersonInImage: baseApi.tagPersonInImage,
   untagPersonFromImage: baseApi.untagPersonFromImage,
   getImageTags: baseApi.getImageTags,
-  updatePreferredImage: baseApi.updatePreferredImage,
   
   // Pass through chat operations (encryption would be applied if needed)
   sendChatMessage: baseApi.sendChatMessage,

@@ -130,7 +130,6 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
         phone: phoneValue,
         email: node.data.email || '',
         bloodline: node.data.bloodline || false,
-        preferredImageId: node.data.preferredImageId || null,
         positionX: node.position?.x || 0,
         positionY: node.position?.y || 0
       });
@@ -557,11 +556,6 @@ function NodeEditor({ node, onUpdate, setSelectedNode, isDebugMode = false, node
           mode="person"
           personId={node.id}
           personName={`${formData.name} ${formData.surname}`}
-          preferredImageId={formData.preferredImageId}
-          onPreferredImageChange={(imageId) => {
-            setFormData(prev => ({ ...prev, preferredImageId: imageId }));
-            onUpdate(node.id, { ...formData, preferredImageId: imageId });
-          }}
           onClose={() => setShowSlideshow(false)}
           socket={socket}
         />
