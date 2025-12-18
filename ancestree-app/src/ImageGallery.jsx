@@ -218,6 +218,18 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
     }
   }, [taggingMode, viewMode, onTaggingModeChange]);
 
+  // Auto-disable tagging mode when leaving image view or changing images
+  useEffect(() => {
+    if (viewMode !== 'view') {
+      setTaggingMode(false);
+    }
+  }, [viewMode]);
+
+  // Reset tagging mode when selected image changes
+  useEffect(() => {
+    setTaggingMode(false);
+  }, [selectedImage?.id]);
+
   // Cleanup preview URLs on unmount
   useEffect(() => {
     return () => {
@@ -707,6 +719,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
                 personsTagged: t.ui.imageGallery.gallery.personsTagged
               }}
               onClick={() => {
+                setTaggingMode(false); // Reset tagging mode when selecting a new image
                 setSelectedImage(image);
                 setViewMode('view');
               }}
