@@ -2898,11 +2898,11 @@ app.post('/api/images/presigned-upload', authenticateToken, (req, res) => {
     });
   }
   
-  // Validate file size (10MB limit)
-  const maxSize = 10 * 1024 * 1024;
+  // Validate file size (25MB limit)
+  const maxSize = 25 * 1024 * 1024;
   if (fileSize && fileSize > maxSize) {
     return res.status(400).json({ 
-      error: 'File too large. Maximum file size is 10MB.',
+      error: 'File too large. Maximum file size is 25MB.',
       code: 'FILE_TOO_LARGE'
     });
   }
