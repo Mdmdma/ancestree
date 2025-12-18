@@ -65,12 +65,61 @@ const ImageThumbnail = React.memo(({ image, onClick, translations }) => {
 
 ImageThumbnail.displayName = 'ImageThumbnail';
 
+// Memoized ImageDisplay component for the view mode - prevents re-render when only people array changes
+const ImageDisplay = React.memo(({ 
+  s3Url, 
+  description, 
+  originalFilename, 
+  hasOpenQuestions, 
+  loadingText 
+}) => {
+  if (!s3Url) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '200px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#333',
+        borderRadius: '5px',
+        color: '#888'
+      }}>
+        {loadingText}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={s3Url}
+      alt={description || originalFilename}
+      style={{
+        width: '100%',
+        maxHeight: '400px',
+        objectFit: 'contain',
+        border: hasOpenQuestions ? '3px solid #dc3545' : '1px solid #444',
+        borderRadius: '5px',
+        transition: 'border-color 0.2s'
+      }}
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if image-specific properties change
+  return prevProps.s3Url === nextProps.s3Url &&
+         prevProps.description === nextProps.description &&
+         prevProps.originalFilename === nextProps.originalFilename &&
+         prevProps.hasOpenQuestions === nextProps.hasOpenQuestions;
+});
+
+ImageDisplay.displayName = 'ImageDisplay';
+
 // Constants for multi-image upload
 const MAX_BATCH_SIZE = 15;
 const MAX_FILE_SIZE_MB = 25;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
+const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
   const { t } = useTranslation();
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -437,7 +486,8 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   };
 
   // Handle person tagging in image
-  const handlePersonTag = async (personId) => {
+  // Optimized to update only the people array without refreshing the entire image
+  const handlePersonTag = useCallback(async (personId) => {
     if (!selectedImage || !personId) return;
 
     // Check if person is already tagged
@@ -450,12 +500,33 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     try {
       const result = await encryptedApi.tagPersonInImage(selectedImage.id, personId);
       if (result.success) {
-        // Refresh the selected image data
-        const updatedImage = await encryptedApi.getImage(selectedImage.id);
-        setSelectedImage(updatedImage);
+        // Get person name from nodes array for immediate UI update
+        const personNode = nodes?.find(n => n.id === personId);
+        const personName = personNode?.data?.name || '';
+        const personSurname = personNode?.data?.surname || '';
         
-        // Also refresh the main gallery to update the person count
-        await loadImages();
+        // Optimistically update the selected image's people array
+        // without fetching the entire image again (preserves s3Url and prevents reload)
+        const newPerson = { 
+          personId: personId,
+          personName: personName,
+          personSurname: personSurname,
+          person_name: personName,
+          person_surname: personSurname
+        };
+        
+        setSelectedImage(prev => ({
+          ...prev,
+          people: [...(prev.people || []), newPerson]
+        }));
+        
+        // Update the images array to reflect the new person count
+        // without refetching from server (preserves image URLs)
+        setImages(prevImages => prevImages.map(img => 
+          img.id === selectedImage.id 
+            ? { ...img, people: [...(img.people || []), newPerson] }
+            : img
+        ));
         
         console.log('Person successfully tagged');
       } else {
@@ -473,7 +544,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         alert(t.ui.imageGallery.errors.tagFailed + error.message);
       }
     }
-  };
+  }, [selectedImage, nodes, t.ui.imageGallery.errors.tagFailed, t.ui.imageGallery.errors.unknownError]);
 
   // Auto-tag when a person is selected in tagging mode
   useEffect(() => {
@@ -493,18 +564,27 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   }, [selectedNode, taggingMode, viewMode, selectedImage?.people]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle person removal from image
-  const handleRemovePersonTag = async (personId) => {
+  // Optimized to update only the people array without refreshing the entire image
+  const handleRemovePersonTag = useCallback(async (personId) => {
     if (!selectedImage || !personId) return;
 
     try {
       const result = await encryptedApi.removePersonFromImage(selectedImage.id, personId);
       if (result.success) {
-        // Refresh the selected image data and the gallery
-        const updatedImage = await encryptedApi.getImage(selectedImage.id);
-        setSelectedImage(updatedImage);
+        // Optimistically update the selected image's people array
+        // without fetching the entire image again (preserves s3Url and prevents reload)
+        setSelectedImage(prev => ({
+          ...prev,
+          people: (prev.people || []).filter(p => p.personId !== personId)
+        }));
         
-        // Also refresh the main gallery to update the person count
-        await loadImages();
+        // Update the images array to reflect the new person count
+        // without refetching from server (preserves image URLs)
+        setImages(prevImages => prevImages.map(img => 
+          img.id === selectedImage.id 
+            ? { ...img, people: (img.people || []).filter(p => p.personId !== personId) }
+            : img
+        ));
         
         console.log(t.ui.imageGallery.success.personRemoved);
       } else {
@@ -514,7 +594,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       console.error('Remove error:', error);
       alert(t.ui.imageGallery.errors.removeFailed + error.message);
     }
-  };
+  }, [selectedImage, t.ui.imageGallery.success.personRemoved, t.ui.imageGallery.errors.removeFailed, t.ui.imageGallery.errors.unknownError]);
 
   // Description editing functions
   const startEditingDescription = useCallback(() => {
@@ -1162,33 +1242,13 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        {selectedImage.s3Url ? (
-          <img
-            src={selectedImage.s3Url}
-            alt={selectedImage.description || selectedImage.originalFilename}
-            style={{
-              width: '100%',
-              maxHeight: '400px',
-              objectFit: 'contain',
-              border: selectedImage.has_open_questions ? '3px solid #dc3545' : '1px solid #444',
-              borderRadius: '5px',
-              transition: 'border-color 0.2s'
-            }}
-          />
-        ) : (
-          <div style={{
-            width: '100%',
-            height: '200px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#333',
-            borderRadius: '5px',
-            color: '#888'
-          }}>
-            {t.ui.imageGallery.view.loadingImage || 'Loading image...'}
-          </div>
-        )}
+        <ImageDisplay
+          s3Url={selectedImage.s3Url}
+          description={selectedImage.description}
+          originalFilename={selectedImage.originalFilename}
+          hasOpenQuestions={selectedImage.has_open_questions}
+          loadingText={t.ui.imageGallery.view.loadingImage || 'Loading image...'}
+        />
       </div>
 
       <div className="gallery-description-section" style={{ marginBottom: '20px' }}>
