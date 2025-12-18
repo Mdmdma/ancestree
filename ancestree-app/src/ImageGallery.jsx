@@ -1191,76 +1191,81 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         )}
       </div>
 
-      {selectedImage.description || !editingDescription ? (
-        <div className="gallery-description-section" style={{ marginBottom: '20px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '10px' 
-          }}>
-            <h4 style={{ margin: 0, color: '#ffffff' }}>{t.ui.imageGallery.view.descriptionTitle}</h4>
-            {!editingDescription && (
-              <Button
-                onClick={startEditingDescription}
-                variant="success"
-                size="medium"
-                style={{ width: 'auto', minWidth: '60px' }}
-              >
-                Edit
-              </Button>
-            )}
-          </div>
-          
-          {editingDescription ? (
-            <DescriptionTextarea
-              value={descriptionValue}
-              onChange={handleDescriptionChange}
-              onSave={saveDescription}
-              onCancel={cancelEditingDescription}
-              placeholder="Enter image description..."
-              maxLength={1000}
-              minHeight="120px"
-              saveButtonText="Save"
-              cancelButtonText="Cancel"
-            />
-          ) : (
-            <div 
-              className="gallery-description-text"
-              style={{ 
-                fontSize: '14px', 
-                lineHeight: '1.5', 
-                color: '#cccccc',
-                backgroundColor: '#2a2a2a',
-                padding: '15px',
-                borderRadius: '5px',
-                border: '1px solid #444'
-              }}
-            >
-              {selectedImage.description || <em style={{ color: '#888' }}>No description available</em>}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="gallery-description-section" style={{ marginBottom: '20px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '10px' 
-          }}>
-            <h4 style={{ margin: 0, color: '#ffffff' }}>{t.ui.imageGallery.view.descriptionTitle}</h4>
+      <div className="gallery-description-section" style={{ marginBottom: '20px' }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '10px' 
+        }}>
+          <h4 style={{ margin: 0, color: '#ffffff' }}>{t.ui.imageGallery.view.descriptionTitle}</h4>
+          {!editingDescription && (
             <Button
               onClick={startEditingDescription}
               variant="success"
               size="medium"
-              style={{ width: 'auto', minWidth: '120px' }}
+              style={{ width: 'auto', minWidth: '60px' }}
             >
-              Add Description
+              {selectedImage.description ? t.ui.imageGallery.view.editDescriptionButton : t.ui.imageGallery.view.addDescriptionButton}
             </Button>
-          </div>
+          )}
         </div>
-      )}
+        
+        {editingDescription ? (
+          <>
+            <textarea
+              value={descriptionValue}
+              onChange={handleDescriptionChange}
+              placeholder={t.ui.imageGallery.view.descriptionPlaceholder}
+              maxLength={1000}
+              className="w-full resize-none font-inherit text-sm bg-zinc-800 text-white border border-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              style={{
+                paddingLeft: '12px',
+                paddingRight: '12px',
+                paddingTop: '12px',
+                paddingBottom: '12px',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+                lineHeight: '1.5',
+                minHeight: '120px'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+              <Button
+                onClick={saveDescription}
+                variant="success"
+                size="medium"
+                style={{ flex: 1 }}
+              >
+                {t.ui.imageGallery.view.saveButton}
+              </Button>
+              <Button
+                onClick={cancelEditingDescription}
+                variant="danger"
+                size="medium"
+                style={{ flex: 1 }}
+              >
+                {t.ui.imageGallery.view.cancelButton}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div 
+            className="gallery-description-text"
+            style={{ 
+              fontSize: '14px', 
+              lineHeight: '1.5', 
+              color: '#cccccc',
+              backgroundColor: '#2a2a2a',
+              padding: '15px',
+              borderRadius: '5px',
+              border: '1px solid #444'
+            }}
+          >
+            {selectedImage.description || <em style={{ color: '#888' }}>{t.ui.imageGallery.view.noDescription}</em>}
+          </div>
+        )}
+      </div>
 
       {selectedImage.people && selectedImage.people.length > 0 && (
         <div>
