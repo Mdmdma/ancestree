@@ -180,7 +180,8 @@ export const en = {
         noTaggedPeople: "No people tagged in this image yet.",
         tagPeoplePrompt: "Click \"Tag People\" to tag family members!",
         removeButton: "Remove",
-        loadingImage: "Loading image..."
+        loadingImage: "Loading image...",
+        openInGalleryButton: "🖼️ Open in Gallery"
       },
       
       // Error messages

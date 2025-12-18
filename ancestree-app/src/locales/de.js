@@ -180,7 +180,8 @@ export const de = {
         noTaggedPeople: "Noch keine Personen in diesem Bild markiert.",
         tagPeoplePrompt: "Klicke auf \"Personen markieren\", um Familienmitglieder zu markieren!",
         removeButton: "Entfernen",
-        loadingImage: "Bild wird geladen..."
+        loadingImage: "Bild wird geladen...",
+        openInGalleryButton: "🖼️ Im Album öffnen"
       },
       
       // Error messages

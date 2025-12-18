@@ -154,7 +154,8 @@ const PictureSlideshow = ({
   personName, 
   onClose, 
   onPersonSelect,
-  socket
+  socket,
+  initialImageId = null // Optional: ID of image to navigate to after loading
 }) => {
   const { t } = useTranslation();
   console.log('PictureSlideshow: Component called with mode:', mode, 'personId:', personId);
@@ -247,11 +248,23 @@ const PictureSlideshow = ({
       
       setImages(imagesData);
       
-      // If we have images, load details for the first one
+      // If we have images, set the initial index
       if (imagesData.length > 0) {
-        setCurrentIndex(0);
-        setDescriptionValue(imagesData[0].description || '');
-        console.log('PictureSlideshow: First image:', imagesData[0]);
+        // If initialImageId is provided, find and navigate to that image
+        let startIndex = 0;
+        if (initialImageId) {
+          const foundIndex = imagesData.findIndex(img => img.id === initialImageId);
+          if (foundIndex !== -1) {
+            startIndex = foundIndex;
+            console.log('PictureSlideshow: Found initial image at index:', startIndex);
+          } else {
+            console.log('PictureSlideshow: Initial image ID not found, starting at first image');
+          }
+        }
+        
+        setCurrentIndex(startIndex);
+        setDescriptionValue(imagesData[startIndex].description || '');
+        console.log('PictureSlideshow: Starting at image:', imagesData[startIndex]);
       } else {
         console.log('PictureSlideshow: No images found');
       }
@@ -261,7 +274,7 @@ const PictureSlideshow = ({
     } finally {
       setLoading(false);
     }
-  }, [mode, personId]);
+  }, [mode, personId, initialImageId]);
 
   useEffect(() => {
     console.log('PictureSlideshow: Component mounted, starting to load images...');

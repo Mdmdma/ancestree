@@ -133,6 +133,7 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState('');
   const [showFamilyGallery, setShowFamilyGallery] = useState(false);
+  const [familyGalleryInitialImageId, setFamilyGalleryInitialImageId] = useState(null); // Image ID to open in gallery
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -1246,6 +1247,22 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
           {taggingMode ? t.ui.imageGallery.view.cancelTaggingButton : t.ui.imageGallery.view.tagPeopleButton}
         </Button>
         <Button
+          onClick={() => {
+            console.log('Open in Gallery clicked, image ID:', selectedImage.id);
+            setFamilyGalleryInitialImageId(selectedImage.id);
+            setShowFamilyGallery(true);
+          }}
+          variant="secondary"
+          size="medium"
+          style={{
+            backgroundColor: '#9C27B0'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7B1FA2'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#9C27B0'}
+        >
+          {t.ui.imageGallery.view.openInGalleryButton}
+        </Button>
+        <Button
           onClick={() => handleDeleteImage(selectedImage.id)}
           variant="danger"
           size="medium"
@@ -1433,15 +1450,17 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
       {/* Family Gallery Slideshow */}
       {showFamilyGallery && (
         <>
-          {console.log('Rendering PictureSlideshow in family mode, showFamilyGallery:', showFamilyGallery)}
+          {console.log('Rendering PictureSlideshow in family mode, showFamilyGallery:', showFamilyGallery, 'initialImageId:', familyGalleryInitialImageId)}
           <PictureSlideshow
             mode="family"
             onClose={() => {
               console.log('Closing family gallery');
               setShowFamilyGallery(false);
+              setFamilyGalleryInitialImageId(null); // Reset initial image ID when closing
             }}
             onPersonSelect={onPersonSelect}
             socket={socket}
+            initialImageId={familyGalleryInitialImageId}
           />
         </>
       )}
