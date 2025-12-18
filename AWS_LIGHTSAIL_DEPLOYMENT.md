@@ -148,7 +148,7 @@ FRONTEND_URL=http://YOUR_STATIC_IP
 
 ```bash
 # Start with PM2
-pm2 start ecosystem.config.json --env production
+pm2 start ecosystem.config.js --env production
 
 # Save PM2 configuration
 pm2 save
