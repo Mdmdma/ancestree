@@ -65,6 +65,11 @@ const ImageThumbnail = React.memo(({ image, onClick, translations }) => {
 
 ImageThumbnail.displayName = 'ImageThumbnail';
 
+// Constants for multi-image upload
+const MAX_BATCH_SIZE = 15;
+const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onViewModeChange, socket }) => {
   const { t } = useTranslation();
   const [images, setImages] = useState([]);
@@ -73,8 +78,8 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const [viewMode, setViewMode] = useState('gallery'); // 'gallery', 'upload', 'view', 'confirm'
   const [description, setDescription] = useState('');
   const [taggingMode, setTaggingMode] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  // Multi-file selection state
+  const [selectedFiles, setSelectedFiles] = useState([]); // Array of { file, previewUrl }
   const [dragOver, setDragOver] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState('');
@@ -82,6 +87,8 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  // Track failed uploads for summary display
+  const [failedUploads, setFailedUploads] = useState([]); // Array of { file, error }
 
   // Notify parent of viewMode changes for mobile sidebar height adjustment
   useEffect(() => {
@@ -165,18 +172,19 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
   // Cleanup preview URLs on unmount
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      // Cleanup all preview URLs
+      selectedFiles.forEach(({ previewUrl }) => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+      });
     };
-  }, [previewUrl]);
+  }, [selectedFiles]);
 
   // Keyboard shortcut: Ctrl+Enter to upload when in confirm mode
   useEffect(() => {
     if (viewMode !== 'confirm') return;
 
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'Enter' && !uploadingImage && selectedFile) {
+      if (e.ctrlKey && e.key === 'Enter' && !uploadingImage && selectedFiles.length > 0) {
         e.preventDefault();
         confirmUpload();
       }
@@ -184,118 +192,197 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, uploadingImage, selectedFile]);
+  }, [viewMode, uploadingImage, selectedFiles]);
 
-  // Handle image upload
+  // Handle image upload (multiple files)
   const handleImageUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
     
-    await handleFileSelection(file);
+    await handleFilesSelection(files);
   };
 
-  // Handle file selection (from input or drag-drop)
-  // CRITICAL: Must read file into memory immediately on Android to avoid ERR_UPLOAD_FILE_CHANGED
-  const handleFileSelection = async (file) => {
-    // Validate file type
+  // Handle multiple file selection (from input or drag-drop)
+  // CRITICAL: Must read files into memory immediately on Android to avoid ERR_UPLOAD_FILE_CHANGED
+  const handleFilesSelection = async (files) => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      alert(t.ui.imageGallery.errors.invalidFileType);
+    const validFiles = [];
+    const errors = [];
+
+    // Check batch size limit
+    const totalFiles = selectedFiles.length + files.length;
+    if (totalFiles > MAX_BATCH_SIZE) {
+      alert(t.ui.imageGallery.errors.batchSizeExceeded.replace('{max}', MAX_BATCH_SIZE));
       return;
     }
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      alert(t.ui.imageGallery.errors.fileSizeExceeded);
-      return;
+    for (const file of files) {
+      // Validate file type
+      if (!allowedTypes.includes(file.type)) {
+        errors.push(`${file.name}: ${t.ui.imageGallery.errors.invalidFileType}`);
+        continue;
+      }
+
+      // Validate file size (25MB max)
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        errors.push(`${file.name}: ${t.ui.imageGallery.errors.fileSizeExceeded}`);
+        continue;
+      }
+
+      try {
+        // Read file into memory IMMEDIATELY - Android content URIs become stale quickly
+        const arrayBuffer = await file.arrayBuffer();
+        const stableBlob = new Blob([arrayBuffer], { type: file.type });
+        
+        // Create a stable File object from the blob with the original filename
+        const stableFile = new File([stableBlob], file.name, { 
+          type: file.type,
+          lastModified: file.lastModified 
+        });
+
+        // Create preview URL from the stable blob
+        const previewUrl = URL.createObjectURL(stableBlob);
+        
+        validFiles.push({ file: stableFile, previewUrl });
+      } catch (error) {
+        console.error('Failed to read file:', error);
+        errors.push(`${file.name}: Failed to read file`);
+      }
     }
 
-    try {
-      // Read file into memory IMMEDIATELY - Android content URIs become stale quickly
-      const arrayBuffer = await file.arrayBuffer();
-      const stableBlob = new Blob([arrayBuffer], { type: file.type });
-      
-      // Create a stable File object from the blob with the original filename
-      const stableFile = new File([stableBlob], file.name, { 
-        type: file.type,
-        lastModified: file.lastModified 
-      });
+    if (errors.length > 0) {
+      alert(t.ui.imageGallery.errors.someFilesSkipped + '\n' + errors.join('\n'));
+    }
 
-      // Create preview URL from the stable blob
-      const url = URL.createObjectURL(stableBlob);
-      setSelectedFile(stableFile);
-      setPreviewUrl(url);
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles]);
       setViewMode('confirm');
-    } catch (error) {
-      console.error('Failed to read file:', error);
-      alert('Failed to read the selected file. Please try again.');
     }
   };
 
-  // Confirm and upload the image
+  // Remove a single file from the selection
+  const removeFileFromSelection = (indexToRemove) => {
+    setSelectedFiles(prev => {
+      const newFiles = [...prev];
+      // Revoke the preview URL before removing
+      if (newFiles[indexToRemove]?.previewUrl) {
+        URL.revokeObjectURL(newFiles[indexToRemove].previewUrl);
+      }
+      newFiles.splice(indexToRemove, 1);
+      
+      // If no files left, go back to upload view
+      if (newFiles.length === 0) {
+        setViewMode('upload');
+      }
+      
+      return newFiles;
+    });
+  };
+
+  // Confirm and upload all selected images
   const confirmUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     setUploadingImage(true);
     setUploadProgress(0);
     setUploadError(null);
     setRetryCount(0);
+    setFailedUploads([]);
     
-    try {
-      const result = await encryptedApi.uploadImage(
-        selectedFile, 
-        description, 
-        'user',
-        // Progress callback
-        (percentComplete, loaded, total) => {
-          setUploadProgress(Math.round(percentComplete));
-        }
-      );
+    const totalFiles = selectedFiles.length;
+    let completedFiles = 0;
+    const failed = [];
+    const successCount = { value: 0 };
+    
+    // Calculate total size for progress
+    const totalSize = selectedFiles.reduce((sum, { file }) => sum + file.size, 0);
+    let uploadedSize = 0;
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const { file, previewUrl } = selectedFiles[i];
       
-      if (result.success) {
-        await loadImages(); // Refresh the gallery
-        resetUploadState();
-        setViewMode('gallery');
+      try {
+        const fileSize = file.size;
+        const startProgress = (uploadedSize / totalSize) * 100;
+        
+        await encryptedApi.uploadImage(
+          file, 
+          description, 
+          'user',
+          // Progress callback for individual file
+          (percentComplete, loaded, total) => {
+            const fileProgress = (loaded / total) * (fileSize / totalSize) * 100;
+            const overallProgress = startProgress + fileProgress;
+            setUploadProgress(Math.min(Math.round(overallProgress), 99));
+          }
+        );
+        
+        uploadedSize += fileSize;
+        completedFiles++;
+        successCount.value++;
+        
+        // Update progress after each successful upload
+        setUploadProgress(Math.round((uploadedSize / totalSize) * 100));
+        
+      } catch (error) {
+        console.error(`Upload error for ${file.name}:`, error);
+        failed.push({ 
+          file, 
+          previewUrl,
+          error: error.message || t.ui.imageGallery.errors.unknownError 
+        });
+      }
+    }
+    
+    setUploadProgress(100);
+    
+    // Handle results
+    if (failed.length > 0) {
+      setFailedUploads(failed);
+      
+      if (successCount.value > 0) {
+        // Partial success - some uploaded, some failed
+        await loadImages(); // Refresh gallery with successful uploads
+        alert(t.ui.imageGallery.success.partialUpload
+          .replace('{success}', successCount.value)
+          .replace('{total}', totalFiles)
+          .replace('{failed}', failed.length));
+      } else {
+        // All failed
+        setUploadError(t.ui.imageGallery.errors.allUploadsFailed);
+      }
+    } else {
+      // All successful
+      await loadImages();
+      resetUploadState();
+      setViewMode('gallery');
+      
+      if (totalFiles === 1) {
         alert(t.ui.imageGallery.success.uploadSuccess);
       } else {
-        const errorMessage = result.error || t.ui.imageGallery.errors.unknownError;
-        setUploadError(errorMessage);
-        alert(t.ui.imageGallery.errors.uploadFailed + errorMessage);
+        alert(t.ui.imageGallery.success.batchUploadSuccess.replace('{count}', totalFiles));
       }
-    } catch (error) {
-      console.error('Upload error:', error);
-      const errorMessage = error.message || t.ui.imageGallery.errors.unknownError;
-      setUploadError(errorMessage);
-      
-      // Provide more user-friendly error messages
-      let displayMessage = errorMessage;
-      if (errorMessage.includes('Network error') || errorMessage.includes('network')) {
-        displayMessage = 'Network error. Please check your internet connection and try again.';
-      } else if (errorMessage.includes('timed out') || errorMessage.includes('timeout')) {
-        displayMessage = 'Upload timed out. This may be due to a slow connection or large file size. Please try again.';
-      } else if (errorMessage.includes('Invalid file type')) {
-        displayMessage = 'Invalid file type. Please select a JPEG, PNG, GIF, or WebP image.';
-      } else if (errorMessage.includes('File too large')) {
-        displayMessage = 'File is too large. Maximum file size is 10MB.';
-      }
-      
-      alert(t.ui.imageGallery.errors.uploadFailed + displayMessage);
-    } finally {
-      setUploadingImage(false);
     }
+    
+    setUploadingImage(false);
   };
 
   // Reset upload state
   const resetUploadState = () => {
-    setSelectedFile(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    setPreviewUrl(null);
+    // Revoke all preview URLs
+    selectedFiles.forEach(({ previewUrl }) => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    });
+    failedUploads.forEach(({ previewUrl }) => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    });
+    
+    setSelectedFiles([]);
     setDescription('');
     setUploadProgress(0);
     setUploadError(null);
     setRetryCount(0);
+    setFailedUploads([]);
   };
 
   // Handle drag and drop events
@@ -323,7 +410,7 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      handleFileSelection(files[0]); // Only handle the first file
+      handleFilesSelection(files);
     }
   };
 
@@ -655,11 +742,12 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         </div>
       </div>
 
-      {/* Hidden file input */}
+      {/* Hidden file input - supports multiple files */}
       <input
         id="file-input"
         type="file"
         accept="image/*"
+        multiple
         onChange={handleImageUpload}
         style={{ display: 'none' }}
       />
@@ -692,8 +780,12 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
     </div>
   );
 
-  // Render confirmation view
-  const renderConfirm = () => (
+  // Render confirmation view for multi-image upload
+  const renderConfirm = () => {
+    const totalSize = selectedFiles.reduce((sum, { file }) => sum + file.size, 0);
+    const totalSizeMB = (totalSize / 1024 / 1024).toFixed(2);
+    
+    return (
     <div className="confirm-container">
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexDirection: 'column' }}>
         <Button
@@ -716,23 +808,108 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       </div>
 
       <h4 className="confirm-title" style={{ margin: '0 0 20px 0', color: '#ffffff' }}>
-        {t.ui.imageGallery.confirm.title}
+        {selectedFiles.length === 1 
+          ? t.ui.imageGallery.confirm.title
+          : (t.ui.imageGallery.confirm.titleMultiple || t.ui.imageGallery.confirm.title).replace('{count}', selectedFiles.length)
+        }
       </h4>
 
-      {/* Image Preview */}
+      {/* Image Preview Grid */}
       <div className="confirm-preview" style={{ marginBottom: '20px' }}>
-        <img
-          src={previewUrl}
-          alt={t.ui.imageGallery.confirm.previewAlt}
-          style={{
-            width: '100%',
-            maxHeight: '300px',
-            objectFit: 'contain',
-            border: '1px solid #444',
-            borderRadius: '8px',
-            backgroundColor: '#2a2a2a'
-          }}
-        />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: selectedFiles.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(120px, 1fr))',
+          gap: '10px',
+          width: '100%'
+        }}>
+          {selectedFiles.map(({ file, previewUrl }, index) => (
+            <div 
+              key={index}
+              style={{
+                position: 'relative',
+                border: '1px solid #444',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                backgroundColor: '#2a2a2a'
+              }}
+            >
+              <img
+                src={previewUrl}
+                alt={`${t.ui.imageGallery.confirm.previewAlt} ${index + 1}`}
+                style={{
+                  width: '100%',
+                  height: selectedFiles.length === 1 ? '300px' : '100px',
+                  objectFit: 'cover',
+                  display: 'block'
+                }}
+              />
+              {/* Remove button */}
+              <button
+                onClick={() => removeFileFromSelection(index)}
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  backgroundColor: 'rgba(244, 67, 54, 0.9)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  padding: 0
+                }}
+                title={t.ui.imageGallery.confirm.removeImage || 'Remove'}
+              >
+                ✕
+              </button>
+              {/* Filename overlay for multi-image */}
+              {selectedFiles.length > 1 && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  color: '#fff',
+                  fontSize: '10px',
+                  padding: '4px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {file.name}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        {/* Add more images button */}
+        {selectedFiles.length < MAX_BATCH_SIZE && (
+          <div style={{ marginTop: '10px', textAlign: 'center' }}>
+            <Button
+              onClick={() => document.getElementById('file-input-add').click()}
+              variant="secondary"
+              size="small"
+            >
+              {t.ui.imageGallery.confirm.addMoreImages || '+ Add more images'}
+            </Button>
+            <input
+              id="file-input-add"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              style={{ display: 'none' }}
+            />
+          </div>
+        )}
       </div>
 
       {/* File Information */}
@@ -745,9 +922,18 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
       }}>
         <h5 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>{t.ui.imageGallery.confirm.fileInfoTitle}</h5>
         <div style={{ fontSize: '14px', lineHeight: '1.5', color: '#cccccc' }}>
-          <div><strong>{t.ui.imageGallery.confirm.filenameLabel}</strong> {selectedFile?.name}</div>
-          <div><strong>{t.ui.imageGallery.confirm.sizeLabel}</strong> {selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : '0'} MB</div>
-          <div><strong>{t.ui.imageGallery.confirm.typeLabel}</strong> {selectedFile?.type}</div>
+          {selectedFiles.length === 1 ? (
+            <>
+              <div><strong>{t.ui.imageGallery.confirm.filenameLabel}</strong> {selectedFiles[0]?.file.name}</div>
+              <div><strong>{t.ui.imageGallery.confirm.sizeLabel}</strong> {(selectedFiles[0]?.file.size / 1024 / 1024).toFixed(2)} MB</div>
+              <div><strong>{t.ui.imageGallery.confirm.typeLabel}</strong> {selectedFiles[0]?.file.type}</div>
+            </>
+          ) : (
+            <>
+              <div><strong>{t.ui.imageGallery.confirm.imageCountLabel || 'Images:'}</strong> {selectedFiles.length} / {MAX_BATCH_SIZE}</div>
+              <div><strong>{t.ui.imageGallery.confirm.totalSizeLabel || 'Total size:'}</strong> {totalSizeMB} MB</div>
+            </>
+          )}
         </div>
       </div>
 
@@ -760,7 +946,10 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           border: '1px solid #444'
         }}>
           <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: '#ffffff', margin: '0 0 10px 0' }}>
-            {t.ui.imageGallery.confirm.descriptionLabel}
+            {selectedFiles.length > 1 
+              ? (t.ui.imageGallery.confirm.descriptionLabelMultiple || t.ui.imageGallery.confirm.descriptionLabel)
+              : t.ui.imageGallery.confirm.descriptionLabel
+            }
           </label>
           <DescriptionTextarea
             value={description}
@@ -771,7 +960,10 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
             showButtons={false}
           />
           <div className="confirm-hint" style={{ fontSize: '12px', color: '#cccccc', marginTop: '8px' }}>
-            {t.ui.imageGallery.confirm.descriptionHint}
+            {selectedFiles.length > 1
+              ? (t.ui.imageGallery.confirm.descriptionHintMultiple || t.ui.imageGallery.confirm.descriptionHint)
+              : t.ui.imageGallery.confirm.descriptionHint
+            }
           </div>
         </div>
       </div>
@@ -786,7 +978,9 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
         >
           {uploadingImage 
             ? t.ui.imageGallery.confirm.uploadingButton
-            : t.ui.imageGallery.confirm.uploadButton
+            : selectedFiles.length > 1
+              ? (t.ui.imageGallery.confirm.uploadButtonMultiple || t.ui.imageGallery.confirm.uploadButton).replace('{count}', selectedFiles.length)
+              : t.ui.imageGallery.confirm.uploadButton
           }
         </Button>
       </div>
@@ -800,7 +994,10 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           border: '1px solid #444'
         }}>
           <div style={{ fontSize: '14px', color: '#cccccc', marginBottom: '10px' }}>
-            {t.ui.imageGallery.confirm.uploadingMessage}
+            {selectedFiles.length > 1
+              ? (t.ui.imageGallery.confirm.uploadingMessageMultiple || t.ui.imageGallery.confirm.uploadingMessage)
+              : t.ui.imageGallery.confirm.uploadingMessage
+            }
           </div>
           
           {/* Progress bar */}
@@ -843,13 +1040,14 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
               marginTop: '8px',
               textAlign: 'center'
             }}>
-              Processing upload...
+              {t.ui.imageGallery.confirm.processingUpload || 'Processing upload...'}
             </div>
           )}
         </div>
       )}
 
-      {uploadError && !uploadingImage && (
+      {/* Failed uploads summary */}
+      {failedUploads.length > 0 && !uploadingImage && (
         <div style={{ 
           marginTop: '20px', 
           padding: '15px',
@@ -858,19 +1056,85 @@ const ImageGallery = ({ selectedNode, onPersonSelect, onTaggingModeChange, onVie
           border: '1px solid #f44336'
         }}>
           <div style={{ fontSize: '14px', color: '#f44336', marginBottom: '10px' }}>
-            <strong>Upload Failed:</strong> {uploadError}
+            <strong>{t.ui.imageGallery.errors.someUploadsFailed || 'Some uploads failed:'}</strong>
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+            gap: '10px',
+            marginBottom: '15px'
+          }}>
+            {failedUploads.map(({ file, previewUrl, error }, index) => (
+              <div key={index} style={{
+                backgroundColor: '#1a1a1a',
+                borderRadius: '4px',
+                padding: '8px',
+                border: '1px solid #f44336'
+              }}>
+                <img
+                  src={previewUrl}
+                  alt={file.name}
+                  style={{
+                    width: '100%',
+                    height: '60px',
+                    objectFit: 'cover',
+                    borderRadius: '4px',
+                    marginBottom: '4px'
+                  }}
+                />
+                <div style={{ 
+                  fontSize: '10px', 
+                  color: '#cccccc',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {file.name}
+                </div>
+                <div style={{ fontSize: '10px', color: '#f44336' }}>
+                  {error}
+                </div>
+              </div>
+            ))}
+          </div>
+          <Button
+            onClick={() => {
+              // Retry only failed uploads
+              setSelectedFiles(failedUploads.map(({ file, previewUrl }) => ({ file, previewUrl })));
+              setFailedUploads([]);
+              confirmUpload();
+            }}
+            variant="success"
+            size="medium"
+          >
+            {t.ui.imageGallery.confirm.retryFailed || 'Retry Failed Uploads'}
+          </Button>
+        </div>
+      )}
+
+      {uploadError && !uploadingImage && failedUploads.length === 0 && (
+        <div style={{ 
+          marginTop: '20px', 
+          padding: '15px',
+          backgroundColor: '#2a2a2a',
+          borderRadius: '5px',
+          border: '1px solid #f44336'
+        }}>
+          <div style={{ fontSize: '14px', color: '#f44336', marginBottom: '10px' }}>
+            <strong>{t.ui.imageGallery.errors.uploadFailed}</strong> {uploadError}
           </div>
           <Button
             onClick={confirmUpload}
             variant="success"
             size="medium"
           >
-            Retry Upload
+            {t.ui.imageGallery.confirm.retryUpload || 'Retry Upload'}
           </Button>
         </div>
       )}
     </div>
   );
+  };
   const renderImageView = () => (
     <div>
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexDirection: 'column' }}>

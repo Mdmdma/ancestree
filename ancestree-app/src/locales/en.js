@@ -108,10 +108,10 @@ export const en = {
       
       // Gallery view
       gallery: {
-        uploadButton: "📤 Upload Image",
+        uploadButton: "📤 Upload Images",
         refreshButton: "🔄 Refresh",
         noImagesTitle: "No images uploaded yet.",
-        noImagesDescription: "Click \"Upload Image\" to add your first family photo!",
+        noImagesDescription: "Click \"Upload Images\" to add your first family photo!",
         noDescription: "No description",
         personTagged: "person tagged",
         personsTagged: "persons tagged"
@@ -121,15 +121,15 @@ export const en = {
       upload: {
         backButton: "← Back to Gallery",
         dragDropTitle: "Drag & Drop or Click to Upload",
-        supportedFormats: "Supported formats: JPEG, PNG, GIF, WebP (Max 10MB)",
-        selectFileButton: "📁 Select File",
+        supportedFormats: "Supported formats: JPEG, PNG, GIF, WebP (Max 25MB per image, max. 15 images)",
+        selectFileButton: "📁 Select Files",
         dropHereMessage: "",
         howItWorksTitle: "📝 How it works:",
         steps: [
-          "Select or drag an image file",
-          "Add a description (optional but recommended)",
+          "Select one or more images or drag them in (max. 15)",
+          "Add a description (optional, applies to all images)",
           "Confirm and upload",
-          "Tag family members in the photo"
+          "Tag family members in the photos"
         ]
       },
       
@@ -138,17 +138,29 @@ export const en = {
         backButton: "← Back",
         cancelButton: "✖ Cancel",
         title: "📋 Confirm Upload",
+        titleMultiple: "📋 Upload {count} Images",
         previewAlt: "Preview",
         fileInfoTitle: "File Information",
         filenameLabel: "Filename:",
         sizeLabel: "Size:",
         typeLabel: "Type:",
+        imageCountLabel: "Images:",
+        totalSizeLabel: "Total size:",
         descriptionLabel: "Description (optional):",
+        descriptionLabelMultiple: "Description for all images (optional):",
         descriptionPlaceholder: "Enter a description for this image...",
         descriptionHint: "Add details about when and where this photo was taken, who is in it, or other relevant information.",
+        descriptionHintMultiple: "This description will be used for all selected images. You can adjust individual descriptions later.",
         uploadButton: "Upload Image",
+        uploadButtonMultiple: "Upload {count} Images",
         uploadingButton: "⏳ Uploading...",
-        uploadingMessage: "Please wait while your image is being uploaded..."
+        uploadingMessage: "Please wait while your image is being uploaded...",
+        uploadingMessageMultiple: "Please wait while your images are being uploaded...",
+        processingUpload: "Processing upload...",
+        removeImage: "Remove",
+        addMoreImages: "+ Add more images",
+        retryFailed: "Retry Failed Uploads",
+        retryUpload: "Retry Upload"
       },
       
       // View image
@@ -168,18 +180,24 @@ export const en = {
       // Error messages
       errors: {
         invalidFileType: "Please select a valid image file (JPEG, PNG, GIF, or WebP)",
-        fileSizeExceeded: "File size must be less than 10MB",
+        fileSizeExceeded: "File size must be less than 25MB",
         uploadFailed: "Failed to upload image: ",
         deleteFailed: "Failed to delete image: ",
         tagFailed: "Failed to tag person: ",
         removeFailed: "Failed to remove person: ",
         loadFailed: "Failed to load images:",
-        unknownError: "Unknown error"
+        unknownError: "Unknown error",
+        batchSizeExceeded: "Maximum {max} images can be uploaded at once.",
+        someFilesSkipped: "Some files were skipped:",
+        someUploadsFailed: "Some uploads failed:",
+        allUploadsFailed: "All uploads failed. Please try again."
       },
       
       // Success messages
       success: {
         uploadSuccess: "Image uploaded successfully!",
+        batchUploadSuccess: "{count} images uploaded successfully!",
+        partialUpload: "{success} of {total} images uploaded successfully. {failed} failed.",
         deleteSuccess: "Image deleted successfully!",
         personRemoved: "Person removed from image!"
       },

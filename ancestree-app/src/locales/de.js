@@ -108,10 +108,10 @@ export const de = {
       
       // Gallery view
       gallery: {
-        uploadButton: "📤 Bild hochladen",
+        uploadButton: "📤 Bilder hochladen",
         refreshButton: "🔄 Aktualisieren",
         noImagesTitle: "Noch keine Bilder hochgeladen.",
-        noImagesDescription: "Klicke auf \"Bild hochladen\", um dein erstes Familienfoto hinzuzufügen!",
+        noImagesDescription: "Klicke auf \"Bilder hochladen\", um dein erstes Familienfoto hinzuzufügen!",
         noDescription: "Keine Beschreibung",
         personTagged: "Person markiert",
         personsTagged: "Personen markiert"
@@ -121,15 +121,15 @@ export const de = {
       upload: {
         backButton: "← Zurück zur Galerie",
         dragDropTitle: "Per Drag & Drop oder Klick hochladen",
-        supportedFormats: "Unterstützte Formate: JPEG, PNG, GIF, WebP (Max 10MB)",
-        selectFileButton: "📁 Datei auswählen",
+        supportedFormats: "Unterstützte Formate: JPEG, PNG, GIF, WebP (Max 25MB pro Bild, max. 15 Bilder)",
+        selectFileButton: "📁 Dateien auswählen",
         dropHereMessage: "",
         howItWorksTitle: "📝 So funktioniert's:",
         steps: [
-          "Wähle eine Bilddatei aus oder ziehe sie herein",
-          "Füge eine Beschreibung hinzu (optional aber empfohlen)",
+          "Wähle ein oder mehrere Bilder aus oder ziehe sie herein (max. 15)",
+          "Füge eine Beschreibung hinzu (optional, gilt für alle Bilder)",
           "Bestätige und lade hoch",
-          "Markiere Familienmitglieder im Foto"
+          "Markiere Familienmitglieder in den Fotos"
         ]
       },
       
@@ -138,17 +138,29 @@ export const de = {
         backButton: "← Zurück",
         cancelButton: "✖ Abbrechen",
         title: "📋 Upload bestätigen",
+        titleMultiple: "📋 {count} Bilder hochladen",
         previewAlt: "Vorschau",
         fileInfoTitle: "Datei-Informationen",
         filenameLabel: "Dateiname:",
         sizeLabel: "Größe:",
         typeLabel: "Typ:",
+        imageCountLabel: "Bilder:",
+        totalSizeLabel: "Gesamtgröße:",
         descriptionLabel: "Beschreibung (optional):",
+        descriptionLabelMultiple: "Beschreibung für alle Bilder (optional):",
         descriptionPlaceholder: "Gib eine Beschreibung für dieses Bild ein...",
         descriptionHint: "Füge Details hinzu, wann und wo dieses Foto aufgenommen wurde, wer darauf zu sehen ist oder andere relevante Informationen.",
+        descriptionHintMultiple: "Diese Beschreibung wird für alle ausgewählten Bilder verwendet. Du kannst die Beschreibungen später einzeln anpassen.",
         uploadButton: "Bild hochladen",
+        uploadButtonMultiple: "{count} Bilder hochladen",
         uploadingButton: "⏳ Wird hochgeladen...",
-        uploadingMessage: "Bitte warte, während dein Bild hochgeladen wird..."
+        uploadingMessage: "Bitte warte, während dein Bild hochgeladen wird...",
+        uploadingMessageMultiple: "Bitte warte, während deine Bilder hochgeladen werden...",
+        processingUpload: "Upload wird verarbeitet...",
+        removeImage: "Entfernen",
+        addMoreImages: "+ Weitere Bilder hinzufügen",
+        retryFailed: "Fehlgeschlagene erneut versuchen",
+        retryUpload: "Erneut versuchen"
       },
       
       // View image
@@ -168,18 +180,24 @@ export const de = {
       // Error messages
       errors: {
         invalidFileType: "Bitte wähle eine gültige Bilddatei (JPEG, PNG, GIF oder WebP)",
-        fileSizeExceeded: "Die Dateigröße muss weniger als 10MB betragen",
+        fileSizeExceeded: "Die Dateigröße muss weniger als 25MB betragen",
         uploadFailed: "Fehler beim Hochladen des Bildes: ",
         deleteFailed: "Fehler beim Löschen des Bildes: ",
         tagFailed: "Fehler beim Markieren der Person: ",
         removeFailed: "Fehler beim Entfernen der Person: ",
         loadFailed: "Fehler beim Laden der Bilder:",
-        unknownError: "Unbekannter Fehler"
+        unknownError: "Unbekannter Fehler",
+        batchSizeExceeded: "Maximal {max} Bilder können gleichzeitig hochgeladen werden.",
+        someFilesSkipped: "Einige Dateien wurden übersprungen:",
+        someUploadsFailed: "Einige Uploads sind fehlgeschlagen:",
+        allUploadsFailed: "Alle Uploads sind fehlgeschlagen. Bitte versuche es erneut."
       },
       
       // Success messages
       success: {
         uploadSuccess: "Bild erfolgreich hochgeladen!",
+        batchUploadSuccess: "{count} Bilder erfolgreich hochgeladen!",
+        partialUpload: "{success} von {total} Bildern erfolgreich hochgeladen. {failed} fehlgeschlagen.",
         deleteSuccess: "Bild erfolgreich gelöscht!",
         personRemoved: "Person vom Bild entfernt!"
       },
