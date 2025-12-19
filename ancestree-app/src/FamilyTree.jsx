@@ -486,7 +486,7 @@ const FamilyTree = ({
       
       setEdges(eds => eds.map(e => 
         e.id === edgeToUpdate.id 
-          ? { ...e, ...edgeToUpdate }
+          ? { ...e, ...edgeToUpdate, data: { ...edgeToUpdate.data, isDebugMode: showDebug } }
           : e
       ));
     });

@@ -22,6 +22,9 @@ export default function PartnerEdge(props) {
 
   const { setEdges } = useReactFlow();
 
+  // Check if debug mode is active
+  const isDebugMode = data?.isDebugMode || false;
+
   // Check if this is an expartner edge
   const isExpartner = type === 'expartner';
 
@@ -38,23 +41,33 @@ export default function PartnerEdge(props) {
   });
 
   const handleToggle = async () => {
-    // Toggle between partner and expartner
-    const newType = isExpartner ? 'partner' : 'expartner';
-    
+    console.log('[PartnerEdge] handleToggle called:', { id, isExpartner, isDebugMode, data });
     try {
-      // Update the edge type in the database using encryptedApi
-      await encryptedApi.updateEdge(id, { type: newType });
-      
-      // Update the edge type in local state
-      setEdges((prevEdges) => 
-        prevEdges.map((edge) => 
-          edge.id === id 
-            ? { ...edge, type: newType }
-            : edge
-        )
-      );
+      if (isExpartner && isDebugMode) {
+        console.log('[PartnerEdge] Deleting expartner edge in debug mode');
+        // In debug mode: delete the expartner edge entirely
+        await encryptedApi.deleteEdge(id);
+        
+        // Remove the edge from local state
+        setEdges((prevEdges) => prevEdges.filter((edge) => edge.id !== id));
+      } else {
+        // Normal mode: toggle between partner and expartner
+        const newType = isExpartner ? 'partner' : 'expartner';
+        console.log('[PartnerEdge] Toggling edge type to:', newType);
+        
+        await encryptedApi.updateEdge(id, { type: newType });
+        
+        // Update the edge type in local state, preserving isDebugMode
+        setEdges((prevEdges) => 
+          prevEdges.map((edge) => 
+            edge.id === id 
+              ? { ...edge, type: newType, data: { ...edge.data, isDebugMode } }
+              : edge
+          )
+        );
+      }
     } catch (error) {
-      console.error('Failed to toggle edge type:', error);
+      console.error('Failed to update/delete edge:', error);
     }
   };
 
