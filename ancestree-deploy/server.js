@@ -3611,7 +3611,7 @@ app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
 
   try {
     const query = `
-      SELECT i.id, i.s3_url, i.description, i.original_filename, i.created_at, i.has_open_questions
+      SELECT i.id, i.s3_key, i.s3_url, i.description, i.original_filename, i.created_at, i.has_open_questions
       FROM images i
       INNER JOIN image_people ip ON i.id = ip.image_id
       WHERE ip.person_id = ?
@@ -3649,6 +3649,7 @@ app.get('/api/people/:personId/images', authenticateToken, (req, res) => {
           } else {
             images.push({
               id: row.id,
+              s3Key: row.s3_key,
               s3Url: row.s3_url,
               description: row.description,
               originalFilename: row.original_filename,
