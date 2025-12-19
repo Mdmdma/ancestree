@@ -104,7 +104,7 @@ const isBloodlineNode = (node) => {
 };
 
 // Validation function for connection rules
-const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, edges) => {
+const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, edges, t, nodes) => {
   // Helper function to count parent handle connections for a node
   const countParentConnections = (node) => {
     return edges.filter(edge => 
@@ -113,12 +113,92 @@ const validateConnection = (sourceNode, targetNode, sourceHandle, targetHandle, 
     ).length;
   };
   
+  // Helper function to check if two persons have a partner edge between them
+  const hasPartnerEdgeBetween = (personId1, personId2) => {
+    return edges.some(edge => 
+      isPartnerEdge(edge) && 
+      ((edge.source === personId1 && edge.target === personId2) ||
+       (edge.source === personId2 && edge.target === personId1))
+    );
+  };
+  
+  // Helper function to get all persons connected to a family's parentconnection
+  const getParentsOfFamily = (familyNodeId) => {
+    return edges
+      .filter(edge => 
+        (edge.target === familyNodeId && edge.targetHandle === 'parentconnection') ||
+        (edge.source === familyNodeId && edge.sourceHandle === 'parentconnection')
+      )
+      .map(edge => edge.target === familyNodeId ? edge.source : edge.target);
+  };
+  
   // Prohibit direct Family-to-Family connections
   if (sourceNode.type === 'family' && targetNode.type === 'family') {
     return { 
       isValid: false, 
       message: t.ui.editor.validationMessages.familyToFamily
     };
+  }
+  
+  // Family parentconnection can only connect to person child handles (not partner handles)
+  if (sourceNode.type === 'family' && targetNode.type === 'person') {
+    if (sourceHandle === 'parentconnection' && targetHandle?.includes('partner')) {
+      return {
+        isValid: false,
+        message: t.ui.editor.validationMessages.familyParentToPartnerHandle
+      };
+    }
+  }
+  
+  if (sourceNode.type === 'person' && targetNode.type === 'family') {
+    if (targetHandle === 'parentconnection' && sourceHandle?.includes('partner')) {
+      return {
+        isValid: false,
+        message: t.ui.editor.validationMessages.familyParentToPartnerHandle
+      };
+    }
+  }
+  
+  // When connecting a person to a family's parentconnection, check partner edges with existing parents
+  if (targetNode.type === 'family' && targetHandle === 'parentconnection' && sourceNode.type === 'person') {
+    const existingParentIds = getParentsOfFamily(targetNode.id);
+    
+    for (const existingParentId of existingParentIds) {
+      if (existingParentId !== sourceNode.id && !hasPartnerEdgeBetween(sourceNode.id, existingParentId)) {
+        // Find the existing parent's name for the error message
+        const existingParentNode = nodes?.find(n => n.id === existingParentId);
+        const existingParentName = existingParentNode?.data?.name || 'Unknown';
+        const newParentName = sourceNode.data?.name || 'Unknown';
+        
+        return {
+          isValid: false,
+          message: t.ui.editor.validationMessages.missingPartnerEdge
+            .replace('{name1}', newParentName)
+            .replace('{name2}', existingParentName)
+        };
+      }
+    }
+  }
+  
+  // Also check the reverse direction (family's parentconnection as source)
+  if (sourceNode.type === 'family' && sourceHandle === 'parentconnection' && targetNode.type === 'person') {
+    const existingParentIds = getParentsOfFamily(sourceNode.id);
+    
+    for (const existingParentId of existingParentIds) {
+      if (existingParentId !== targetNode.id && !hasPartnerEdgeBetween(targetNode.id, existingParentId)) {
+        // Find the existing parent's name for the error message
+        const existingParentNode = nodes?.find(n => n.id === existingParentId);
+        const existingParentName = existingParentNode?.data?.name || 'Unknown';
+        const newParentName = targetNode.data?.name || 'Unknown';
+        
+        return {
+          isValid: false,
+          message: t.ui.editor.validationMessages.missingPartnerEdge
+            .replace('{name1}', newParentName)
+            .replace('{name2}', existingParentName)
+        };
+      }
+    }
   }
   
   // Prohibit direct Person parent-to-child connections
@@ -1388,7 +1468,9 @@ const FamilyTree = ({
         targetNode, 
         params.sourceHandle, 
         params.targetHandle,
-        edges
+        edges,
+        t,
+        nodes
       );
       
       if (!validationResult.isValid) {
@@ -1710,7 +1792,9 @@ const FamilyTree = ({
               virtualTargetNode,
               sourceHandle,
               virtualTargetHandle,
-              edges
+              edges,
+              t,
+              nodes
             );
             
             if (!validationResult.isValid) {

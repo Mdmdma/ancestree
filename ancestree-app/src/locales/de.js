@@ -71,7 +71,9 @@ export const de = {
         partnerNodeMultiplePartners: "{name} ist bereits mit einem Blutlinien-Partner verbunden. Partner-Knoten können nur einen Partner haben.",
         bloodlineToBloodlinePartner: "Damit das automatische Layout funktioniert, könne Blutlinien Knoten nicht miteinander verbunden werden. Sollte dies erforderlich sein, füge die Entsprechende Person erneut als Partner hinzu",
         partnerNodeParentHandle: "{name} ist ein Partner-Knoten und kann den Eltern-Anschluss nicht verwenden. Partner-Knoten können nur über Kind-Anschlüsse Familien bilden.",
-        bloodlineMultipleParents: "{name} hat bereits {count} Eltern-Verbindung(en). Blutlinien-Knoten können nur eine Eltern-Familie haben."
+        bloodlineMultipleParents: "{name} hat bereits {count} Eltern-Verbindung(en). Blutlinien-Knoten können nur eine Eltern-Familie haben.",
+        familyParentToPartnerHandle: "Der Eltern-Anschluss eines Familien-Knotens kann nur mit Kind-Anschlüssen von Personen verbunden werden, nicht mit Partner-Anschlüssen.",
+        missingPartnerEdge: "{name1} und {name2} müssen als Partner verbunden sein, bevor sie gemeinsam als Eltern einer Familie verbunden werden können. Erstelle zuerst eine Partner-Verbindung zwischen ihnen."
       },
 
       // Debug information

@@ -71,7 +71,9 @@ export const en = {
         partnerNodeMultiplePartners: "{name} is already connected to a bloodline partner. Partner nodes can only have one partner.",
         bloodlineToBloodlinePartner: "For automatic layout to work, bloodline nodes cannot be connected to each other. If necessary, add the corresponding person again as a partner.",
         partnerNodeParentHandle: "{name} is a partner node and cannot use the parent handle. Partner nodes can only form families through child handles.",
-        bloodlineMultipleParents: "{name} already has {count} parent connection(s). Bloodline nodes can only have one parent family."
+        bloodlineMultipleParents: "{name} already has {count} parent connection(s). Bloodline nodes can only have one parent family.",
+        familyParentToPartnerHandle: "The parent connection of a family node can only connect to child handles of persons, not to partner handles.",
+        missingPartnerEdge: "{name1} and {name2} must be connected as partners before they can be connected together as parents of a family. Create a partner connection between them first."
       },
 
       // Debug information
