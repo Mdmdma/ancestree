@@ -562,6 +562,16 @@ const initializeFamilyDb = (familyDb) => {
           }
         });
       }
+      
+      if (!columnNames.includes('thumbnail_s3_key')) {
+        familyDb.run("ALTER TABLE images ADD COLUMN thumbnail_s3_key TEXT", (err) => {
+          if (err) {
+            console.error('Error adding thumbnail_s3_key column to images:', err);
+          } else {
+            console.log('Added thumbnail_s3_key column to images table');
+          }
+        });
+      }
     });
 
     // Migration: Add has_tagged_image column to nodes table if it doesn't exist

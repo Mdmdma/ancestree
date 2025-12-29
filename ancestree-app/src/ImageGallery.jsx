@@ -1,15 +1,59 @@
 import { encryptedApi } from './encryptedApi';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 import { useTranslation } from './locales/LanguageContext';
 import PictureSlideshow from './PictureSlideshow';
 import DescriptionTextarea from './components/DescriptionTextarea';
 import Button from './components/Button';
+import { generateThumbnail } from './thumbnailUtils';
 
-// Memoized ImageThumbnail component to prevent unnecessary re-renders
-const ImageThumbnail = React.memo(({ image, onClick, translations }) => {
+// Memoized ImageThumbnail component with lazy loading
+const ImageThumbnail = React.memo(({ image, onClick, translations, onLoadFullImage }) => {
+  const [currentSrc, setCurrentSrc] = useState(image.thumbnailUrl || image.s3Url);
+  const [isLoadingFull, setIsLoadingFull] = useState(false);
+  const imgRef = React.useRef(null);
+
+  // Use Intersection Observer to detect when thumbnail is visible
+  useEffect(() => {
+    if (!image.thumbnailUrl || isLoadingFull) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !isLoadingFull) {
+            setIsLoadingFull(true);
+            // Load full image in background when thumbnail becomes visible
+            const fullImg = new Image();
+            fullImg.src = image.s3Url;
+            fullImg.onload = () => {
+              setCurrentSrc(image.s3Url);
+              if (onLoadFullImage) {
+                onLoadFullImage(image.id);
+              }
+            };
+            fullImg.onerror = () => {
+              console.warn(`Failed to load full image for ${image.id}, keeping thumbnail`);
+            };
+          }
+        });
+      },
+      { rootMargin: '50px' } // Start loading slightly before visible
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    return () => {
+      if (imgRef.current) {
+        observer.unobserve(imgRef.current);
+      }
+    };
+  }, [image.id, image.s3Url, image.thumbnailUrl, isLoadingFull, onLoadFullImage]);
+
   return (
     <div
+      ref={imgRef}
       style={{
         border: image.has_open_questions ? '3px solid #dc3545' : '1px solid #444',
         borderRadius: '8px',
@@ -23,7 +67,7 @@ const ImageThumbnail = React.memo(({ image, onClick, translations }) => {
       onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
     >
       <img
-        src={image.s3Url}
+        src={currentSrc}
         alt={image.description || image.originalFilename}
         style={{
           width: '100%',
@@ -60,6 +104,8 @@ const ImageThumbnail = React.memo(({ image, onClick, translations }) => {
          prevProps.image.has_open_questions === nextProps.image.has_open_questions &&
          prevProps.image.description === nextProps.image.description &&
          prevProps.image.people.length === nextProps.image.people.length &&
+         prevProps.image.thumbnailUrl === nextProps.image.thumbnailUrl &&
+         prevProps.image.s3Url === nextProps.image.s3Url &&
          prevProps.translations === nextProps.translations;
 });
 
@@ -94,6 +140,8 @@ const ImageDisplay = React.memo(({
     <img
       src={s3Url}
       alt={description || originalFilename}
+      data-image-url={s3Url}
+      crossOrigin="anonymous"
       style={{
         width: '100%',
         maxHeight: '400px',
@@ -139,6 +187,9 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
   const [retryCount, setRetryCount] = useState(0);
   // Track failed uploads for summary display
   const [failedUploads, setFailedUploads] = useState([]); // Array of { file, error }
+  // Track images being processed for thumbnail generation
+  const [thumbnailGenerationQueue, setThumbnailGenerationQueue] = useState(new Set());
+  const isGeneratingThumbnailsRef = useRef(false);
 
   // Notify parent of viewMode changes for mobile sidebar height adjustment
   useEffect(() => {
@@ -165,6 +216,134 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
   useEffect(() => {
     loadImages();
   }, [loadImages]);
+
+  // Generate thumbnail for an image that doesn't have one (backward fill)
+  // NOTE: This requires S3 CORS configuration to work properly
+  // For images uploaded before thumbnail feature was implemented
+  const generateThumbnailForImage = useCallback(async (image) => {
+    // Skip if already in queue or already has thumbnail
+    if (thumbnailGenerationQueue.has(image.id) || image.thumbnailS3Key || image.thumbnailUrl) {
+      return;
+    }
+
+    // Add to queue
+    setThumbnailGenerationQueue(prev => new Set([...prev, image.id]));
+
+    try {
+      console.log(`[Thumbnail] Attempting to generate thumbnail for image ${image.id}`);
+      console.log('[Thumbnail] NOTE: This requires S3 bucket CORS configuration allowing GET requests');
+      
+      // Wait for the image element to be loaded in DOM
+      const waitForImage = () => {
+        return new Promise((resolve, reject) => {
+          const checkImage = () => {
+            const imgElement = document.querySelector(`img[data-image-url="${image.s3Url}"]`);
+            if (imgElement && imgElement.complete) {
+              resolve(imgElement);
+            } else if (imgElement) {
+              // Image found but not loaded yet, wait for load event
+              imgElement.addEventListener('load', () => resolve(imgElement), { once: true });
+              imgElement.addEventListener('error', () => reject(new Error('Image failed to load')), { once: true });
+            } else {
+              // Image not in DOM yet, retry after a short delay
+              setTimeout(checkImage, 100);
+            }
+          };
+          checkImage();
+          // Timeout after 10 seconds
+          setTimeout(() => reject(new Error('Timeout waiting for image to load')), 10000);
+        });
+      };
+      
+      const imgElement = await waitForImage();
+      
+      // Create a canvas to extract image data
+      const canvas = document.createElement('canvas');
+      canvas.width = imgElement.naturalWidth;
+      canvas.height = imgElement.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(imgElement, 0, 0);
+      
+      // Convert canvas to blob
+      const imageBlob = await new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to create blob from canvas'));
+        }, image.mimeType || 'image/jpeg', 0.95);
+      });
+      
+      const imageFile = new File([imageBlob], image.originalFilename || 'image.jpg', { 
+        type: image.mimeType || 'image/jpeg' 
+      });
+      
+      // Generate thumbnail
+      const { blob: thumbnailBlob } = await generateThumbnail(imageFile);
+      
+      // Upload thumbnail and update image record
+      const result = await encryptedApi.addThumbnailToImage(
+        image.id, 
+        thumbnailBlob, 
+        image.s3Key
+      );
+      
+      console.log(`[Thumbnail] Successfully created thumbnail for image ${image.id}`);
+      
+      // Update local state with new thumbnail URL
+      setImages(prevImages => prevImages.map(img => 
+        img.id === image.id 
+          ? { ...img, thumbnailUrl: result.thumbnailUrl, thumbnailS3Key: result.thumbnailS3Key }
+          : img
+      ));
+      
+    } catch (error) {
+      const isCORSError = error.message.includes('Tainted') || error.message.includes('CORS') || error.message.includes('cross-origin');
+      
+      if (isCORSError) {
+        console.warn(`[Thumbnail] Cannot generate thumbnail due to CORS restrictions. S3 bucket needs CORS configuration to allow GET requests with 'Access-Control-Allow-Origin: *'`);
+        console.warn(`[Thumbnail] Image ${image.id} will continue to use full-size image. New uploads will have thumbnails.`);
+      } else {
+        console.error(`[Thumbnail] Failed to generate thumbnail for image ${image.id}:`, error);
+      }
+    } finally {
+      // Remove from queue
+      setThumbnailGenerationQueue(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(image.id);
+        return newSet;
+      });
+    }
+  }, [thumbnailGenerationQueue]);
+
+  // Batch generate thumbnails for images without them
+  const batchGenerateMissingThumbnails = useCallback(async (imagesToProcess, batchSize = 3) => {
+    if (isGeneratingThumbnailsRef.current) {
+      console.log('[Thumbnail] Already generating thumbnails, skipping batch');
+      return;
+    }
+
+    isGeneratingThumbnailsRef.current = true;
+
+    try {
+      for (let i = 0; i < imagesToProcess.length; i += batchSize) {
+        const batch = imagesToProcess.slice(i, i + batchSize);
+        
+        // Process batch in parallel
+        await Promise.all(batch.map(img => generateThumbnailForImage(img)));
+        
+        // Small delay between batches
+        if (i + batchSize < imagesToProcess.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+    } finally {
+      isGeneratingThumbnailsRef.current = false;
+    }
+  }, [generateThumbnailForImage]);
+
+  // Callback when full image is loaded (for tracking)
+  const handleFullImageLoaded = useCallback((imageId) => {
+    console.log(`[Thumbnail] Full image loaded for ${imageId}`);
+  }, []);
 
   // Listen for Socket.IO question toggle events
   useEffect(() => {
@@ -367,10 +546,20 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
         const fileSize = file.size;
         const startProgress = (uploadedSize / totalSize) * 100;
         
+        // Generate thumbnail before upload
+        let thumbnailBlob = null;
+        try {
+          const { blob } = await generateThumbnail(file);
+          thumbnailBlob = blob;
+        } catch (thumbnailError) {
+          console.warn(`Failed to generate thumbnail for ${file.name}, uploading without thumbnail:`, thumbnailError);
+        }
+        
         await encryptedApi.uploadImage(
           file, 
-          description, 
+          description,
           'user',
+          thumbnailBlob, // Pass thumbnail blob to upload function
           // Progress callback for individual file
           (percentComplete, loaded, total) => {
             const fileProgress = (loaded / total) * (fileSize / totalSize) * 100;
@@ -723,7 +912,12 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
                 setTaggingMode(false); // Reset tagging mode when selecting a new image
                 setSelectedImage(image);
                 setViewMode('view');
+                // Generate thumbnail in background if missing
+                if (!image.thumbnailS3Key && !image.thumbnailUrl) {
+                  generateThumbnailForImage(image);
+                }
               }}
+              onLoadFullImage={handleFullImageLoaded}
             />
           ))}
         </div>

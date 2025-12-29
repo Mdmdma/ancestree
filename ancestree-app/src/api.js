@@ -690,7 +690,7 @@ export const api = {
   },
   
   // Step 3: Confirm upload and save metadata to database
-  async confirmImageUpload(s3Key, originalFilename, description, fileSize, mimeType, uploadedBy = 'user') {
+  async confirmImageUpload(s3Key, originalFilename, description, fileSize, mimeType, uploadedBy = 'user', thumbnailS3Key = null) {
     const response = await fetch(`${API_BASE_URL}/images/confirm-upload`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -700,7 +700,8 @@ export const api = {
         description, 
         fileSize, 
         mimeType, 
-        uploadedBy 
+        uploadedBy,
+        thumbnailS3Key
       })
     });
     
@@ -712,10 +713,36 @@ export const api = {
     return response.json();
   },
   
-  // Combined upload function (handles all 3 steps)
+  // Upload thumbnail to S3
+  async uploadThumbnail(thumbnailBlob, thumbnailFilename, originalS3Key, onProgress = null) {
+    const fileType = 'image/jpeg'; // Thumbnails are always JPEG
+    const fileSize = thumbnailBlob.size;
+
+    // Use retry logic for the upload
+    return this.retryWithBackoff(async (attempt) => {
+      // Step 1: Get presigned upload URL for thumbnail
+      if (onProgress) onProgress(0, 0, fileSize);
+      const { uploadUrl, s3Key: thumbnailS3Key } = await this.getPresignedUploadUrl(
+        thumbnailFilename, 
+        fileType, 
+        fileSize
+      );
+      
+      // Step 2: Upload thumbnail directly to S3
+      await this.uploadToS3(uploadUrl, thumbnailBlob, (percent, loaded, total) => {
+        if (onProgress) {
+          onProgress(percent, loaded, total);
+        }
+      });
+      
+      return { thumbnailS3Key };
+    }, 3, 1000);
+  },
+
+  // Combined upload function (handles all steps for both image and thumbnail)
   // Note: For Android compatibility, the file should already be read into memory
   // (as a stable File/Blob) before calling this function. See ImageGallery.jsx.
-  async uploadImage(file, description, uploadedBy = 'user', onProgress = null) {
+  async uploadImage(file, description, uploadedBy = 'user', thumbnailBlob = null, onProgress = null) {
     // Validate file on client side before attempting upload
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
@@ -731,35 +758,63 @@ export const api = {
     const safeFilename = sanitizeFilename(file.name);
     const fileType = file.type;
     const fileSize = file.size;
+    const thumbnailSize = thumbnailBlob ? thumbnailBlob.size : 0;
+    const totalSize = fileSize + thumbnailSize;
 
     // Use retry logic for the upload
     return this.retryWithBackoff(async (attempt) => {
-      // Step 1: Get presigned upload URL from backend
-      if (onProgress) onProgress(5, 0, fileSize);
+      // Step 1: Get presigned upload URL from backend for main image
+      if (onProgress) onProgress(3, 0, totalSize);
       const { uploadUrl, s3Key } = await this.getPresignedUploadUrl(safeFilename, fileType, fileSize);
       
-      // Step 2: Upload directly to S3
-      if (onProgress) onProgress(10, 0, fileSize);
+      // Step 2: Upload main image directly to S3
+      if (onProgress) onProgress(5, 0, totalSize);
       await this.uploadToS3(uploadUrl, file, (percent, loaded, total) => {
-        // Scale progress from 10% to 90%
+        // Scale main image progress from 5% to 50%
         if (onProgress) {
-          const scaledPercent = 10 + (percent * 0.8);
-          onProgress(scaledPercent, loaded, total);
+          const scaledPercent = 5 + (percent * 0.45);
+          onProgress(scaledPercent, loaded, totalSize);
         }
       });
       
-      // Step 3: Confirm upload and save metadata
-      if (onProgress) onProgress(95, fileSize, fileSize);
+      // Step 3: Upload thumbnail if provided
+      let thumbnailS3Key = null;
+      if (thumbnailBlob) {
+        if (onProgress) onProgress(50, fileSize, totalSize);
+        
+        // Generate thumbnail filename from original filename
+        const thumbnailFilename = sanitizeFilename(
+          safeFilename.replace(/(\.[^.]+)$/, '.thumbnail.jpg')
+        );
+        
+        const { thumbnailS3Key: uploadedThumbnailKey } = await this.uploadThumbnail(
+          thumbnailBlob,
+          thumbnailFilename,
+          s3Key,
+          (percent, loaded, total) => {
+            // Scale thumbnail progress from 50% to 85%
+            if (onProgress) {
+              const scaledPercent = 50 + (percent * 0.35);
+              onProgress(scaledPercent, fileSize + loaded, totalSize);
+            }
+          }
+        );
+        thumbnailS3Key = uploadedThumbnailKey;
+      }
+      
+      // Step 4: Confirm upload and save metadata
+      if (onProgress) onProgress(90, totalSize, totalSize);
       const result = await this.confirmImageUpload(
         s3Key, 
         safeFilename, 
         description, 
         fileSize, 
         fileType, 
-        uploadedBy
+        uploadedBy,
+        thumbnailS3Key
       );
       
-      if (onProgress) onProgress(100, fileSize, fileSize);
+      if (onProgress) onProgress(100, totalSize, totalSize);
       return result;
     }, 3, 1000); // 3 retries, starting with 1 second delay
   },
@@ -861,6 +916,32 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
+    return response.json();
+  },
+
+  // Add thumbnail to existing image (for backward fill)
+  async addThumbnailToImage(imageId, thumbnailBlob, originalS3Key) {
+    // Generate thumbnail filename from original S3 key
+    const thumbnailFilename = originalS3Key.split('/').pop().replace(/(\.[^.]+)$/, '.thumbnail.jpg');
+    
+    // Upload thumbnail to S3
+    const { thumbnailS3Key } = await this.uploadThumbnail(
+      thumbnailBlob,
+      thumbnailFilename,
+      originalS3Key
+    );
+    
+    // Update image record with thumbnail S3 key
+    const response = await fetch(`${API_BASE_URL}/images/${imageId}/thumbnail`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ thumbnailS3Key })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to add thumbnail to image');
+    }
+    
     return response.json();
   },
 

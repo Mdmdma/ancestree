@@ -565,11 +565,19 @@ export const encryptedApi = {
       let urlsFromKeys = {};
       let urlsFromIds = {};
       
-      // Batch fetch presigned URLs using s3Keys for decrypted images
+      // Collect all S3 keys to fetch (both full images and thumbnails)
       if (decryptedKeyImages.length > 0) {
-        const s3Keys = decryptedKeyImages.map(img => img.s3Key);
+        const allS3Keys = [];
+        
+        for (const img of decryptedKeyImages) {
+          allS3Keys.push(img.s3Key);
+          if (img.thumbnailS3Key && !img.thumbnailS3Key.startsWith('enc:')) {
+            allS3Keys.push(img.thumbnailS3Key);
+          }
+        }
+        
         try {
-          const response = await baseApi.getPresignedViewUrlsByKeys(s3Keys);
+          const response = await baseApi.getPresignedViewUrlsByKeys(allS3Keys);
           urlsFromKeys = response.urls || {};
         } catch (error) {
           console.error('[EncryptedAPI] Error fetching URLs by s3Keys:', error);
@@ -593,6 +601,7 @@ export const encryptedApi = {
       // Map presigned URLs back to images
       return images.map(image => {
         let presignedUrl = null;
+        let thumbnailUrl = null;
         
         // First try to find URL by s3Key
         if (image.s3Key && urlsFromKeys[image.s3Key]) {
@@ -603,19 +612,26 @@ export const encryptedApi = {
           presignedUrl = urlsFromIds[image.id];
         }
         
-        if (presignedUrl) {
-          return {
-            ...image,
-            s3Url: presignedUrl
-          };
+        // Resolve thumbnail URL if available
+        if (image.thumbnailS3Key && !image.thumbnailS3Key.startsWith('enc:') && urlsFromKeys[image.thumbnailS3Key]) {
+          thumbnailUrl = urlsFromKeys[image.thumbnailS3Key];
+        }
+        
+        const result = {
+          ...image,
+          s3Url: presignedUrl || image.s3Url || ''
+        };
+        
+        if (thumbnailUrl) {
+          result.thumbnailUrl = thumbnailUrl;
         }
         
         // If still no URL, log a warning
-        if (!image.s3Url || image.s3Url === '') {
+        if (!result.s3Url || result.s3Url === '') {
           console.warn(`[EncryptedAPI] Could not resolve presigned URL for image ${image.id}`);
         }
         
-        return image;
+        return result;
       });
     } catch (error) {
       console.error('[EncryptedAPI] Error resolving image URLs:', error);
@@ -736,10 +752,10 @@ export const encryptedApi = {
   },
   
   // Image operations with encryption
-  async uploadImage(file, description, uploadedBy = 'user', onProgress = null) {
+  async uploadImage(file, description, uploadedBy = 'user', thumbnailBlob = null, onProgress = null) {
     // Upload the image using presigned URL (handled by baseApi)
-    // Pass all parameters to baseApi including the progress callback
-    const result = await baseApi.uploadImage(file, description, uploadedBy, onProgress);
+    // Pass all parameters to baseApi including thumbnail and progress callback
+    const result = await baseApi.uploadImage(file, description, uploadedBy, thumbnailBlob, onProgress);
     
     // If encryption is enabled, immediately encrypt the metadata
     if (isEncryptionEnabled() && result.success && result.image) {
@@ -750,6 +766,7 @@ export const encryptedApi = {
         filename: result.image.filename,
         originalFilename: result.image.originalFilename,
         s3Key: result.image.s3Key,
+        thumbnailS3Key: result.image.thumbnail_s3_key || result.image.thumbnailS3Key,
         // s3Url is now a presigned URL, we don't need to store it permanently
         uploadedBy: result.image.uploadedBy,
         description: result.image.description,
@@ -771,6 +788,23 @@ export const encryptedApi = {
           // The s3Url from result is already a presigned URL
         }
       };
+    }
+    
+    return result;
+  },
+  
+  // Add thumbnail to existing image (backward fill)
+  async addThumbnailToImage(imageId, thumbnailBlob, originalS3Key) {
+    const result = await baseApi.addThumbnailToImage(imageId, thumbnailBlob, originalS3Key);
+    
+    // If encryption is enabled, encrypt the thumbnail S3 key
+    if (isEncryptionEnabled() && result.success && result.thumbnailS3Key) {
+      const encryptedThumbnailKey = await encryptImageData({ 
+        thumbnailS3Key: result.thumbnailS3Key 
+      });
+      
+      // Update with encrypted thumbnail key
+      await baseApi.updateImage(imageId, encryptedThumbnailKey);
     }
     
     return result;

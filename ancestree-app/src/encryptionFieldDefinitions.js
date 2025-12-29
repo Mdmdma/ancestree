@@ -90,7 +90,7 @@ export const EDGE_DB_ENCRYPTED_COLUMNS = [
 
 /**
  * Image fields to encrypt
- * Per user requirements: uploadedBy, originalFilename, filename, s3Key, s3Url, description
+ * Per user requirements: uploadedBy, originalFilename, filename, s3Key, s3Url, description, thumbnailS3Key
  * Description max length: 1000 characters
  */
 export const IMAGE_ENCRYPTED_FIELDS = [
@@ -100,6 +100,7 @@ export const IMAGE_ENCRYPTED_FIELDS = [
   'uploadedBy',
   's3Key',
   's3Url',
+  'thumbnailS3Key',
   'uploadDate',  // Date as string
   'fileSize',    // Size as string
   'mimeType',
@@ -119,6 +120,7 @@ export const IMAGE_DB_ENCRYPTED_COLUMNS = [
   'uploaded_by',
   's3_key',
   's3_url',
+  'thumbnail_s3_key',
   'upload_date',
   'file_size',
   'mime_type'

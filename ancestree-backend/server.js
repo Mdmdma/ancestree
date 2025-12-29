@@ -2931,7 +2931,7 @@ app.post('/api/images/presigned-upload', authenticateToken, (req, res) => {
 // Confirm upload and save image metadata to database
 app.post('/api/images/confirm-upload', authenticateToken, (req, res) => {
   const familyName = req.user.familyName;
-  const { s3Key, originalFilename, description, fileSize, mimeType, uploadedBy } = req.body;
+  const { s3Key, originalFilename, description, fileSize, mimeType, uploadedBy, thumbnailS3Key } = req.body;
   
   if (!s3Key || !originalFilename) {
     return res.status(400).json({ 
@@ -2951,6 +2951,7 @@ app.post('/api/images/confirm-upload', authenticateToken, (req, res) => {
       original_filename: originalFilename,
       s3_key: s3Key,
       s3_url: '', // No longer storing public URLs
+      thumbnail_s3_key: thumbnailS3Key || null,
       description: description || '',
       file_size: fileSize || 0,
       mime_type: mimeType || 'image/jpeg',
@@ -2959,8 +2960,8 @@ app.post('/api/images/confirm-upload', authenticateToken, (req, res) => {
 
     familyDb.run(`INSERT INTO images (
       id, filename, original_filename, s3_key, s3_url, description, 
-      file_size, mime_type, uploaded_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      file_size, mime_type, uploaded_by, thumbnail_s3_key
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       imageData.id,
       imageData.filename,
       imageData.original_filename,
@@ -2969,7 +2970,8 @@ app.post('/api/images/confirm-upload', authenticateToken, (req, res) => {
       imageData.description,
       imageData.file_size,
       imageData.mime_type,
-      imageData.uploaded_by
+      imageData.uploaded_by,
+      imageData.thumbnail_s3_key
     ], function(err) {
       if (err) {
         console.error('Database error:', err);
@@ -2979,14 +2981,16 @@ app.post('/api/images/confirm-upload', authenticateToken, (req, res) => {
         });
       }
 
-      // Generate a presigned view URL for immediate display
+      // Generate presigned view URLs for immediate display
       const viewUrl = generatePresignedViewUrl(s3Key);
+      const thumbnailUrl = thumbnailS3Key ? generatePresignedViewUrl(thumbnailS3Key) : null;
 
       res.json({
         success: true,
         image: {
           ...imageData,
-          s3Url: viewUrl // Provide presigned URL for immediate use
+          s3Url: viewUrl, // Provide presigned URL for immediate use
+          thumbnailUrl: thumbnailUrl
         }
       });
     });
@@ -3158,6 +3162,7 @@ app.get('/api/images', authenticateToken, (req, res) => {
           originalFilename: row.original_filename,
           s3Key: row.s3_key,
           s3Url: row.s3_url,
+          thumbnailS3Key: row.thumbnail_s3_key,
           description: row.description,
           uploadDate: row.upload_date,
           fileSize: row.file_size,
@@ -3210,6 +3215,7 @@ app.get('/api/images/:id', authenticateToken, (req, res) => {
           originalFilename: imageRow.original_filename,
           s3Key: imageRow.s3_key,
           s3Url: imageRow.s3_url,
+          thumbnailS3Key: imageRow.thumbnail_s3_key,
           description: imageRow.description,
           uploadDate: imageRow.upload_date,
           fileSize: imageRow.file_size,
@@ -3480,6 +3486,48 @@ app.put('/api/images/:id/question', authenticateToken, (req, res) => {
   } catch (error) {
     console.error('Error toggling image question:', error);
     res.status(500).json({ error: 'Failed to toggle image question' });
+  }
+});
+
+// Add thumbnail to existing image (for backward fill)
+app.put('/api/images/:id/thumbnail', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const { thumbnailS3Key } = req.body;
+  const familyName = req.user.familyName;
+
+  if (!thumbnailS3Key) {
+    return res.status(400).json({ error: 'thumbnailS3Key is required' });
+  }
+
+  try {
+    const familyDb = getFamilyDb(familyName);
+    
+    familyDb.run(
+      'UPDATE images SET thumbnail_s3_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [thumbnailS3Key, id],
+      function(err) {
+        if (err) {
+          console.error('Error updating image thumbnail:', err);
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Image not found' });
+        }
+
+        // Generate presigned URL for the thumbnail
+        const thumbnailUrl = generatePresignedViewUrl(thumbnailS3Key);
+
+        res.json({ 
+          success: true, 
+          thumbnailS3Key,
+          thumbnailUrl
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Error adding thumbnail to image:', error);
+    res.status(500).json({ error: 'Failed to add thumbnail' });
   }
 });
 
