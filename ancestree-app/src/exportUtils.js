@@ -201,6 +201,237 @@ function insertPngMetadata(pngData, metadata) {
 }
 
 /**
+ * Extract metadata from PNG file
+ * @param {ArrayBuffer} pngData - PNG file data
+ * @returns {Object|null} - Extracted metadata with description field, or null if no metadata found
+ */
+function extractPngMetadata(pngData) {
+  const png = new Uint8Array(pngData);
+  
+  // PNG signature
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  
+  // Verify PNG signature
+  for (let i = 0; i < 8; i++) {
+    if (png[i] !== signature[i]) {
+      return null; // Not a valid PNG
+    }
+  }
+  
+  const metadata = {};
+  let pos = 8; // Start after signature
+  
+  // Iterate through chunks
+  while (pos < png.length - 12) { // Need at least 12 bytes for chunk header
+    const view = new DataView(png.buffer, png.byteOffset + pos);
+    const chunkLength = view.getUint32(0, false);
+    
+    // Prevent infinite loop on corrupted files
+    if (chunkLength > png.length - pos || chunkLength < 0) {
+      break;
+    }
+    
+    const chunkType = String.fromCharCode(
+      png[pos + 4],
+      png[pos + 5],
+      png[pos + 6],
+      png[pos + 7]
+    );
+    
+    // Stop at IEND chunk
+    if (chunkType === 'IEND') {
+      break;
+    }
+    
+    // Extract tEXt chunks
+    if (chunkType === 'tEXt') {
+      const chunkData = png.slice(pos + 8, pos + 8 + chunkLength);
+      
+      // Find null separator between keyword and text
+      let nullPos = -1;
+      for (let i = 0; i < chunkData.length; i++) {
+        if (chunkData[i] === 0) {
+          nullPos = i;
+          break;
+        }
+      }
+      
+      if (nullPos !== -1) {
+        const keyword = new TextDecoder('latin1').decode(chunkData.slice(0, nullPos));
+        const text = new TextDecoder('utf-8').decode(chunkData.slice(nullPos + 1));
+        
+        // Store description
+        if (keyword === 'Description') {
+          metadata.description = text;
+        } else if (keyword === 'Upload Date') {
+          metadata.uploadDate = text;
+        }
+      }
+    }
+    
+    // Move to next chunk (length + type + data + crc)
+    pos += 4 + 4 + chunkLength + 4;
+  }
+  
+  return Object.keys(metadata).length > 0 ? metadata : null;
+}
+
+/**
+ * Extract metadata from JPEG file
+ * @param {ArrayBuffer} jpegData - JPEG file data
+ * @returns {Object|null} - Extracted metadata with description field, or null if no metadata found
+ */
+function extractJpegMetadata(jpegData) {
+  const data = new Uint8Array(jpegData);
+  
+  // JPEG starts with FFD8
+  if (data[0] !== 0xFF || data[1] !== 0xD8) {
+    return null; // Not a valid JPEG
+  }
+  
+  const metadata = {};
+  let pos = 2;
+  
+  // Scan for APP1 marker (EXIF data)
+  while (pos < data.length - 4) {
+    if (data[pos] !== 0xFF) {
+      break;
+    }
+    
+    const marker = data[pos + 1];
+    
+    // APP1 marker (EXIF)
+    if (marker === 0xE1) {
+      const segmentLength = (data[pos + 2] << 8) | data[pos + 3];
+      const segmentData = data.slice(pos + 4, pos + 2 + segmentLength);
+      
+      // Check for EXIF header
+      const exifHeader = String.fromCharCode(...segmentData.slice(0, 4));
+      if (exifHeader === 'Exif') {
+        // Try to extract description from EXIF
+        // EXIF uses TIFF format - look for ImageDescription tag (0x010E)
+        const exifData = segmentData.slice(6); // Skip "Exif\0\0"
+        
+        // Simple scan for ImageDescription tag (not full EXIF parser)
+        // This is a simplified approach - real EXIF parsing is complex
+        const description = extractExifDescription(exifData);
+        if (description) {
+          metadata.description = description;
+        }
+      }
+      
+      break; // Only process first APP1 segment
+    }
+    
+    // Move to next marker
+    if (marker === 0xD8 || marker === 0xD9) {
+      // SOI or EOI
+      pos += 2;
+    } else {
+      // Other markers have length
+      const segmentLength = (data[pos + 2] << 8) | data[pos + 3];
+      pos += 2 + segmentLength;
+    }
+  }
+  
+  return Object.keys(metadata).length > 0 ? metadata : null;
+}
+
+/**
+ * Extract ImageDescription from EXIF data (simplified)
+ * @param {Uint8Array} exifData - EXIF data block
+ * @returns {string|null} - Description or null
+ */
+function extractExifDescription(exifData) {
+  try {
+    // Determine byte order (MM or II)
+    const byteOrder = String.fromCharCode(exifData[0], exifData[1]);
+    const littleEndian = byteOrder === 'II';
+    
+    if (byteOrder !== 'II' && byteOrder !== 'MM') {
+      return null;
+    }
+    
+    const view = new DataView(exifData.buffer, exifData.byteOffset);
+    
+    // Skip TIFF header, get IFD0 offset
+    const ifd0Offset = view.getUint32(4, littleEndian);
+    
+    if (ifd0Offset >= exifData.length) {
+      return null;
+    }
+    
+    // Read number of directory entries
+    const numEntries = view.getUint16(ifd0Offset, littleEndian);
+    
+    // Scan IFD entries for ImageDescription (0x010E)
+    for (let i = 0; i < numEntries; i++) {
+      const entryOffset = ifd0Offset + 2 + (i * 12);
+      
+      if (entryOffset + 12 > exifData.length) {
+        break;
+      }
+      
+      const tag = view.getUint16(entryOffset, littleEndian);
+      
+      // ImageDescription tag (0x010E = 270)
+      if (tag === 0x010E) {
+        const type = view.getUint16(entryOffset + 2, littleEndian);
+        const count = view.getUint32(entryOffset + 4, littleEndian);
+        
+        // Type 2 = ASCII string
+        if (type === 2 && count > 0) {
+          let valueOffset;
+          
+          // If count <= 4, value is stored inline
+          if (count <= 4) {
+            valueOffset = entryOffset + 8;
+          } else {
+            // Value is stored at offset
+            valueOffset = view.getUint32(entryOffset + 8, littleEndian);
+          }
+          
+          if (valueOffset + count <= exifData.length) {
+            const descBytes = exifData.slice(valueOffset, valueOffset + count - 1); // Exclude null terminator
+            return new TextDecoder('utf-8').decode(descBytes);
+          }
+        }
+        
+        break;
+      }
+    }
+  } catch (error) {
+    console.warn('Error extracting EXIF description:', error);
+  }
+  
+  return null;
+}
+
+/**
+ * Extract description from image file
+ * @param {File} file - Image file
+ * @returns {Promise<string|null>} - Description from metadata, or null if not found
+ */
+export async function extractImageDescription(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    
+    if (file.type === 'image/png') {
+      const metadata = extractPngMetadata(arrayBuffer);
+      return metadata?.description || null;
+    } else if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
+      const metadata = extractJpegMetadata(arrayBuffer);
+      return metadata?.description || null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error extracting image description:', error);
+    return null;
+  }
+}
+
+/**
  * Convert an image to PNG format with metadata embedded
  * @param {HTMLImageElement} img - Loaded image element
  * @param {Object} metadata - Metadata to embed (description, tagged people)

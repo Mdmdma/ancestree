@@ -6,6 +6,7 @@ import PictureSlideshow from './PictureSlideshow';
 import DescriptionTextarea from './components/DescriptionTextarea';
 import Button from './components/Button';
 import { generateThumbnail } from './thumbnailUtils';
+import { extractImageDescription } from './exportUtils';
 
 // Memoized ImageThumbnail component with lazy loading
 const ImageThumbnail = React.memo(({ image, onClick, translations, onLoadFullImage }) => {
@@ -481,10 +482,25 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
           lastModified: file.lastModified 
         });
 
+        // Extract metadata description if available (PNG/JPEG)
+        let metadataDescription = null;
+        try {
+          metadataDescription = await extractImageDescription(stableFile);
+          if (metadataDescription) {
+            console.log(`[Metadata] Extracted description from ${file.name}: "${metadataDescription}"`);
+          }
+        } catch (metadataError) {
+          console.warn(`[Metadata] Could not extract description from ${file.name}:`, metadataError);
+        }
+
         // Create preview URL from the stable blob
         const previewUrl = URL.createObjectURL(stableBlob);
         
-        validFiles.push({ file: stableFile, previewUrl });
+        validFiles.push({ 
+          file: stableFile, 
+          previewUrl,
+          metadataDescription // Store extracted description with file
+        });
       } catch (error) {
         console.error('Failed to read file:', error);
         errors.push(`${file.name}: Failed to read file`);
@@ -498,6 +514,12 @@ const ImageGallery = ({ nodes, selectedNode, onPersonSelect, onTaggingModeChange
     if (validFiles.length > 0) {
       setSelectedFiles(prev => [...prev, ...validFiles]);
       setViewMode('confirm');
+      
+      // If first file has metadata description and no description set yet, use it as default
+      if (validFiles[0].metadataDescription && !description) {
+        setDescription(validFiles[0].metadataDescription);
+        console.log(`[Metadata] Using extracted description as default: "${validFiles[0].metadataDescription}"`);
+      }
     }
   };
 
