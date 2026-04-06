@@ -6,7 +6,10 @@
       "Bash(npx eslint *)",
       "Bash(cd ancestree-app *)",
       "Bash(cd ancestree-backend *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(rsync *)",
+      "Bash(ssh *)",
+      "Bash(lsof *)"
     ]
   },
   "hooks": {
