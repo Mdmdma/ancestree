@@ -709,10 +709,11 @@ function updateHasTaggedImageForImageDeletion(familyDb, imageId, familyName, io,
 
 // Run cleanup every 5 minutes (300000 ms)
 const CLEANUP_INTERVAL = 60 * 1000 * 5; // 5 minutes
-setInterval(cleanupNullKeys, CLEANUP_INTERVAL);
-
-// Run initial cleanup on server start
-setTimeout(cleanupNullKeys, 5000); // Wait 5 seconds after server start
+if (require.main === module) {
+  setInterval(cleanupNullKeys, CLEANUP_INTERVAL);
+  // Run initial cleanup on server start
+  setTimeout(cleanupNullKeys, 5000); // Wait 5 seconds after server start
+}
 
 // ============= USER AND TERMS CLEANUP ROUTINE =============
 // Cleanup users who haven't accepted new terms after 1 month
@@ -936,10 +937,11 @@ async function permanentlyDeleteExpiredUsers() {
 
 // Run user cleanup once per day (86400000 ms)
 const USER_CLEANUP_INTERVAL = 60 * 1000 * 60 * 24; // 24 hours
-setInterval(cleanupInactiveAndNonCompliantUsers, USER_CLEANUP_INTERVAL);
-
-// Run initial user cleanup 30 seconds after server start
-setTimeout(cleanupInactiveAndNonCompliantUsers, 30000);
+if (require.main === module) {
+  setInterval(cleanupInactiveAndNonCompliantUsers, USER_CLEANUP_INTERVAL);
+  // Run initial user cleanup 30 seconds after server start
+  setTimeout(cleanupInactiveAndNonCompliantUsers, 30000);
+}
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -4091,12 +4093,16 @@ function migrateAdminSettingsToFamilyDb() {
   });
 }
 
-// Run migration on startup
-migrateAdminSettingsToFamilyDb();
+// Run migration and start server only when run directly (not imported for testing)
+if (require.main === module) {
+  migrateAdminSettingsToFamilyDb();
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Server also available on local network at http://[your-ip]:${PORT}`);
-  console.log(`Socket.IO enabled for real-time collaboration`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server also available on local network at http://[your-ip]:${PORT}`);
+    console.log(`Socket.IO enabled for real-time collaboration`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
+
+module.exports = { app, server, io };

@@ -1,9 +1,39 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
+// Configurable database directory (overridable for testing)
+let databaseDir = path.join(__dirname, 'databases');
+
+const setDatabaseDir = (dir) => {
+  databaseDir = dir;
+};
+
+const getDatabaseDir = () => databaseDir;
+
 // Authentication database - contains only users table
-const authDbPath = path.join(__dirname, 'databases', 'database_auth.db');
-const authDb = new sqlite3.Database(authDbPath);
+let _authDbInstance = null;
+
+const getAuthDb = () => {
+  if (!_authDbInstance) {
+    const authDbPath = path.join(databaseDir, 'database_auth.db');
+    _authDbInstance = new sqlite3.Database(authDbPath);
+  }
+  return _authDbInstance;
+};
+
+// Reset auth DB (for testing)
+const resetAuthDb = () => {
+  _authDbInstance = null;
+};
+
+// Lazy proxy so all existing code using `authDb.method()` works transparently
+const authDb = new Proxy({}, {
+  get(target, prop) {
+    const db = getAuthDb();
+    const val = db[prop];
+    return typeof val === 'function' ? val.bind(db) : val;
+  }
+});
 
 // Cache for family database connections
 const familyDatabases = new Map();
@@ -24,7 +54,7 @@ const getFamilyDb = (familyName) => {
   }
 
   // Create new connection
-  const familyDbPath = path.join(__dirname, 'databases', `database_family_${familyName}.db`);
+  const familyDbPath = path.join(databaseDir, `database_family_${familyName}.db`);
   const familyDb = new sqlite3.Database(familyDbPath);
   
   // Initialize the family database schema
@@ -672,29 +702,37 @@ const ensureFamilyHasNodes = (familyId) => {
   });
 };
 
-// Initialize authentication database
-initializeAuthDb();
+// Auto-initialize only when run as main module (not during testing)
+if (require.main === module || !process.env.VITEST) {
+  initializeAuthDb();
 
-// Ensure all families have at least one node (check after auth DB is ready)
-authDb.all("SELECT id FROM users", [], (err, users) => {
-  if (err) {
-    console.error('Error getting users for node check:', err);
-    return;
-  }
-  
-  if (users && users.length > 0) {
-    users.forEach(user => {
-      ensureFamilyHasNodes(user.id);
-    });
-  }
-});
+  // Ensure all families have at least one node (check after auth DB is ready)
+  authDb.all("SELECT id FROM users", [], (err, users) => {
+    if (err) {
+      console.error('Error getting users for node check:', err);
+      return;
+    }
+
+    if (users && users.length > 0) {
+      users.forEach(user => {
+        ensureFamilyHasNodes(user.id);
+      });
+    }
+  });
+}
 
 module.exports = {
   authDb,
+  getAuthDb,
+  resetAuthDb,
   getFamilyDb,
   getFamilyDbById,
   closeAllFamilyDatabases,
   closeFamilyDatabase,
   insertDefaultNodeForFamily,
-  ensureFamilyHasNodes
+  ensureFamilyHasNodes,
+  initializeAuthDb,
+  initializeFamilyDb,
+  setDatabaseDir,
+  getDatabaseDir
 };
